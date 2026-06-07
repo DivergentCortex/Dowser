@@ -129,6 +129,13 @@ These functions emit a warning and return `$null` on non-Windows:
 - Related: `Get-DowserReport`
 - Source: `Get-FileReport.ps1` (bundled in `Get-DowserReport.ps1`)
 
+### Get-DowserInfo
+- Purpose: Reports Dowser module identity: manifest version, latest changelog entry version and date, public function count, and module root path.
+- Inputs: None (reads Dowser.psd1 and docs/CHANGELOG.md relative to module root)
+- Outputs: PSCustomObject with Module, ModuleVersion, LatestChangelogVersion, LatestChangelogDate, LatestChangelogTitle, ModuleRoot, PublicFunctions, ChangelogPath.
+- Related: None
+- Source: Original to Dowser (not ported)
+
 ### Invoke-DowserFastSearch
 - Purpose: Parallel single-pattern text search across files using a RunspacePool. Returns per-file match objects with line numbers.
 - Inputs: `Path` (pipeline), `SearchString` (alias: `Pattern`), `Threads` (default 10), `Include`, `Exclude`, `CaseSensitive`
@@ -160,6 +167,9 @@ These functions emit a warning and return `$null` on non-Windows:
 - Aliases: `dintegrity`, `dinteg`
 
 ### Expand-DowserExe
-- Purpose: Extracts files from extractable EXE archives using 7-Zip. Runs Test-DowserExtractable first, then 7z x.
+- Purpose: Extracts files from extractable EXE archives using 7-Zip. Runs Test-DowserExtractable first, then 7z x. ShouldProcess support (-WhatIf, -Confirm).
 - Inputs: `Path` (pipeline, FullName alias), `Destination`, `SevenZipPath`, `Force`, `PassThru`
-- Outputs: PSCustomObject per EXE - Path, Destinat
+- Outputs: PSCustomObject per EXE with Path, Destination, ExitCode, Extractable, Classification. Auto-creates destination folder named `<ExeName>_extracted`.
+- Related: `Test-DowserExtractable` (classification without extraction), `Test-DowserIntegrity` (corruption detection)
+- Source: Original to Dowser (not ported)
+- Aliases: `dexpand`, `dextract`

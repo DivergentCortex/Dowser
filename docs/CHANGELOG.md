@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.07.016] - 2026-06-07
+### docs(project-wide): Full documentation pass: rewrite README, ARCHITECTURE; fix INDEX; archive spent artifacts
+
+What changed:
+- README.md rewritten: removed stale Windows D:\ import path, added project description, quick start examples, full exported function table with aliases, platform support section, accurate project layout
+- ARCHITECTURE.md rewritten: added executive summary, private helper inventory, parallelism model, platform support model, design decisions with rationale (switch vs bool, tilde resolution, pattern auto-wrap, Write-Information for banners), removed stale 'cross-platform is out of scope' claim
+- INDEX.md: added missing Get-DowserInfo entry, fixed truncated Expand-DowserExe entry (completed outputs, related, source, aliases fields)
+- Archived spent working artifacts to .archives/_archive.zip: PORTING_OUTLINE.md (porting complete at 21/21), docs/superpowers/plans/2026-05-24-cross-platform-compat.md (plan fully implemented), DOWSER_PROJECT_OUTLINE.md (superseded by README + ARCHITECTURE)
+- Created .gitignore with entries for .archives/, Tests/Reports/, .firecrawl/
+
+Why:
+- Documentation was stale: README had hardcoded Windows paths and no function inventory, ARCHITECTURE claimed cross-platform was out of scope (contradicted by changelog 013), INDEX was missing Get-DowserInfo and had a truncated Expand-DowserExe entry, and three spent design artifacts cluttered the docs surface
+
+
 ## [2026.06.04.015] - 2026-06-04
 ### fix(module-wide): Fix [switch] defaults, pattern matching, and silent error swallowing across 7 functions
 
