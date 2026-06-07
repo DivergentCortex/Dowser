@@ -1,0 +1,8 @@
+# Archive directory (removed/spent artifacts, not maintained)
+.archives/
+
+# Test reports (regenerated on each run)
+Tests/Reports/
+
+# Firecrawl research cache
+.firecrawl/
