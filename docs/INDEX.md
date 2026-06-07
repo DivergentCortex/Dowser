@@ -20,7 +20,7 @@ Dowser runs on PowerShell 5.1 (Windows) and pwsh 7+ (Windows/Linux/macOS).
 ### Fully Cross-Platform
 These functions work identically on all supported platforms:
 - `Find-DowserDuplicate`, `Find-DowserFile`, `Find-DowserOrphan`, `Find-DowserDependency`
-- `Invoke-DowserFastSearch`, `Measure-DowserDirectory`
+- `Invoke-DowserFastSearch`, `Measure-DowserDirectory`, `Measure-DowserDiskUsage`
 - `Get-DowserMap`, `Get-DowserTopology`, `Get-DowserInfo`
 - `ConvertTo-DowserBase64`
 
@@ -135,6 +135,22 @@ These functions emit a warning and return `$null` on non-Windows:
 - Outputs: PSCustomObject with Module, ModuleVersion, LatestChangelogVersion, LatestChangelogDate, LatestChangelogTitle, ModuleRoot, PublicFunctions, ChangelogPath.
 - Related: None
 - Source: Original to Dowser (not ported)
+
+### Measure-DowserDirectory
+- Purpose: Measures size, file count, and key file timestamps for each immediate subdirectory under a root path.
+- Inputs: `Path` (pipeline, FullName alias; defaults to `.`)
+- Outputs: PSCustomObject per subdirectory with Directory, DataSize, FileCount, LargestFile, LargestFileName, NewestFileName, NewestFileDate, OldestFileName, OldestFileDate.
+- Related: `Measure-DowserDiskUsage` (recursive rollup, ranking, treemap), `Get-DowserReport` (per-file metrics)
+- Source: `Get-DirectorySizeCounts.ps1`
+- Aliases: `dsize`
+
+### Measure-DowserDiskUsage
+- Purpose: WinDirStat-style recursive disk-usage report: biggest directories (rollup), biggest files, and by-extension breakdown, ranked descending. Optional -ExportHtml produces a self-contained treemap HTML report.
+- Inputs: `Path` (pipeline, FullName alias; defaults to `.`), `TopN` (default 15), `MinSize` (file-ranking filter), `ExportHtml` (path), `ExcludePath` (directory names to skip)
+- Outputs: PSCustomObject per section (Section = Summary | BiggestDirectories | BiggestFiles | ByExtension) with RelPath, SizeBytes, Size, PctOfTotal, Bar, RootPath fields.
+- Related: `Measure-DowserDirectory` (immediate-subdir sizing only, no ranking or HTML)
+- Source: Original to Dowser (not ported)
+- Aliases: `ddu`
 
 ### Invoke-DowserFastSearch
 - Purpose: Parallel single-pattern text search across files using a RunspacePool. Returns per-file match objects with line numbers.

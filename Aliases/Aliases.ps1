@@ -31,6 +31,7 @@ Set-Alias -Name shtree    -Value Get-DowserTopology
 
 # Measure-Dowser*
 Set-Alias -Name dsize     -Value Measure-DowserDirectory
+Set-Alias -Name ddu       -Value Measure-DowserDiskUsage
 
 # Invoke-Dowser*
 Set-Alias -Name dfast     -Value Invoke-DowserFastSearch

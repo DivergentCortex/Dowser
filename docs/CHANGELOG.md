@@ -2,6 +2,21 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.07.017] - 2026-06-07
+### feat(Measure-DowserDiskUsage): Add Measure-DowserDiskUsage (ddu) -- WinDirStat-style recursive disk-usage report with HTML treemap
+
+What changed:
+- Created Public/Measure-DowserDiskUsage.ps1: recursive directory scan, biggest-dirs rollup ranked by size, biggest-files ranking, by-extension aggregation; all size strings via Format-DowserSize
+- Added -ExportHtml: self-contained HTML report with slice-and-dice treemap (block area proportional to disk usage), three ranked tables, dark palette matching Get-DowserReport.ps1 (#1e1e1e, #569cd6, #4ec9b0)
+- Added -MinSize filter (parsed by ConvertTo-DowserBytes), -ExcludePath for skipping named dirs, -TopN (default 15)
+- Created Tests/Measure-DowserDiskUsage.Tests.ps1: temp tree with known byte sizes; asserts total, dir-rollup order, file-ranking order, extension aggregation, HTML treemap markup and palette colors
+- Added Set-Alias ddu Measure-DowserDiskUsage to Aliases/Aliases.ps1
+- Added full INDEX.md entries for Measure-DowserDiskUsage and the previously platform-table-only Measure-DowserDirectory
+
+Why:
+- User has directories ballooning to tens of GB and needs a WinDirStat-style 'what is eating my space' answer built into Dowser; Measure-DowserDirectory covers immediate subdirs only with no ranking, no extension breakdown, and no HTML output
+
+
 ## [2026.06.07.016] - 2026-06-07
 ### docs(project-wide): Full documentation pass: rewrite README, ARCHITECTURE; fix INDEX; archive spent artifacts
 
