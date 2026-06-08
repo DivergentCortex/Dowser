@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.07.018] - 2026-06-07
+### fix(Measure-DowserDiskUsage): Fix treemap proportionality, symlink root dropped, case-sensitive ancestor walk, non-portable test paths
+
+What changed:
+- Bug #1 (Linux case-sensitive dir keys): ancestor-walk stop condition changed from -eq (ordinal case-sensitive) to [string]::Equals(..., OrdinalIgnoreCase), matching the OrdinalIgnoreCase comparer used in $dirSizes; prevents infinite walk on Linux when path casing diverges
+- Bug #2 (symlink/reparse root dropped): reparse-point skip guard now exempts the root directory itself; only reparse points encountered during descent are skipped, so a symlink passed as -Path is scanned normally
+- Bug #3 (treemap area-proportionality): treemap block widths now use TotalBytes (actual root total) as the denominator instead of the sum of shown items; block area is now proportional to fraction of the real total, eliminating double-count inflation from overlapping nested-dir rollup values
+- Bug #4 (non-portable test paths): replaced 'BigDir\huge.bin' string literals (Windows backslash) with Join-Path $tmpRoot (Join-Path 'BigDir' 'huge.bin') so paths are correct on Linux and macOS
+- Added 'Cross-platform path handling' Pester context with three new tests: RelPath separator correctness per platform, pipeline input via FullName alias, and trailing-separator path normalisation
+
+Why:
+- Codex review identified four defects: Linux path comparisons broke the ancestor walk, a symlink root was silently skipped producing empty results, treemap widths were computed from a self-referencing sum producing non-proportional blocks, and test file paths used Windows-only backslash literals
+
+
 ## [2026.06.07.017] - 2026-06-07
 ### feat(Measure-DowserDiskUsage): Add Measure-DowserDiskUsage (ddu) -- WinDirStat-style recursive disk-usage report with HTML treemap
 

@@ -6,33 +6,37 @@ Describe 'Measure-DowserDiskUsage' {
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Build a temp tree with known file sizes:
+        # Build a temp tree with known file sizes.
+        # All paths use nested Join-Path calls for cross-platform correctness.
+        #
         #   $tmpRoot/
         #     BigDir/
-        #       huge.bin      1,000,000 bytes
-        #       medium.bin      500,000 bytes
+        #       huge.bin        1,000,000 bytes
+        #       medium.bin        500,000 bytes
         #     SmallDir/
-        #       small.txt         1,000 bytes
-        #       tiny.dat            100 bytes
-        #     root.ps1            10,000 bytes
+        #       small.txt           1,000 bytes
+        #       tiny.dat              100 bytes
+        #     root.ps1             10,000 bytes
+        #     noext                   500 bytes   (extensionless -- tests '<none>' bucket)
         #
-        # Total bytes: 1,000,000 + 500,000 + 1,000 + 100 + 10,000 = 1,511,100
+        # Total bytes: 1,000,000 + 500,000 + 1,000 + 100 + 10,000 + 500 = 1,511,600
         # BigDir rollup  : 1,500,000
         # SmallDir rollup:     1,100
+        # Root-level files (treemap remainder): 10,000 + 500 = 10,500
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DduTest_$([System.IO.Path]::GetRandomFileName())"
         $null = New-Item -ItemType Directory -Path $tmpRoot -Force
         $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'BigDir')   -Force
         $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'SmallDir') -Force
 
-        # Write files with exact byte counts using byte arrays
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'BigDir\huge.bin'),   ([byte[]]::new(1000000)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'BigDir\medium.bin'), ([byte[]]::new(500000)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'SmallDir\small.txt'),([byte[]]::new(1000)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'SmallDir\tiny.dat'), ([byte[]]::new(100)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'root.ps1'),          ([byte[]]::new(10000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir')   'huge.bin'),   ([byte[]]::new(1000000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir')   'medium.bin'), ([byte[]]::new(500000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'small.txt'),  ([byte[]]::new(1000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'tiny.dat'),   ([byte[]]::new(100)))
+        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'root.ps1'),                          ([byte[]]::new(10000)))
+        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'noext'),                             ([byte[]]::new(500)))
 
-        $expectedTotal = 1511100
-        $script:tmpRoot = $tmpRoot
+        $expectedTotal = 1511600
+        $script:tmpRoot       = $tmpRoot
         $script:expectedTotal = $expectedTotal
     }
 
@@ -59,7 +63,7 @@ Describe 'Measure-DowserDiskUsage' {
 
         It 'Reports correct total file count' {
             $summary = $script:results | Where-Object { $_.Section -eq 'Summary' }
-            $summary.TotalFiles | Should -Be 5
+            $summary.TotalFiles | Should -Be 6
         }
 
         It 'Summary TotalSize is a non-empty string' {
@@ -93,9 +97,9 @@ Describe 'Measure-DowserDiskUsage' {
         }
 
         It 'BigDir is ranked before SmallDir' {
-            $names = $script:dirRows | Select-Object -ExpandProperty RelPath
-            $bigIdx   = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'BigDir' }))
-            $smallIdx = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'SmallDir' }))
+            $names = @($script:dirRows | Select-Object -ExpandProperty RelPath)
+            $bigIdx   = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'BigDir' }   | Select-Object -First 1))
+            $smallIdx = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'SmallDir' } | Select-Object -First 1))
             $bigIdx | Should -BeLessThan $smallIdx
         }
 
@@ -103,7 +107,7 @@ Describe 'Measure-DowserDiskUsage' {
             $script:dirRows | ForEach-Object { $_.Size | Should -Not -BeNullOrEmpty }
         }
 
-        It 'PctOfTotal for BigDir is approximately 99.3%' {
+        It 'PctOfTotal for BigDir is approximately 99.2%' {
             $bigDir = $script:dirRows | Where-Object { $_.RelPath -match 'BigDir' }
             $bigDir.PctOfTotal | Should -BeGreaterThan 98
         }
@@ -114,8 +118,8 @@ Describe 'Measure-DowserDiskUsage' {
             $script:fileRows = $script:results | Where-Object { $_.Section -eq 'BiggestFiles' }
         }
 
-        It 'Returns at least 4 file rows' {
-            $script:fileRows.Count | Should -BeGreaterOrEqual 4
+        It 'Returns at least 5 file rows' {
+            $script:fileRows.Count | Should -BeGreaterOrEqual 5
         }
 
         It 'huge.bin is ranked first' {
@@ -189,6 +193,17 @@ Describe 'Measure-DowserDiskUsage' {
             $ps1.SizeBytes | Should -Be 10000
         }
 
+        It '<none> extension aggregates the extensionless file noext (500 bytes)' {
+            $none = $script:extRows | Where-Object { $_.Extension -eq '<none>' }
+            $none | Should -Not -BeNullOrEmpty
+            $none.SizeBytes | Should -Be 500
+        }
+
+        It '<none> FileCount is 1' {
+            $none = $script:extRows | Where-Object { $_.Extension -eq '<none>' }
+            $none.FileCount | Should -Be 1
+        }
+
         It 'Extension rows are ordered descending by size' {
             $sizes = $script:extRows | Select-Object -ExpandProperty SizeBytes
             for ($i = 0; $i -lt ($sizes.Count - 1); $i++) {
@@ -201,6 +216,7 @@ Describe 'Measure-DowserDiskUsage' {
         BeforeAll {
             $script:htmlPath = Join-Path ([System.IO.Path]::GetTempPath()) "DduTest_$([System.IO.Path]::GetRandomFileName()).html"
             $null = Measure-DowserDiskUsage -Path $script:tmpRoot -TopN 15 -ExportHtml $script:htmlPath
+            $script:htmlContent = [System.IO.File]::ReadAllText($script:htmlPath)
         }
 
         AfterAll {
@@ -218,35 +234,64 @@ Describe 'Measure-DowserDiskUsage' {
         }
 
         It 'Contains treemap markup (ddu-treemap id)' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match 'id=.ddu-treemap'
+            $script:htmlContent | Should -Match 'id=.ddu-treemap'
         }
 
         It 'Contains treemap block elements (ddu-block class)' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match "class='ddu-block'"
+            $script:htmlContent | Should -Match "class='ddu-block"
         }
 
         It 'Contains the dark background palette color #1e1e1e' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match '#1e1e1e'
+            $script:htmlContent | Should -Match '#1e1e1e'
         }
 
         It 'Contains accent blue #569cd6' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match '#569cd6'
+            $script:htmlContent | Should -Match '#569cd6'
         }
 
         It 'Contains teal accent #4ec9b0' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match '#4ec9b0'
+            $script:htmlContent | Should -Match '#4ec9b0'
         }
 
         It 'Contains the ranked tables sections' {
-            $content = [System.IO.File]::ReadAllText($script:htmlPath)
-            $content | Should -Match 'Biggest Directories'
-            $content | Should -Match 'Biggest Files'
-            $content | Should -Match 'By Extension'
+            $script:htmlContent | Should -Match 'Biggest Directories'
+            $script:htmlContent | Should -Match 'Biggest Files'
+            $script:htmlContent | Should -Match 'By Extension'
+        }
+
+        It 'Treemap block widths sum to approximately 100% of total (proportionality check)' {
+            # Extract width:NN.NN% values from all ddu-block style attributes (immediate-child
+            # blocks + remainder block). Their widths must be proportional to TotalBytes and
+            # must together sum close to 100 (all bytes accounted for).
+            $allWidths = [System.Collections.Generic.List[double]]::new()
+            $rx = [System.Text.RegularExpressions.Regex]::new(
+                "class='ddu-block[^']*'[^>]*style='[^']*width:([\d.]+)%")
+            $rxMatches = $rx.Matches($script:htmlContent)
+            foreach ($m in $rxMatches) {
+                $allWidths.Add([double]$m.Groups[1].Value)
+            }
+            $allWidths.Count | Should -BeGreaterThan 0
+            $totalWidth = 0.0
+            foreach ($w in $allWidths) { $totalWidth += $w }
+            # All blocks (immediate children + remainder) must together represent the full
+            # tree -- sum should be within 1% of 100 to account for rounding.
+            $totalWidth | Should -BeGreaterThan 99
+            $totalWidth | Should -BeLessOrEqual 101
+        }
+
+        It 'Largest treemap block width is proportional to BigDir fraction of total' {
+            # BigDir = 1500000 / 1511600 = ~99.2% of total.
+            # The largest ddu-block width must be >= 98 (immediate-child block for BigDir).
+            $rx = [System.Text.RegularExpressions.Regex]::new(
+                "class='ddu-block[^']*'[^>]*style='[^']*width:([\d.]+)%")
+            $widths = $rx.Matches($script:htmlContent) | ForEach-Object { [double]$_.Groups[1].Value }
+            ($widths | Measure-Object -Maximum).Maximum | Should -BeGreaterThan 98
+        }
+
+        It 'Remainder block for root-level files is present in treemap' {
+            # root.ps1 (10000) + noext (500) = 10500 bytes live directly in root,
+            # not under any immediate subdir -- must appear as a remainder block.
+            $script:htmlContent | Should -Match 'ddu-remainder'
         }
     }
 
@@ -254,8 +299,8 @@ Describe 'Measure-DowserDiskUsage' {
         It 'Skips excluded directory and its files' {
             $excl = Measure-DowserDiskUsage -Path $script:tmpRoot -TopN 15 -ExcludePath 'BigDir'
             $summary = $excl | Where-Object { $_.Section -eq 'Summary' }
-            # BigDir had 1500000 bytes; total should be 1511100 - 1500000 = 11100
-            $summary.TotalBytes | Should -Be 11100
+            # BigDir had 1500000 bytes; total should be 1511600 - 1500000 = 11600
+            $summary.TotalBytes | Should -Be 11600
         }
     }
 
@@ -272,6 +317,65 @@ Describe 'Measure-DowserDiskUsage' {
             $help = Get-Help Measure-DowserDiskUsage -ErrorAction SilentlyContinue
             $help | Should -Not -BeNullOrEmpty
             $help.Synopsis | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Cross-platform path handling' {
+        It 'RelPath uses the platform separator (no wrong-platform slashes)' {
+            $dirRows = $script:results | Where-Object { $_.Section -eq 'BiggestDirectories' }
+            $dirRows | Should -Not -BeNullOrEmpty
+            if ($IsLinux -or $IsMacOS) {
+                $dirRows | ForEach-Object {
+                    $_.RelPath | Should -Not -Match '\\'
+                }
+            }
+            else {
+                $dirRows | ForEach-Object {
+                    $_.RelPath | Should -Not -Match '^/'
+                }
+            }
+        }
+
+        It 'Accepts path via pipeline (FullName alias)' {
+            $item = Get-Item $script:tmpRoot
+            $r = $item | Measure-DowserDiskUsage -TopN 5
+            $summary = $r | Where-Object { $_.Section -eq 'Summary' }
+            $summary | Should -Not -BeNullOrEmpty
+            $summary.TotalBytes | Should -Be $script:expectedTotal
+        }
+
+        It 'Handles a path with trailing separator' {
+            $trailingPath = $script:tmpRoot + [System.IO.Path]::DirectorySeparatorChar
+            $r = Measure-DowserDiskUsage -Path $trailingPath -TopN 5
+            $summary = $r | Where-Object { $_.Section -eq 'Summary' }
+            $summary | Should -Not -BeNullOrEmpty
+            $summary.TotalBytes | Should -Be $script:expectedTotal
+        }
+
+        It 'Scans a symlinked root directory correctly (non-Windows only)' -Skip:($IsWindows -ne $false) {
+            # Symlink pointing at the temp tree; function must scan it without skipping
+            # (FIX #2: root reparse point is allowed even though it is a symlink).
+            $symlinkPath = Join-Path ([System.IO.Path]::GetTempPath()) "DduSymlink_$([System.IO.Path]::GetRandomFileName())"
+            $created = $false
+            try {
+                $null = New-Item -ItemType SymbolicLink -Path $symlinkPath -Target $script:tmpRoot -ErrorAction Stop
+                $created = $true
+            }
+            catch {
+                Set-ItResult -Skipped -Because "symlink creation not permitted: $($_.Exception.Message)"
+                return
+            }
+            try {
+                $r = Measure-DowserDiskUsage -Path $symlinkPath -TopN 5
+                $summary = $r | Where-Object { $_.Section -eq 'Summary' }
+                $summary | Should -Not -BeNullOrEmpty
+                $summary.TotalBytes | Should -Be $script:expectedTotal
+            }
+            finally {
+                if ($created -and (Test-Path $symlinkPath)) {
+                    Remove-Item -LiteralPath $symlinkPath -Force -ErrorAction SilentlyContinue
+                }
+            }
         }
     }
 }
