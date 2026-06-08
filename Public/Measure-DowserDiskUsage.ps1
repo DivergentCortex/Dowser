@@ -467,11 +467,7 @@ function _Build-DduHtml {
     # Sort by size desc, limit to TopN for readability
     $tmItems = @($immChildren | Sort-Object SizeBytes -Descending | Select-Object -First ([Math]::Min($TopN, 20)))
 
-    # Remainder = bytes in root files (not under any immediate subdir)
-    $immChildTotal = [long]0
-    foreach ($ti in $tmItems) { $immChildTotal += $ti.SizeBytes }
-    $rootFileBytes = $TotalBytes - $immChildTotal
-    # Account for items beyond TopN that were excluded from the visual
+    # Remainder = bytes not under any immediate subdir (root-level files + items beyond TopN)
     $allImmTotal = [long]0
     foreach ($ic in $immChildren) { $allImmTotal += $ic.SizeBytes }
     $rootFileBytes = $TotalBytes - $allImmTotal
