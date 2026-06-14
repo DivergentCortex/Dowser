@@ -268,6 +268,7 @@ function Get-DowserMap {
             FileCount      = 0
             SkippedFolders = 0
             SkippedFiles   = 0
+            LinkCount      = 0
         }
     }
 
@@ -531,6 +532,7 @@ function Get-DowserMap {
     if ($Ascii) {
         $treeChars = @{ Branch = '+-'; Last = '\\-'; Pipe = '| '; Space = '  ' }
         $fileChar = '-'; $folderChar = '+'; $errorChar = 'X'
+        $linkChar = '>'; $targetChar = '~'
     } else {
         $branch = if ($AsHtml) { '&#x251C;&#x2500;' } else { [string]([char]0x251C) + [char]0x2500 }
         $last   = if ($AsHtml) { '&#x2514;&#x2500;' } else { [string]([char]0x2514) + [char]0x2500 }
@@ -539,6 +541,8 @@ function Get-DowserMap {
         $fileChar   = if ($AsHtml) { '&#x00B7;' } else { [char]0x00B7 }
         $folderChar = if ($AsHtml) { '&#x25A0;' } else { [char]0x25A0 }
         $errorChar  = if ($AsHtml) { '&#x00D7;' } else { [char]0x00D7 }
+        $linkChar   = if ($AsHtml) { '&#x2192;' } else { [char]0x2192 }
+        $targetChar = if ($AsHtml) { '&#x21B3;' } else { [char]0x21B3 }
     }
     $esc = [char]0x1b
     $ansiGray = "$esc[90m"; $ansiReset = "$esc[0m"
@@ -577,14 +581,17 @@ function Get-DowserMap {
             $summaryLines += "  Files: $($TraversalState.FileCount)"
             $skippedFolderCount = [int]$TraversalState.SkippedFolders
             $skippedFileCount = [int]$TraversalState.SkippedFiles
+            $linkCount = [int]$TraversalState.LinkCount
             if ($skippedFolderCount -gt 0 -or $skippedFileCount -gt 0) {
                 $summaryLines += "  Skipped: $skippedFolderCount folders, $skippedFileCount files"
             }
+            if ($linkCount -gt 0) { $summaryLines += "  Symlinks: $linkCount" }
             $summaryBullets += "- Folders: $($TraversalState.FolderCount)"
             $summaryBullets += "- Files: $($TraversalState.FileCount)"
             if ($skippedFolderCount -gt 0 -or $skippedFileCount -gt 0) {
                 $summaryBullets += "- Skipped: $skippedFolderCount folders, $skippedFileCount files"
             }
+            if ($linkCount -gt 0) { $summaryBullets += "- Symlinks: $linkCount" }
         }
         $finalLines = if ($summaryLines.Count -gt 0) { $filteredLines + $summaryLines } else { $filteredLines }
 
@@ -638,10 +645,10 @@ function Get-DowserMap {
         }
 
         # pre-filter items before calculating isLast (fixes tree connector bug)
-        $filteredFolders = @(); $filteredFiles = @()
+        $filteredFolders = @(); $filteredLinks = @(); $filteredFiles = @()
         foreach ($item in $rawItems) {
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
-                if ($item.PSIsContainer) { $TraversalState.SkippedFolders++ } else { $TraversalState.SkippedFiles++ }
+                $filteredLinks += $item
                 continue
             }
             if (Test-ExcludeByPath $item) {
@@ -661,7 +668,7 @@ function Get-DowserMap {
             }
         }
 
-        $items = @($filteredFolders) + @($filteredFiles)
+        $items = @($filteredFolders) + @($filteredLinks) + @($filteredFiles)
         $count = @($items).Count
 
         for ($i = 0; $i -lt $count; $i++) {
@@ -670,7 +677,15 @@ function Get-DowserMap {
             $connector = if ($isLast) { $treeChars.Last } else { $treeChars.Branch }
             $nextIndent = if ($isLast) { "$Indent$($treeChars.Space)" } else { "$Indent$($treeChars.Pipe)" }
 
-            if ($item.PSIsContainer) {
+            if (Test-ReparsePoint $item) {
+                $linkTarget = $item.Target
+                if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
+                $line1 = "$Indent$connector $linkChar $($item.Name)"
+                $line2 = "$nextIndent $targetChar $linkTarget"
+                $output += Format-HiddenLine -Line $line1 -IsHidden:(Test-IsHidden $item)
+                $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
+                $TraversalState.LinkCount++
+            } elseif ($item.PSIsContainer) {
                 # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
                 $annotation = Get-FolderAnnotation -folderPath $item.FullName
                 $line = "$Indent$connector $folderChar $($item.Name)$folderSuffix$annotation"
@@ -731,10 +746,10 @@ function Get-DowserMap {
     }
 
     # filter folders
-    $folders = @()
+    $folders = @(); $links = @()
     foreach ($child in $children) {
         if (-not $child.PSIsContainer) { continue }
-        if (-not $FollowReparse -and (Test-ReparsePoint $child)) { $TraversalState.SkippedFolders++; continue }
+        if (-not $FollowReparse -and (Test-ReparsePoint $child)) { $links += $child; continue }
         if (Test-ExcludeByPath $child) { $TraversalState.SkippedFolders++; continue }
         if (($effectiveIncludePatterns -or $IncludeExtensions)) {
             if (-not (Test-FolderContainsMatchingFiles $child.FullName)) { $TraversalState.SkippedFolders++; continue }
@@ -755,7 +770,7 @@ function Get-DowserMap {
         }
     }
 
-    $all = @($folders) + @($files)
+    $all = @($folders) + @($links) + @($files)
     $count = @($all).Count
     for ($i = 0; $i -lt $count; $i++) {
         $item = $all[$i]
@@ -764,23 +779,30 @@ function Get-DowserMap {
         $additionalIndent = if ($isLast) { $treeChars.Space } else { $treeChars.Pipe }
         $recursiveIndent = $childrenBaseIndent + $additionalIndent
 
-        if ($item.PSIsContainer) {
+        if (Test-ReparsePoint $item) {
+            $linkTarget = $item.Target
+            if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
+            $line1 = "$childrenBaseIndent$connector $linkChar $($item.Name)"
+            $line2 = "$recursiveIndent $targetChar $linkTarget"
+            $output += Format-HiddenLine -Line $line1 -IsHidden:(Test-IsHidden $item)
+            $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
+            $TraversalState.LinkCount++
+        } elseif ($item.PSIsContainer) {
             # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
             $annotation = Get-FolderAnnotation -folderPath $item.FullName
             $line = "$childrenBaseIndent$connector $folderChar $($item.Name)$folderSuffix$annotation"
+            $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
+            if ($CurrentDepth -lt $MaxDepth) {
+                $TraversalState.FolderCount++
+                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                $output += @($line) + $subTree
+            } else {
+                $TraversalState.FolderCount++
+                $output += $line
+            }
         } else {
             $line = "$childrenBaseIndent$connector $fileChar $($item.Name)"
-        }
-        $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
-
-        if ($item.PSIsContainer -and ($CurrentDepth -lt $MaxDepth)) {
-            $TraversalState.FolderCount++
-            $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
-            $output += @($line) + $subTree
-        } elseif ($item.PSIsContainer) {
-            $TraversalState.FolderCount++
-            $output += $line
-        } else {
+            $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             $TraversalState.FileCount++
             $output += $line
         }
