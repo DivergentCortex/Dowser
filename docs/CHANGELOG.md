@@ -2,34 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
-## [2026.06.14.020] - 2026-06-14
-### fix(Get-DowserMap): Fix -FollowReparse regression and Pester skip-scoping; add ShowFullPathTree symlink test coverage
-
-What changed:
-- Fixed AC2 regression: render-loop guards at lines 680 and 782 were unconditional (if (Test-ReparsePoint $item)) so -FollowReparse symlinks were caught by the link-render branch instead of falling through to the folder-descent branch; fixed by adding -not $FollowReparse -and prefix to both guards, matching the pre-filter pattern
-- Fixed Pester skip-scoping: -Skip:($script:canSymlink) evaluated at discovery time when $script: set at file scope is not visible inside Pester 5 BeforeAll blocks, causing all 11 tests to skip; fixed by using $global:DowserTestCanSymlink set at file parse scope so the value is available at discovery time; global is cleaned up in AfterAll
-- Added ShowFullPathTree context (4 tests) covering the trunk render path (line 782) for both default no-descend and -FollowReparse descend cases; this is the path that carried the AC2 bug
-- Pester suite now runs 11/11 passing, 0 skipped on this Linux box where symlink creation is permitted
-
-Why:
-- The render-loop FollowReparse guard was missing, causing directory symlinks to always render as two-line link blocks even when -FollowReparse was set, breaking AC2. The Pester $script: scoping issue caused all tests to skip silently, masking the regression. Both defects were caught by the raven pair audit.
-
-
 ## [2026.06.14.019] - 2026-06-14
-### feat(Get-DowserMap): Detect and show symlinks as two-line render instead of silently skipping them
+### feat(Get-DowserMap): Detect and show symlinks as a two-line block instead of silently skipping them
 
 What changed:
-- Added $linkChar (U+2192 →) and $targetChar (U+21B3 ↳) glyph vars in both the if($Ascii) block (ASCII fallbacks '>' and '~') and the else block (if($AsHtml) entity / else [char] form), matching the existing dual-path codepoint convention at lines 533-546
-- Added LinkCount = 0 to the $TraversalState initializer; LinkCount increments per symlink shown and appears in -EmitSummary output when non-zero
-- Non-ShowFullPathTree path: replaced the reparse-point SkippedFolders++ guard with $filteredLinks accumulation; $items is now @($filteredFolders) + @($filteredLinks) + @($filteredFiles) so $isLast is correct for the combined list; render loop checks Test-ReparsePoint first and emits line1 ($Indent$connector $linkChar $name) and line2 ($nextIndent $targetChar $target), both passed through Format-HiddenLine
-- ShowFullPathTree path: same pattern using $childrenBaseIndent/$recursiveIndent; $all is now @($folders) + @($links) + @($files); folder render block restructured so Format-HiddenLine and the MaxDepth branch are self-contained in the elseif
-- Broken/dangling symlinks: $item.Target null/empty falls back to string '(broken link)'
-- All three output modes handled: console emits [char] glyphs, -AsHtml emits &#x2192;/&#x21B3; entities (set at glyph-var init time), -AsMarkdown uses console chars inside the fenced block
-- -FollowReparse behavior unchanged: symlinks in $filteredLinks / $links are only accumulated when -not $FollowReparse; with -FollowReparse the original guard is not reached so links fall through to normal folder handling
-- Added Tests/Get-DowserMap.Tests.ps1: Pester 5 suite; target dir created outside the mapped root so inner.txt appearance uniquely proves traversal; $canSymlink guard skips suite if symlink creation is not permitted; tests cover: arrow line emitted, target line emitted with resolved path, no-descend by default, continuation bar present on non-last-child target line, -FollowReparse descends, -AsHtml entities correct
+- Symlinks and reparse points are now rendered in place as a two-line block (name line, then a target line) instead of being silently dropped from the tree. Default behavior shows the link without descending into it; -FollowReparse descends as if the link were a normal folder.
+- Added link glyphs: name marker U+2192 and target marker U+21B3, with ASCII fallbacks (> and ~) under -Ascii and HTML entities under -AsHtml, matching the existing glyph convention.
+- Broken or dangling links (no resolvable target) render with a "(broken link)" placeholder on the target line.
+- Symlink rendering works in all three output modes (console, -AsHtml, -AsMarkdown) and on both the default and -ShowFullPathTree render paths.
+- Added a LinkCount field to traversal state; it appears in -EmitSummary output when at least one link is shown.
+- Added Tests/Get-DowserMap.Tests.ps1 (Pester 5): covers the name and target lines, no-descend default, continuation bar on non-last children, -FollowReparse descent, and -AsHtml entity output. The suite skips on platforms where symlink creation is not permitted.
 
 Why:
-- Default behavior silently dropped symlinks from the tree output (SkippedFolders++), making them invisible. Task #1 requires showing them as a two-line block (→ name / ↳ target) without descending, so users can see what links exist and where they point without the tree recursing into them.
+- The tree silently dropped symlinks, making them invisible in the output. Showing them as a two-line block (name / target) lets users see what links exist and where they point without the tree recursing into them, while -FollowReparse remains available for callers who want to descend.
 
 
 ## [2026.06.07.018] - 2026-06-07

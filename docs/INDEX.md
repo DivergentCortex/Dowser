@@ -93,6 +93,14 @@ These functions emit a warning and return `$null` on non-Windows:
 - Purpose: Returns the most recent log file from a directory.
 - Source: `Find-MostRecentLog.ps1`
 
+### Find-DowserString
+- Purpose: Multi-pattern literal text search across a directory tree using compiled Aho-Corasick matching, with three-phase RunspacePool parallelism (streaming directory enumeration, parallel file gathering, parallel searching). Multiple output modes.
+- Inputs: `Path` (pipeline), `Pattern` (one or more literal patterns), `Recurse`, `Include`, `Exclude`, `CaseSensitive`, plus output-mode switches.
+- Outputs: PSCustomObject per match with file, line number, and matched pattern; a `[READ-ERROR]` sentinel row distinguishes unreadable files from no-match.
+- Related: `Invoke-DowserFastSearch` (single-pattern parallel search, simpler output)
+- Source: `Find-DowserString.ps1`
+- Aliases: `dstr`, `dgrep`
+
 ### Get-DowserOwnership
 - Purpose: Gets file ownership and extended Shell.Application metadata for files in a directory (extension-filtered).
 - Inputs: `Directory` (required), `Extension` (wildcard, default `*`)
@@ -123,11 +131,12 @@ These functions emit a warning and return `$null` on non-Windows:
 - Source: `Get-FileReport.ps1`
 
 ### Compare-DowserReport
-- Purpose: Diffs two Get-DowserReport snapshots — shows NEW, CHANGED, REMOVED, UNCHANGED files with size/line/word/char deltas.
+- Purpose: Diffs two Get-DowserReport snapshots -- shows NEW, CHANGED, REMOVED, UNCHANGED files with size/line/word/char deltas.
 - Inputs: `Before` (PSCustomObject[]), `After` (PSCustomObject[]), `ShowUnchanged`
 - Outputs: PSCustomObject per file with Status and delta fields.
 - Related: `Get-DowserReport`
-- Source: `Get-FileReport.ps1` (bundled in `Get-DowserReport.ps1`)
+- Source: `Public/Get-DowserReport.ps1` (defined in the same file as Get-DowserReport)
+- Note: Dot-sourced into the session with Get-DowserReport but not an independently exported member, because the loader exports one name per file. Call it directly after import.
 
 ### Get-DowserInfo
 - Purpose: Reports Dowser module identity: manifest version, latest changelog entry version and date, public function count, and module root path.

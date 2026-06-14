@@ -12,7 +12,7 @@ The module originated as a port of 22 standalone scripts from a General_Scripts 
 Dowser.psd1  -->  Dowser.psm1
                     |
                     +-- Private/*.ps1    (6 helpers, not exported)
-                    +-- Public/*.ps1     (25 functions, one per file, exported)
+                    +-- Public/*.ps1     (26 functions, one per file, exported)
                     +-- Aliases/Aliases.ps1  (Set-Alias calls, sourced last)
 ```
 
