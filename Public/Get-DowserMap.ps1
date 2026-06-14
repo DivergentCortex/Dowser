@@ -677,7 +677,7 @@ function Get-DowserMap {
             $connector = if ($isLast) { $treeChars.Last } else { $treeChars.Branch }
             $nextIndent = if ($isLast) { "$Indent$($treeChars.Space)" } else { "$Indent$($treeChars.Pipe)" }
 
-            if (Test-ReparsePoint $item) {
+            if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
                 $linkTarget = $item.Target
                 if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
                 $line1 = "$Indent$connector $linkChar $($item.Name)"
@@ -779,7 +779,7 @@ function Get-DowserMap {
         $additionalIndent = if ($isLast) { $treeChars.Space } else { $treeChars.Pipe }
         $recursiveIndent = $childrenBaseIndent + $additionalIndent
 
-        if (Test-ReparsePoint $item) {
+        if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
             $linkTarget = $item.Target
             if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
             $line1 = "$childrenBaseIndent$connector $linkChar $($item.Name)"
