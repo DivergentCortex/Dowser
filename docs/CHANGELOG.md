@@ -346,7 +346,7 @@ Why:
 
 ---
 
-## [2026.04.12.006] - [2026-04-15] - [2026-04-12] - Invoke-DowserTestSuite interactive path fallback + ASCII sweep (Powershell-Codesmith)
+## [2026.04.12.006] - [2026-04-12] - Invoke-DowserTestSuite interactive path fallback + ASCII sweep (Powershell-Codesmith)
 
 ### Fixed
 - `Tests/Invoke-DowserTestSuite.ps1` - Fixed param default path resolution when run outside script context.
@@ -377,7 +377,7 @@ Why:
 
 ---
 
-## [2026.04.12.005] - [2026-04-15] - [2026-04-12] — Test Suite + Inline Fixes (Powershell-Codesmith)
+## [2026.04.12.005] - [2026-04-12] — Test Suite + Inline Fixes (Powershell-Codesmith)
 
 ### Added
 - `Tests/Invoke-DowserTestSuite.ps1` — Comprehensive test suite covering all 21 cmdlets (131 total tests).
@@ -438,7 +438,7 @@ Why:
 - Get-DowserTemplate / ConvertTo-DowserExe / ConvertTo-DowserIco: Windows-only features (COM, csc,
   System.Drawing). Tests SKIP on Linux. Function correctly when run on Windows.
 
-## [2026.04.12.004] - [2026-04-15] - [2026-04-12] — Phase 4: Final 3 cmdlets + Blocker 24 resolution (21/21 complete)
+## [2026.04.12.004] - [2026-04-12] — Phase 4: Final 3 cmdlets + Blocker 24 resolution (21/21 complete)
 
 ### Added
 - `Public\Invoke-DowserFastSearch.ps1` — Port of `General_Scripts\Invoke-FastTextSearch.ps1` (117 lines → 161 lines).
@@ -480,7 +480,7 @@ Why:
   functionality was partially absorbed by Get-DowserMap (-IncludeSize, -IncludePsCount switches
   added during Phase 3). Get-DowserTree as a standalone merge target is lower priority.
 
-## [2026.04.12.003] - [2026-04-15] - [2026-04-12] — Phase 3 Inspection-Class cmdlets
+## [2026.04.12.003] - [2026-04-12] — Phase 3 Inspection-Class cmdlets
 
 ### Added
 - `Public\Get-DowserOwnership.ps1` — Port of `General_Scripts\Get-FileOwnership.ps1` (118 lines).
@@ -520,7 +520,7 @@ Why:
     single-file mode; grouped table view for multi-level scans; CSV/HTML export; Compare-DowserReport diff.
   - Syntax check: PASS (0 errors).
 
-## [2026.04.12.002] - [2026-04-15] - [2026-04-12]
+## [2026.04.12.002] - [2026-04-12]
 
 ### Added
 - `Public\Get-DowserMap.ps1` — Port of `General_Scripts\Get-DirectoryMap.ps1` (823 lines).
