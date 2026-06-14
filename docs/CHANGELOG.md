@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.14.020] - 2026-06-14
+### fix(Get-DowserMap): Fix -FollowReparse regression and Pester skip-scoping; add ShowFullPathTree symlink test coverage
+
+What changed:
+- Fixed AC2 regression: render-loop guards at lines 680 and 782 were unconditional (if (Test-ReparsePoint $item)) so -FollowReparse symlinks were caught by the link-render branch instead of falling through to the folder-descent branch; fixed by adding -not $FollowReparse -and prefix to both guards, matching the pre-filter pattern
+- Fixed Pester skip-scoping: -Skip:($script:canSymlink) evaluated at discovery time when $script: set at file scope is not visible inside Pester 5 BeforeAll blocks, causing all 11 tests to skip; fixed by using $global:DowserTestCanSymlink set at file parse scope so the value is available at discovery time; global is cleaned up in AfterAll
+- Added ShowFullPathTree context (4 tests) covering the trunk render path (line 782) for both default no-descend and -FollowReparse descend cases; this is the path that carried the AC2 bug
+- Pester suite now runs 11/11 passing, 0 skipped on this Linux box where symlink creation is permitted
+
+Why:
+- The render-loop FollowReparse guard was missing, causing directory symlinks to always render as two-line link blocks even when -FollowReparse was set, breaking AC2. The Pester $script: scoping issue caused all tests to skip silently, masking the regression. Both defects were caught by the raven pair audit.
+
+
 ## [2026.06.14.019] - 2026-06-14
 ### feat(Get-DowserMap): Detect and show symlinks as two-line render instead of silently skipping them
 
