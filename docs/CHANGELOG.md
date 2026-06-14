@@ -2,6 +2,23 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.14.019] - 2026-06-14
+### feat(Get-DowserMap): Detect and show symlinks as two-line render instead of silently skipping them
+
+What changed:
+- Added $linkChar (U+2192 →) and $targetChar (U+21B3 ↳) glyph vars in both the if($Ascii) block (ASCII fallbacks '>' and '~') and the else block (if($AsHtml) entity / else [char] form), matching the existing dual-path codepoint convention at lines 533-546
+- Added LinkCount = 0 to the $TraversalState initializer; LinkCount increments per symlink shown and appears in -EmitSummary output when non-zero
+- Non-ShowFullPathTree path: replaced the reparse-point SkippedFolders++ guard with $filteredLinks accumulation; $items is now @($filteredFolders) + @($filteredLinks) + @($filteredFiles) so $isLast is correct for the combined list; render loop checks Test-ReparsePoint first and emits line1 ($Indent$connector $linkChar $name) and line2 ($nextIndent $targetChar $target), both passed through Format-HiddenLine
+- ShowFullPathTree path: same pattern using $childrenBaseIndent/$recursiveIndent; $all is now @($folders) + @($links) + @($files); folder render block restructured so Format-HiddenLine and the MaxDepth branch are self-contained in the elseif
+- Broken/dangling symlinks: $item.Target null/empty falls back to string '(broken link)'
+- All three output modes handled: console emits [char] glyphs, -AsHtml emits &#x2192;/&#x21B3; entities (set at glyph-var init time), -AsMarkdown uses console chars inside the fenced block
+- -FollowReparse behavior unchanged: symlinks in $filteredLinks / $links are only accumulated when -not $FollowReparse; with -FollowReparse the original guard is not reached so links fall through to normal folder handling
+- Added Tests/Get-DowserMap.Tests.ps1: Pester 5 suite; target dir created outside the mapped root so inner.txt appearance uniquely proves traversal; $canSymlink guard skips suite if symlink creation is not permitted; tests cover: arrow line emitted, target line emitted with resolved path, no-descend by default, continuation bar present on non-last-child target line, -FollowReparse descends, -AsHtml entities correct
+
+Why:
+- Default behavior silently dropped symlinks from the tree output (SkippedFolders++), making them invisible. Task #1 requires showing them as a two-line block (→ name / ↳ target) without descending, so users can see what links exist and where they point without the tree recursing into them.
+
+
 ## [2026.06.07.018] - 2026-06-07
 ### fix(Measure-DowserDiskUsage): Fix treemap double-count, symlink root skipped, case-sensitive dir keys on Linux
 

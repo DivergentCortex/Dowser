@@ -136,6 +136,15 @@ These functions emit a warning and return `$null` on non-Windows:
 - Related: None
 - Source: Original to Dowser (not ported)
 
+### Get-DowserMap
+- Purpose: Visual tree renderer for directory structures. Renders folder/file hierarchy using Unicode box-drawing characters with optional size (-IncludeSize) and .ps1 count (-IncludePsCount) annotations. Supports HTML, Markdown, and full-path trunk display modes. Symlinks are shown in place without traversal by default (two-line block: → name / ↳ target); use -FollowReparse to descend into them.
+- Inputs: `Path` (pipeline, FullName alias), `MaxDepth` (default 3), `ShowFullPathTree` / `S`, `LinuxPaths` / `L`, `Ascii`, `AsHtml`, `AsMarkdown`, `IncludeHidden`, `FollowReparse`, `IncludeSize`, `IncludePsCount`, `FoldersOnly`, `IncludeFilePatterns`, `IncludeExtensions`, `ExcludeExtensions`, `ExcludeFolders`, `ExcludeFiles`, `IncludeFolders`, `ExcludePathPatterns`, `NoDefaultExcludes`, `OutputFile`, `MarkdownFile`, `EmitSummary`, `UseRunspaces`, `MaxThreads`
+- Outputs: String array of tree lines (pipeline). Optional file output via -OutputFile / -MarkdownFile.
+- Tree glyphs: `■` folder, `·` file, `→` (U+2192) symlink name, `↳` (U+21B3) symlink target, `×` access denied. Box-drawing: `├─` branch, `└─` last, `│` continuation. HTML mode emits `&#xNNNN;` entities; -Ascii mode uses `+`/`-`/`>`/`~`.
+- Related: `Get-DowserTopology` (any PSProvider path, ANSI color, no size/count annotations)
+- Source: `Get-DowserMap.ps1`
+- Aliases: `dmap`
+
 ### Measure-DowserDirectory
 - Purpose: Measures size, file count, and key file timestamps for each immediate subdirectory under a root path.
 - Inputs: `Path` (pipeline, FullName alias; defaults to `.`)
