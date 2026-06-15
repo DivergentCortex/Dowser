@@ -1,6 +1,6 @@
 # Dowser Index
 
-Single source of truth for what exists in the module. **Read this before adding anything.** If a similar capability already exists, extend it — do not add a parallel implementation.
+Single source of truth for what exists in the module. **Read this before adding anything.** If a similar capability already exists, extend it -- do not add a parallel implementation.
 
 ## Format
 
@@ -109,7 +109,7 @@ These functions emit a warning and return `$null` on non-Windows:
 - Source: `Get-FileOwnership.ps1`
 
 ### Get-DowserProperty
-- Purpose: Comprehensive file inspector — VersionInfo, Shell COM extended props (0-500), hashes, Authenticode, .NET assembly, PE header.
+- Purpose: Comprehensive file inspector -- VersionInfo, Shell COM extended props (0-500), hashes, Authenticode, .NET assembly, PE header.
 - Inputs: `FilePath` (pipeline-friendly, FullName alias), `IncludeEmptyProperties`, `IncludeSignature`, `IncludeDirectories`
 - Outputs: PSCustomObject with all available file metadata.
 - Related: `Get-DowserOwnership` (directory-wide scan)
@@ -146,7 +146,7 @@ These functions emit a warning and return `$null` on non-Windows:
 - Source: Original to Dowser (not ported)
 
 ### Get-DowserMap
-- Purpose: Visual tree renderer for directory structures. Renders folder/file hierarchy using Unicode box-drawing characters with optional size (-IncludeSize) and .ps1 count (-IncludePsCount) annotations. Supports HTML, Markdown, and full-path trunk display modes. Symlinks are shown in place without traversal by default (two-line block: → name / ↳ target); use -FollowReparse to descend into them.
+- Purpose: Visual tree renderer for directory structures. Renders folder/file hierarchy using Unicode box-drawing characters with optional size (-IncludeSize) and .ps1 count (-IncludePsCount) annotations. Supports HTML, Markdown, and full-path trunk display modes. Symlinks are shown in place without traversal by default (two-line block: a name line marked U+2192 and a target line marked U+21B3); use -FollowReparse to descend into them.
 - Inputs: `Path` (pipeline, FullName alias), `MaxDepth` (default 3), `ShowFullPathTree` / `S`, `LinuxPaths` / `L`, `Ascii`, `AsHtml`, `AsMarkdown`, `IncludeHidden`, `FollowReparse`, `IncludeSize`, `IncludePsCount`, `FoldersOnly`, `IncludeFilePatterns`, `IncludeExtensions`, `ExcludeExtensions`, `ExcludeFolders`, `ExcludeFiles`, `IncludeFolders`, `ExcludePathPatterns`, `NoDefaultExcludes`, `OutputFile`, `MarkdownFile`, `EmitSummary`, `UseRunspaces`, `MaxThreads`
 - Outputs: String array of tree lines (pipeline). Optional file output via -OutputFile / -MarkdownFile.
 - Tree glyphs: `■` folder, `·` file, `→` (U+2192) symlink name, `↳` (U+21B3) symlink target, `×` access denied. Box-drawing: `├─` branch, `└─` last, `│` continuation. HTML mode emits `&#xNNNN;` entities; -Ascii mode uses `+`/`-`/`>`/`~`.
@@ -173,7 +173,7 @@ These functions emit a warning and return `$null` on non-Windows:
 ### Invoke-DowserFastSearch
 - Purpose: Parallel single-pattern text search across files using a RunspacePool. Returns per-file match objects with line numbers.
 - Inputs: `Path` (pipeline), `SearchString` (alias: `Pattern`), `Threads` (default 10), `Include`, `Exclude`, `CaseSensitive`
-- Outputs: PSCustomObject per matching file — FileName, FileType, LineNumbers, FullPath.
+- Outputs: PSCustomObject per matching file -- FileName, FileType, LineNumbers, FullPath.
 - Related: `Find-DowserString` (multi-pattern, Aho-Corasick, multiple output modes)
 - Source: `Invoke-FastTextSearch.ps1`
 - Aliases: `dfast`
@@ -183,7 +183,7 @@ These functions emit a warning and return `$null` on non-Windows:
 - Inputs: `InputObject` (pipeline), `Property`, `Descending`, `CaseSensitive`, `Unique`, `Top`
 - Outputs: Sorted objects (same type as input).
 - Related: `Find-DowserFile`, `Find-DowserDuplicate`
-- Source: `Invoke-NumericalSorting.ps1` (Sort-Numerical function; Get-SortKey → Private\Get-DowserSortKey)
+- Source: `Invoke-NumericalSorting.ps1` (Sort-Numerical function; Get-SortKey maps to Private\Get-DowserSortKey)
 - Aliases: `dsort`, `dnsort`
 
 ### Test-DowserExtractable

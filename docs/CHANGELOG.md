@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.14.020] - 2026-06-14
+### docs(project-wide): Reconcile docs to 26-function surface; fix README/INDEX/ARCHITECTURE; fold and de-slop changelog 019
+
+What changed:
+- README.md: added the missing Measure-DowserDiskUsage row, corrected the function count from 25 to 26 (matches Public/ file count), rewrote the Compare-DowserReport note to state accurately that it is dot-sourced with Get-DowserReport but not an independently exported member, expanded the platform-support section, and added a Measure-DowserDiskUsage quick-start example
+- INDEX.md: added the missing Find-DowserString entry (a headline function that had no entry), and recharacterized Compare-DowserReport to note it is not an independent export
+- ARCHITECTURE.md: corrected Public/ function count from 25 to 26
+- CHANGELOG.md: consolidated the Get-DowserMap symlink-render feature and its same-day regression fix (originally two adjacent same-day entries) into the single 2026.06.14.019 feat entry, since the fix corrected a defect introduced earlier the same day with no release between them; trimmed the combined entry to standard length and removed AI-slop and internal references (line numbers, internal variable names, 'set at glyph-var init time', 'caught by the raven pair audit'). The 2026.06.14.020 slot freed by that consolidation is reused by this documentation-reconciliation entry.
+
+Why:
+- Docs had drifted behind the code: the README undercounted functions and omitted Measure-DowserDiskUsage, INDEX was missing Find-DowserString, and both treated Compare-DowserReport ambiguously. The symlink-feature changelog entry was roughly 3x normal length and carried implementation noise and internal references that mean nothing to a reader; its same-day regression fix corrected unshipped code from the same feature, so the two belong as one entry (2026.06.14.019) rather than separate historical events.
+
+
 ## [2026.06.14.019] - 2026-06-14
 ### feat(Get-DowserMap): Detect and show symlinks as a two-line block instead of silently skipping them
 
