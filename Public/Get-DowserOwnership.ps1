@@ -85,18 +85,35 @@ function Get-DowserOwnership {
                     continue
                 }
 
-                # COM metadata — Windows only; skip gracefully on Linux/PSCore
+                # COM metadata is Windows-only. On non-Windows, populate real Unix
+                # ownership from the .NET FileInfo instead of returning an empty object.
+                # Canonical guard: $IsWindows is $null on PS 5.1, so -ne $false means
+                # Windows and -eq $false means a non-Windows pwsh runtime.
                 $ShellApplication = $null
                 $ShellFolder      = $null
                 $ShellFile        = $null
-                try {
-                    $ShellApplication = New-Object -ComObject Shell.Application -ErrorAction Stop
-                    $ShellFolder = $ShellApplication.Namespace($FileInformation.Directory.FullName)
-                    $ShellFile   = $ShellFolder.ParseName($FileInformation.Name)
-                } catch {
-                    Write-Verbose "Shell.Application COM not available on this platform; skipping extended metadata."
+                if ($IsWindows -ne $false) {
+                    try {
+                        $ShellApplication = New-Object -ComObject Shell.Application -ErrorAction Stop
+                        $ShellFolder = $ShellApplication.Namespace($FileInformation.Directory.FullName)
+                        $ShellFile   = $ShellFolder.ParseName($FileInformation.Name)
+                    } catch {
+                        Write-Verbose "Shell.Application COM not available on this platform; skipping extended metadata."
+                    }
+                }
+                if ($IsWindows -eq $false) {
+                    # Unix ownership: User/Group/UnixMode are exposed by Get-Item on
+                    # PowerShell Core for Unix filesystems.
+                    $MetaDataObject['Owner']    = $FileInformation.User
+                    $MetaDataObject['Group']    = $FileInformation.Group
+                    $MetaDataObject['UnixMode'] = $FileInformation.UnixMode
+                    $MetaDataObject['PlatformNote'] = 'Unix ownership via .NET FileInfo; Shell.Application extended metadata is Windows-only and was skipped.'
                 }
                 if ($null -eq $ShellFolder) {
+                    $MetaDataObject["Attributes"] = $FileInformation.Attributes
+                    $MetaDataObject['IsReadOnly'] = $FileInformation.IsReadOnly
+                    $MetaDataObject['IsHidden'] = $FileInformation.Attributes -like '*Hidden*'
+                    $MetaDataObject['IsSystem'] = $FileInformation.Attributes -like '*System*'
                     if ($AsHashTable) { $MetaDataObject } else { [PSCustomObject]$MetaDataObject }
                     continue
                 }
@@ -148,7 +165,6 @@ function Get-DowserOwnership {
         }
     }
 
-    [System.IO.DirectoryInfo]$Directory
     $DirectoryFiles = Get-ChildItem $Directory -Recurse -Force
     $List = $DirectoryFiles | Where-Object { $_.extension -like $Extension }
     $List.FullName | Get-FileMetaData
