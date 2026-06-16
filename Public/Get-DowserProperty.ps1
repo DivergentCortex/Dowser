@@ -30,7 +30,7 @@
 #>
 
 # deep file inspector. shell COM, VersionInfo, PE header, .NET assembly, optional signature.
-# shell COM is slow on UNC — that's expected. IncludeSignature adds another 0.5-2s per file.
+# shell COM is slow on UNC -- that's expected. IncludeSignature adds another 0.5-2s per file.
 
 function Get-DowserProperty {
     [CmdletBinding()]
@@ -160,8 +160,8 @@ function Get-DowserProperty {
                 Write-Verbose "Version information not available or error: $($_.Exception.Message)"
             }
 
-            # 3. Extended Properties via Shell.Application COM (Windows-only)
-            if ($IsWindows) {
+            # 3. Extended Properties via Shell.Application COM (Windows-only; $IsWindows is $null on 5.1)
+            if ($IsWindows -ne $false) {
                 Write-Verbose "Getting extended properties using COM object..."
                 try {
                     $Shell = New-Object -ComObject Shell.Application
@@ -222,8 +222,8 @@ function Get-DowserProperty {
                 Write-Verbose "Hash calculation error: $($_.Exception.Message)"
             }
 
-            # 5. Digital Signature (opt-in — slow, Windows-only)
-            if ($IsWindows -and $IncludeSignature) {
+            # 5. Digital Signature (opt-in -- slow, Windows-only; $IsWindows null on 5.1 = Windows)
+            if (($IsWindows -ne $false) -and $IncludeSignature) {
                 Write-Verbose "Getting digital signature information..."
                 try {
                     if ($IsDirectory) { throw [System.InvalidOperationException]::new('Digital signature is not applicable to directories.') }
