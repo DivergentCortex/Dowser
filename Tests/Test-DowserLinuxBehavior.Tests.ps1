@@ -78,6 +78,16 @@ Describe 'Dowser Linux behavior fixes' {
         It 'Excludes files under an excluded directory (.git) regardless of separator' {
             ($script:orphResult.FullName -join "`n") | Should -Not -Match '\.git'
         }
+
+        It 'Returns clean FileInfo objects with no Format-Table pollution' {
+            $script:orphResult.Count | Should -BeGreaterThan 0
+            foreach ($o in $script:orphResult) {
+                $o | Should -BeOfType [System.IO.FileInfo]
+            }
+            # No format-record objects leak into the return.
+            ($script:orphResult | Where-Object { $_.GetType().FullName -like 'Microsoft.PowerShell.Commands.Internal.Format.*' }) |
+                Should -BeNullOrEmpty
+        }
     }
 
     Context 'ConvertTo-DowserBase64' {
