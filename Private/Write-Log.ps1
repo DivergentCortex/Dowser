@@ -1,7 +1,6 @@
 function Get-SafeLogIdentity {
     # Returns current user identity string, cross-platform safe.
-    # Used in CMTrace log format context field.
-    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    # Used in CMTrace log format context field. $IsWindows null on 5.1 = Windows.
     if ($IsWindows -ne $false) {
         try {
             return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -541,7 +540,7 @@ function Get-ExecutionContextInfo {
     [CmdletBinding()]
     param()
 
-    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    # non-Windows degraded shape ($IsWindows null on 5.1 = Windows)
     if ($IsWindows -eq $false) {
         return [PSCustomObject]@{
             UserName    = Get-SafeLogIdentity
