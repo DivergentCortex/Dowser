@@ -166,7 +166,7 @@ function Expand-DowserExe {
                     $extractResult
                 }
                 else {
-                    $extractResult
+                    Write-Verbose "$($file.Name): $($extractResult.Details)"
                 }
             }
         }

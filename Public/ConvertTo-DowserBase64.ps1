@@ -117,20 +117,25 @@ else {
             Write-Verbose "Saved to file: $OutputFile"
         }
 
-        # Handle Clipboard / Console Output
+        # Handle Clipboard / Console Output. Set-Clipboard is unavailable in
+        # headless/no-display sessions (common on Linux); warn instead of throwing.
+        # On clipboard failure, only fall back to the pipeline when no -OutputFile
+        # was given -- if a file is the destination, do not emit an unexpected blob.
         if ($CopyToClipboard) {
-            # Set-Clipboard is unavailable in headless/no-display sessions (common on
-            # Linux). Try it, and warn instead of throwing if there is no clipboard.
+            $clipboardOk = $false
             if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
                 try {
                     Set-Clipboard -Value $b64 -ErrorAction Stop
+                    $clipboardOk = $true
                     Write-Verbose "Copied to clipboard!"
                 } catch {
-                    Write-Warning "Could not copy to clipboard ($($_.Exception.GetType().Name)); emitting Base64 to the pipeline instead."
-                    Write-Output $b64
+                    Write-Warning "Could not copy to clipboard ($($_.Exception.GetType().Name))."
                 }
             } else {
-                Write-Warning "Set-Clipboard is not available on this platform; emitting Base64 to the pipeline instead."
+                Write-Warning "Set-Clipboard is not available on this platform."
+            }
+            if (-not $clipboardOk -and -not $OutputFile) {
+                Write-Verbose "Emitting Base64 to the pipeline as the clipboard fallback."
                 Write-Output $b64
             }
         }

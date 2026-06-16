@@ -4,8 +4,7 @@ function ConvertTo-DowserExe {
         [string]$ScriptPath
     )
 
-    # Platform guard: produces Windows PE binaries, requires Windows
-    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    # platform guard: produces Windows PE binaries ($IsWindows null on 5.1 = Windows)
     if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserExe produces Windows PE executables and requires Windows. Not available on this platform."
         return $null
@@ -77,8 +76,7 @@ function ConvertTo-DowserExeConfuserEx {
         [string]$ConfuserExPath
     )
 
-    # Platform guard: produces Windows PE binaries + runs ConfuserEx, requires Windows
-    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    # platform guard: Windows PE binaries + ConfuserEx ($IsWindows null on 5.1 = Windows)
     if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserExeConfuserEx produces Windows PE executables and requires Windows. Not available on this platform."
         return $null

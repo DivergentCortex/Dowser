@@ -87,8 +87,7 @@ function Get-DowserOwnership {
 
                 # COM metadata is Windows-only. On non-Windows, populate real Unix
                 # ownership from the .NET FileInfo instead of returning an empty object.
-                # Canonical guard: $IsWindows is $null on PS 5.1, so -ne $false means
-                # Windows and -eq $false means a non-Windows pwsh runtime.
+                # ($IsWindows is $null on PS 5.1, so -ne $false means Windows.)
                 $ShellApplication = $null
                 $ShellFolder      = $null
                 $ShellFile        = $null

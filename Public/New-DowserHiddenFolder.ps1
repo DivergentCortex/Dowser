@@ -67,8 +67,7 @@ function New-DowserHiddenFolder {
             if ($PSCmdlet.ShouldProcess($Path, 'Set hidden attributes')) {
                 $folder = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
 
-                # Canonical platform guard: $IsWindows is $null on PS 5.1, so -ne $false
-                # means Windows and -eq $false means a non-Windows pwsh runtime.
+                # $IsWindows is $null on PS 5.1, so -ne $false means Windows.
                 if ($IsWindows -ne $false) {
                     # Windows: NTFS Hidden+System attributes hide the folder in Explorer.
                     $folder.Attributes = [System.IO.FileAttributes]'Hidden,System,Directory'

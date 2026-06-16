@@ -14,8 +14,7 @@ function ConvertTo-DowserIco {
         $MaxSize = 0
     )
 
-    # Platform guard: System.Drawing requires Windows GDI+
-    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    # platform guard: System.Drawing needs Windows GDI+ ($IsWindows null on 5.1 = Windows)
     if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform."
         return $null

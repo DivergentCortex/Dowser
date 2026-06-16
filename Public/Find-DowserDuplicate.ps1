@@ -391,6 +391,7 @@ function Find-DowserDuplicate {
     $modeSummary = $dupSets | Group-Object Mode | ForEach-Object {
         $totalDupes = ($_.Group | Measure-Object -Property Count -Sum).Sum
         [PSCustomObject]@{
+            OutputType = 'ModeSummary'
             Mode       = $_.Name
             Sets       = $_.Count
             TotalFiles = $totalDupes
@@ -405,6 +406,7 @@ function Find-DowserDuplicate {
     # top 15 largest duplicate sets as a quick preview
     $topSets = $dupSets | Sort-Object Count -Descending | Select-Object -First 15 | ForEach-Object {
         [PSCustomObject]@{
+            OutputType = 'TopSets'
             Mode       = $_.Mode
             FileName   = if ($_.MatchKey.Length -gt 60) { $_.MatchKey.Substring(0, 57) + '...' } else { $_.MatchKey }
             Duplicates = $_.Count
