@@ -1,7 +1,8 @@
 function Get-SafeLogIdentity {
     # Returns current user identity string, cross-platform safe.
     # Used in CMTrace log format context field.
-    if ($IsWindows) {
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -ne $false) {
         try {
             return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
         } catch {
@@ -280,7 +281,7 @@ Function Write-Log {
             "file=`"$Source`">"
 
         # Create log directory if needed
-        $logDir = Split-Path (Get-Variable -Name logfilepath -ValueOnly)
+        $logDir = Split-Path $Logfile
         if (!(Test-Path $logDir)) {
             New-Item -Path $logDir -ItemType Directory -Force | Out-Null
         }
@@ -384,7 +385,7 @@ Function Write-Log {
             $logFolder = Split-Path $Logfile
             if (Test-Path $logFolder) {
                 try {
-                    Cleanup-LogFiles -LogFolder $logFolder -MaxAgeDays $maxAgeDays
+                    Remove-DowserOldLogFiles -LogFolder $logFolder -MaxAgeDays $maxAgeDays
                 } catch {
                     # Cleanup failure shouldn't break logging
                     Write-Warning "Auto-cleanup failed: $_"
@@ -449,7 +450,7 @@ Function Write-Log {
     }
 }
 
-Function Cleanup-LogFiles {
+Function Remove-DowserOldLogFiles {
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory = $true)]
@@ -525,11 +526,11 @@ function Write-LogFinal {
     # Write another log message indicating that the cleanup routine is triggered.
     Write-Log -Message "Final log entry: Triggering log cleanup." -Severity 'Verbose'
     
-    # Determine the log folder—assuming your global $LogFile variable holds the current log file path.
+    # Determine the log folder -- assuming your global $LogFile variable holds the current log file path.
     $logFolder = Split-Path $LogFile
     
     try {
-        Cleanup-LogFiles -LogFolder $logFolder
+        Remove-DowserOldLogFiles -LogFolder $logFolder
     }
     catch {
         Write-Log -Message "Log cleanup failed: $_" -Severity 'Error'
@@ -540,7 +541,8 @@ function Get-ExecutionContextInfo {
     [CmdletBinding()]
     param()
 
-    if (-not $IsWindows) {
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -eq $false) {
         return [PSCustomObject]@{
             UserName    = Get-SafeLogIdentity
             IsAdmin     = ($env:USER -eq 'root')
@@ -556,7 +558,7 @@ function Get-ExecutionContextInfo {
     $isSystem   = $identity.Name -eq 'NT AUTHORITY\SYSTEM'
     $isAdmin    = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 
-    # Best-effort “interactive” guess: has a non-empty USERNAME and explorer.exe for that user
+    # Best-effort "interactive" guess: has a non-empty USERNAME and explorer.exe for that user
     $interactiveUser = $null
     try {
         $explorer = Get-Process explorer -IncludeUserName -ErrorAction SilentlyContinue
@@ -582,7 +584,7 @@ Function Initialize-Log {
     [CmdletBinding()]
     Param (
         [Parameter(Mandatory = $false)]
-        [string]$LogFilePath = (Get-Variable -Name logfilepath -ValueOnly),
+        [string]$LogFilePath = $LogFilePath,
 
         [string]$ScriptName,
 
