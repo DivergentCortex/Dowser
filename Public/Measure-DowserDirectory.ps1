@@ -66,7 +66,7 @@ function Measure-DowserDirectory {
                 Write-Verbose "Searching $($dir.FullName)"
 
                 # immediate child count (dirs + files) — mirrors original fcount behavior
-                $fcount = (Get-ChildItem "$rootPath\$($dir.Name)" -ErrorAction SilentlyContinue | Measure-Object).Count
+                $fcount = (Get-ChildItem (Join-Path $rootPath $dir.Name) -ErrorAction SilentlyContinue | Measure-Object).Count
 
                 $subFolderItems = Get-ChildItem $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue |
                     Where-Object { -not $_.PSIsContainer }

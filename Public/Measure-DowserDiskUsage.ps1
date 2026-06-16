@@ -141,7 +141,7 @@ function Measure-DowserDiskUsage {
 
                 # Skip reparse points (symlinks, junctions) encountered during descent
                 # to avoid infinite loops -- but never skip the root the caller gave us.
-                $isRoot = [string]::Equals($currentDir.FullName, $resolvedRoot, [System.StringComparison]::OrdinalIgnoreCase)
+                $isRoot = $dirComparer.Equals($currentDir.FullName, $resolvedRoot)
                 if (-not $isRoot -and ($currentDir.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
                     Write-Verbose "Skipping reparse point: $($currentDir.FullName)"
                     continue

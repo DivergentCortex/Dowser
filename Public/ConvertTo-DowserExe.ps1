@@ -5,7 +5,8 @@ function ConvertTo-DowserExe {
     )
 
     # Platform guard: produces Windows PE binaries, requires Windows
-    if (-not $IsWindows) {
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserExe produces Windows PE executables and requires Windows. Not available on this platform."
         return $null
     }
@@ -59,7 +60,13 @@ namespace PowerShellWrapper
 
     # Compile the C# code into an executable
     $outputFile = [System.IO.Path]::GetFileNameWithoutExtension($ScriptPath) + ".exe"
-    Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
+    # Add-Type dropped -OutputType in PS 6+, so it throws on pwsh 7 even on Windows.
+    if ($PSVersionTable.PSVersion.Major -lt 6) {
+        Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
+    } else {
+        Write-Warning "ConvertTo-DowserExe requires Windows PowerShell 5.1 (Add-Type -OutputType was removed in PowerShell 6+). Run this under powershell.exe."
+        return $null
+    }
 }
 
 function ConvertTo-DowserExeConfuserEx {
@@ -69,6 +76,13 @@ function ConvertTo-DowserExeConfuserEx {
         [Parameter(Mandatory = $true)]
         [string]$ConfuserExPath
     )
+
+    # Platform guard: produces Windows PE binaries + runs ConfuserEx, requires Windows
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -eq $false) {
+        Write-Warning "ConvertTo-DowserExeConfuserEx produces Windows PE executables and requires Windows. Not available on this platform."
+        return $null
+    }
 
     # Read the content of the PowerShell script
     $scriptContent = Get-Content -Path $ScriptPath -Raw
@@ -119,6 +133,11 @@ namespace PowerShellWrapper
 
     # Compile the C# code into an executable
     $outputFile = [System.IO.Path]::GetFileNameWithoutExtension($ScriptPath) + ".exe"
+    # Add-Type dropped -OutputType in PS 6+, so it throws on pwsh 7 even on Windows.
+    if ($PSVersionTable.PSVersion.Major -ge 6) {
+        Write-Warning "ConvertTo-DowserExeConfuserEx requires Windows PowerShell 5.1 (Add-Type -OutputType was removed in PowerShell 6+). Run this under powershell.exe."
+        return $null
+    }
     Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
 
     # Obfuscate the compiled executable using ConfuserEx

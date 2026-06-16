@@ -74,7 +74,7 @@ function Test-DowserExtractable {
 
         [string]$Filter = '*.exe',
 
-        [string]$SevenZipPath = $(if ($IsWindows) { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' } else { '7z' }),
+        [string]$SevenZipPath = $(if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }),
 
         [switch]$SkipSevenZip
     )
@@ -88,7 +88,7 @@ function Test-DowserExtractable {
         }
 
         # expand.exe for native CAB detection
-        $expandExe = if ($IsWindows) { Join-Path $env:SystemRoot 'System32\expand.exe' } else { $null }
+        $expandExe = if ($IsWindows -eq $false) { $null } else { Join-Path $env:SystemRoot 'System32\expand.exe' }
         $hasExpand = $expandExe -and (Test-Path $expandExe)
 
         # -------------------------------------------------------------------

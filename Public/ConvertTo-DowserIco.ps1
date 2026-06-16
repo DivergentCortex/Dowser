@@ -15,7 +15,8 @@ function ConvertTo-DowserIco {
     )
 
     # Platform guard: System.Drawing requires Windows GDI+
-    if (-not $IsWindows) {
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform."
         return $null
     }
@@ -57,19 +58,6 @@ function ConvertTo-DowserIco {
             New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
         }
     }
-
-    # Import DestroyIcon from user32 to free native handle afterwards
-    Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-
-namespace Win32 {
-    public static class NativeMethods {
-        [DllImport("user32.dll", SetLastError=true)]
-        public static extern bool DestroyIcon(IntPtr hIcon);
-    }
-}
-'@ -PassThru | Out-Null
 
     try {
         # Read file into memory (handles UNC paths better)

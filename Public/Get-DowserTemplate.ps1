@@ -36,7 +36,8 @@ function Get-DowserTemplate {
     )
 
     # Platform guard: requires Shell.Application COM object (Windows-only)
-    if (-not $IsWindows) {
+    # $IsWindows is $null on PS 5.1 (Windows-only runtime), so treat $null as Windows.
+    if ($IsWindows -eq $false) {
         Write-Warning "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform."
         return $null
     }

@@ -54,7 +54,9 @@ function Find-DowserOrphan {
         $path = $_.FullName
         $exclude = $false
         foreach ($ex in $ExcludePaths) {
-            if ($path -like "*\$ex\*") { $exclude = $true; break }
+            # Match the excluded segment regardless of path separator so exclusions
+            # work on both Windows (\) and Linux (/).
+            if (($path -like "*\$ex\*") -or ($path -like "*/$ex/*")) { $exclude = $true; break }
         }
         -not $exclude
     }
