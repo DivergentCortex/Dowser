@@ -63,7 +63,7 @@ function Expand-DowserExe {
         [Parameter(Position = 1)]
         [string]$Destination,
 
-        [string]$SevenZipPath = $(if ($IsWindows) { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' } else { '7z' }),
+        [string]$SevenZipPath = $(if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }),
 
         [switch]$Force,
 

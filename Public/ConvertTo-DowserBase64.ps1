@@ -45,8 +45,6 @@ param(
     [switch]$CopyToClipboard
 )
 
-$ErrorActionPreference = "Stop"
-
 # --- Main Execution ---
 
 $resolvedInput = $Path
@@ -115,20 +113,32 @@ else {
         }
         
         if ($OutputFile) {
-            Set-Content -Path $OutputFile -Value $b64 -Encoding UTF8
+            Set-Content -Path $OutputFile -Value $b64 -Encoding UTF8 -ErrorAction Stop
             Write-Verbose "Saved to file: $OutputFile"
         }
 
         # Handle Clipboard / Console Output
         if ($CopyToClipboard) {
-            Set-Clipboard -Value $b64
-            Write-Verbose "Copied to clipboard!"
-        } 
-        
+            # Set-Clipboard is unavailable in headless/no-display sessions (common on
+            # Linux). Try it, and warn instead of throwing if there is no clipboard.
+            if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
+                try {
+                    Set-Clipboard -Value $b64 -ErrorAction Stop
+                    Write-Verbose "Copied to clipboard!"
+                } catch {
+                    Write-Warning "Could not copy to clipboard ($($_.Exception.GetType().Name)); emitting Base64 to the pipeline instead."
+                    Write-Output $b64
+                }
+            } else {
+                Write-Warning "Set-Clipboard is not available on this platform; emitting Base64 to the pipeline instead."
+                Write-Output $b64
+            }
+        }
+
         if (-not $OutputFile -and -not $CopyToClipboard) {
-            Write-Verbose "`n--- Base64 Output ---"
-            Write-Verbose $b64
-            Write-Verbose "---------------------"
+            # No destination requested: emit the Base64 string to the pipeline so it
+            # is actually usable by callers (previously only Write-Verbose).
+            Write-Output $b64
         } elseif (-not $OutputFile) {
             Write-Verbose "Length: $($b64.Length) chars"
         }

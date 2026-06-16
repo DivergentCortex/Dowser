@@ -9,7 +9,7 @@
 .PARAMETER Path
     One or more paths to render. Accepts pipeline input. Defaults to current location.
 .PARAMETER LiteralPath
-    Literal path(s) — no wildcard expansion.
+    Literal path(s) -- no wildcard expansion.
 .PARAMETER Depth
     How many levels to display. Default is [int]::MaxValue (full depth).
 .PARAMETER IndentSize
@@ -19,7 +19,7 @@
 .PARAMETER ShowProperty
     Display item properties inline. Use * for all, or a comma-separated list.
 .PARAMETER InColor
-    (Dynamic — FileSystem only) Colorize output using PSAnsiFileMap ANSI codes.
+    (Dynamic -- FileSystem only) Colorize output using PSAnsiFileMap ANSI codes.
 .EXAMPLE
     Get-DowserTopology -Path D:\Projects -Depth 3
 .EXAMPLE
@@ -32,7 +32,7 @@
     Aliases preserved: pstree, shtree
 #>
 
-# provider-agnostic tree. inner ShowContainer recurses. ordering matters — depth check must be first.
+# provider-agnostic tree. inner ShowContainer recurses. ordering matters -- depth check must be first.
 # InColor only wires up for FileSystem paths. dont remove the DynamicParam block.
 
 function Get-DowserTopology {
@@ -109,9 +109,14 @@ function Get-DowserTopology {
         }
 
         if ($PSBoundParameters.ContainsKey("InColor")) {
-            $Colorize = $True
-            $script:top   = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi
-            $script:child = ($global:PSAnsiFileMap).where({ $_.description -eq 'ChildContainer' }).Ansi
+            # $global:PSAnsiFileMap is a PS7+ construct; on 5.1 it is null and indexing it null-refs.
+            if ($PSVersionTable.PSVersion.Major -ge 7) {
+                $Colorize = $True
+                $script:top   = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi
+                $script:child = ($global:PSAnsiFileMap).where({ $_.description -eq 'ChildContainer' }).Ansi
+            } else {
+                Write-Warning "Get-DowserTopology -InColor requires PowerShell 7+ (PSAnsiFileMap). Rendering without color."
+            }
         }
 
         function GetIndentString {

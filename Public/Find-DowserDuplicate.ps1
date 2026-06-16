@@ -398,7 +398,9 @@ function Find-DowserDuplicate {
     } | Sort-Object Mode
 
     Write-Verbose ""
-    $modeSummary | Format-Table -AutoSize
+    $modeSummary | Format-Table -AutoSize | Out-String | Write-Verbose
+    # Emit summary objects to the pipeline so callers can capture them.
+    Write-Output $modeSummary
 
     # top 15 largest duplicate sets as a quick preview
     $topSets = $dupSets | Sort-Object Count -Descending | Select-Object -First 15 | ForEach-Object {
@@ -410,7 +412,9 @@ function Find-DowserDuplicate {
     }
 
     Write-Verbose "Top duplicate sets (by count):"
-    $topSets | Format-Table -AutoSize
+    $topSets | Format-Table -AutoSize | Out-String | Write-Verbose
+    # Emit the top-sets preview objects to the pipeline so callers can capture them.
+    Write-Output $topSets
 
     Write-Verbose "--- $($dupSets.Count) duplicate set(s) found across $(@($files).Count) files scanned ---"
     Write-Verbose 'Full details: $global:dupObjects'

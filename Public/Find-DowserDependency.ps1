@@ -22,17 +22,36 @@ function Find-DowserDependency {
         [string[]]$FunctionNames,
 
         [Parameter(Mandatory = $false)]
-        [string[]]$ExcludePaths = @(
-            '\\$Recycle.Bin',
-            '\Windows\',
-            '\Program Files',
-            '\Program Files (x86)',
-            '\Users\'
-        ),
+        [string[]]$ExcludePaths,
 
         [switch]$IncludeContent,
         [switch]$ExportResults
     )
+
+    # Default exclusions are platform-specific. The historic Windows defaults
+    # (\Windows\, \Program Files, ...) never match Linux paths, so populate
+    # sensible per-platform defaults only when the caller did not supply any.
+    # Canonical guard: $IsWindows is $null on PS 5.1, so -ne $false means Windows.
+    if (-not $PSBoundParameters.ContainsKey('ExcludePaths')) {
+        if ($IsWindows -ne $false) {
+            $ExcludePaths = @(
+                '\$Recycle.Bin',
+                '\Windows\',
+                '\Program Files',
+                '\Program Files (x86)',
+                '\Users\'
+            )
+        }
+        else {
+            $ExcludePaths = @(
+                '/proc/',
+                '/sys/',
+                '/dev/',
+                '/usr/',
+                '/.git/'
+            )
+        }
+    }
 
     # Combine all search paths
     $searchPaths = @($SearchPath)

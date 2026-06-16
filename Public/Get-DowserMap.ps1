@@ -210,11 +210,17 @@ function Get-DowserMap {
     }
 
     # path normalization helpers
-    function ConvertTo-BackslashPath { param([string]$s) if ($null -eq $s) { return $null } return ($s -replace '/', '\\') }
+    # Internal path comparison/filtering uses the platform separator so that
+    # Get-ChildItem -LiteralPath calls and string compares stay valid on Linux
+    # (forward slash) as well as Windows (backslash). $sep is computed once.
+    $sep = [string][IO.Path]::DirectorySeparatorChar
+    function ConvertTo-NativeSeparator { param([string]$s) if ($null -eq $s) { return $null } if ($sep -eq '/') { return ($s -replace '\\', '/') } else { return ($s -replace '/', '\') } }
+    # ConvertTo-WslPath translates a Windows drive/UNC path into a /mnt style path.
+    # It needs backslash-normalized input for its regex, so it normalizes locally.
     function ConvertTo-WslPath {
         param([string]$inputPath)
         if ([string]::IsNullOrWhiteSpace($inputPath)) { return $inputPath }
-        $normalized = ConvertTo-BackslashPath $inputPath
+        $normalized = ($inputPath -replace '/', '\')
         if ($normalized -match '^[\\]{2}(?<server>[^\\]+)\\(?<share>[^\\]+)(?<rest>.*)$') {
             $server = $matches.server; $share = $matches.share
             $rest = $matches.rest -replace '^[\\/]+', ''
@@ -232,11 +238,11 @@ function Get-DowserMap {
 
     $rootFull = $Path
     try { $rootFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath } catch { }
-    $rootFull = ConvertTo-BackslashPath $rootFull
-    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length-1] -ne '\\') { $rootFull += '\\' }
+    $rootFull = ConvertTo-NativeSeparator $rootFull
+    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length-1] -ne $sep[0]) { $rootFull += $sep }
 
     $excludePaths = @()
-    if ($ExcludePathPatterns) { $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-BackslashPath $_ }) }
+    if ($ExcludePathPatterns) { $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) }
 
     # IncludeFolders breakdown: exact names, wildcards, exact paths, wildcard paths
     $includeExactNames = @(); $includeWildcardNames = @()
@@ -244,9 +250,9 @@ function Get-DowserMap {
     if ($IncludeFolders) {
         foreach ($entry in $IncludeFolders) {
             if ([string]::IsNullOrWhiteSpace($entry)) { continue }
-            $normalizedEntry = (ConvertTo-BackslashPath $entry).Trim()
+            $normalizedEntry = (ConvertTo-NativeSeparator $entry).Trim()
             if ($normalizedEntry -match '[\\/]') {
-                $normalizedEntry = $normalizedEntry.Trim('\')
+                $normalizedEntry = $normalizedEntry.Trim($sep[0])
                 if ($normalizedEntry) {
                     if ($normalizedEntry -notmatch '[\*\?\[\]]') { $includeExactPaths += $normalizedEntry.ToLowerInvariant() }
                     else { $includeWildcardPaths += $normalizedEntry }
@@ -382,7 +388,7 @@ function Get-DowserMap {
     }
     function Test-ExcludeByPath { param($item)
         if (-not $excludePaths -or (@($excludePaths).Count -eq 0)) { return $false }
-        $full = ConvertTo-BackslashPath $item.FullName
+        $full = ConvertTo-NativeSeparator $item.FullName
         $rel  = ConvertTo-RelativePath $full
         if (Test-MatchAny -value $full -patterns $excludePaths) { return $true }
         if (Test-MatchAny -value $rel  -patterns $excludePaths) { return $true }
@@ -398,13 +404,13 @@ function Get-DowserMap {
         }
         if ((@($includeExactPaths).Count -gt 0)) {
             foreach ($path in $includeExactPaths) {
-                $firstSegment = ($path -split '\\')[0]
+                $firstSegment = ($path -split '[\\/]')[0]
                 if ($firstSegment -eq $nameKey) { return $true }
             }
         }
         if ((@($includeWildcardPaths).Count -gt 0)) {
             foreach ($pattern in $includeWildcardPaths) {
-                $firstPattern = ($pattern -split '\\')[0]
+                $firstPattern = ($pattern -split '[\\/]')[0]
                 if ($item.Name -like $firstPattern) { return $true }
             }
         }
@@ -458,7 +464,7 @@ function Get-DowserMap {
     function Test-FolderContainsMatchingFiles {
         param([string]$folderPath, [int]$maxDepthToCheck = 50)
         if (-not $effectiveIncludePatterns -and -not $IncludeExtensions) { return $true }
-        $normalizedPath = ConvertTo-BackslashPath $folderPath
+        $normalizedPath = ConvertTo-NativeSeparator $folderPath
         $cacheKey = $normalizedPath.ToLowerInvariant()
         if ($MatchCache.ContainsKey($cacheKey)) { return $MatchCache[$cacheKey] }
 
@@ -486,7 +492,7 @@ function Get-DowserMap {
     function Test-FolderContainsIncludedFolder {
         param([string]$folderPath, [int]$maxDepthToCheck = 50)
         if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) { return $true }
-        $normalizedPath = ConvertTo-BackslashPath $folderPath
+        $normalizedPath = ConvertTo-NativeSeparator $folderPath
         $cacheKey = $normalizedPath.ToLowerInvariant()
         if ($IncludeFolderCache.ContainsKey($cacheKey)) { return $IncludeFolderCache[$cacheKey] }
 
@@ -615,7 +621,7 @@ function Get-DowserMap {
                     $mdDir = Split-Path -Path $markdownTarget -Parent
                     if ($mdDir -and -not (Test-Path -LiteralPath $mdDir)) { New-Item -ItemType Directory -Path $mdDir -Force | Out-Null }
                     if ($LinuxPaths) { $displayRoot = ConvertTo-WslPath $Path }
-                    else { $displayRoot = if ($rootFull) { $rootFull.TrimEnd('\\') } else { ConvertTo-BackslashPath $Path } }
+                    else { $displayRoot = if ($rootFull) { $rootFull.TrimEnd($sep[0]) } else { ConvertTo-NativeSeparator $Path } }
                     if (-not $displayRoot) { $displayRoot = $Path }
                     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
                     $mdLines = @( '# Directory Map', '', ('**Root:** `{0}`' -f $displayRoot), ('**Generated:** {0}' -f $timestamp) )

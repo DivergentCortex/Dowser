@@ -11,7 +11,7 @@ function Get-DowserTemplate {
         Useful for understanding or cloning a folder's Explorer template when
         automating folder setup.
 
-        Windows only — Shell.Application COM is not available on Linux/macOS.
+        Windows only -- Shell.Application COM is not available on Linux/macOS.
 
     .PARAMETER Path
         The folder path to inspect. Defaults to current directory.
@@ -24,9 +24,9 @@ function Get-DowserTemplate {
 
     .NOTES
         Alias: dtemplate
-        Source: Get-FolderTemplate.ps1 (General_Scripts — had live execution code outside function)
+        Source: Get-FolderTemplate.ps1 (General_Scripts -- had live execution code outside function)
         Fixed: live execution code removed; -folderPath renamed to -Path; [CmdletBinding()] added.
-        Shell.Application GetDetailsOf loop (0..500) can be slow — Write-Progress included.
+        Shell.Application GetDetailsOf loop (0..500) can be slow -- Write-Progress included.
     #>
     [CmdletBinding()]
     param (
