@@ -100,14 +100,19 @@ Describe 'Get-DowserTopology -InColor cross-platform' {
 }
 
 Describe '7-Zip default-parameter expression resolves on non-Windows' -Skip:($IsWindows -ne $false) {
-    It 'Test-DowserExtractable default SevenZipPath is bare 7z on Linux' {
-        $cmd = Get-Command Test-DowserExtractable
-        $def = $cmd.Parameters['SevenZipPath'].Attributes |
-            Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] }
-        # The runtime default is produced by the guarded expression; resolve it by
-        # invoking with an unreadable file and confirming it does not throw at bind time.
-        { Test-DowserExtractable -Path $script:SampleFile -WarningAction SilentlyContinue | Out-Null } |
-            Should -Not -Throw
+    It 'binds the default SevenZipPath to bare 7z on Linux, not a Windows path' {
+        # The begin block echoes the resolved $SevenZipPath through verbose
+        # ("7-Zip found at: <path>" or "7-Zip not found at <path>"). Capture it
+        # and confirm the runtime default is '7z', not Program Files\7-Zip\7z.exe.
+        # A no-throw assertion alone would pass even with the old unsafe default.
+        $verbose = Test-DowserExtractable -Path $script:SampleFile -Verbose 4>&1 |
+            Where-Object { $_ -is [System.Management.Automation.VerboseRecord] } |
+            ForEach-Object { $_.Message }
+        $sevenZipLine = $verbose | Where-Object { $_ -match '7-?Zip (found at|not found at)' } | Select-Object -First 1
+        $sevenZipLine | Should -Not -BeNullOrEmpty
+        $sevenZipLine | Should -Match '(:\s*|at\s+)7z(\s|$)'
+        $sevenZipLine | Should -Not -Match 'Program Files'
+        $sevenZipLine | Should -Not -Match '7z\.exe'
     }
 }
 

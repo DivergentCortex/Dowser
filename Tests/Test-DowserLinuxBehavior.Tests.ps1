@@ -103,6 +103,19 @@ Describe 'Dowser Linux behavior fixes' {
             # Round-trips back to the original bytes.
             [Convert]::FromBase64String($out).Length | Should -Be 32
         }
+
+        It 'With -OutputFile and a failing clipboard, writes the file and emits NOTHING to the pipeline' -Skip:$script:onWindows {
+            # On headless Linux Set-Clipboard runtime-fails (no display); -OutputFile is
+            # the destination, so the clipboard failure must NOT emit a blob to the
+            # pipeline (the regression the audit caught).
+            $outFile = Join-Path $script:tmpRoot 'b64out.txt'
+            $out = ConvertTo-DowserBase64 -Path $script:imgPath -OutputFile $outFile -CopyToClipboard -WarningAction SilentlyContinue
+            # File is the destination and was written...
+            Test-Path -LiteralPath $outFile | Should -BeTrue
+            (Get-Content -LiteralPath $outFile -Raw).Trim() | Should -Not -BeNullOrEmpty
+            # ...and the pipeline stays empty (no unexpected blob for capturing callers).
+            $out | Should -BeNullOrEmpty
+        }
     }
 
     Context 'New-DowserHiddenFolder' {
