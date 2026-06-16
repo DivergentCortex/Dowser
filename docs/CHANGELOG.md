@@ -2,6 +2,32 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.16.026] - 2026-06-16
+### fix(platform-guards): Audit cleanup: real -PassThru in Expand-DowserExe, Get-DowserProperty guard, stronger 7z test, trim comments
+
+What changed:
+- Expand-DowserExe.ps1 (~line 165): fixed dead `if ($PassThru) { $extractResult } else { $extractResult }` where both branches emitted, making -PassThru a no-op. Now implements standard -PassThru semantics: the extraction result object is emitted to the pipeline ONLY when -PassThru is supplied; the default path writes a one-line Write-Verbose summary and emits nothing. BEHAVIOR CHANGE: the function no longer always-emits the result object by default.
+- Get-DowserProperty.ps1 (~line 164): converted the bare `if ($IsWindows)` Shell.Application COM guard to the canonical `if ($IsWindows -ne $false)` idiom (same PS 5.1 $null bug class fixed elsewhere -- the bare form skipped the Windows COM path on 5.1). The non-Windows degraded else-branch (verbose 'not available on this platform' then continue to hashing) is unaffected.
+- Tests/Test-DowserPlatformGuards.Tests.ps1: strengthened the 7-Zip default-param test from a no-throw-only assertion (which passed even with the old unsafe default) to capturing Test-DowserExtractable's verbose stream and asserting the runtime-bound SevenZipPath resolves to the bare '7z' token and is NOT a 'Program Files'/'7z.exe' Windows path.
+- Trimmed the duplicated two-line canonical-guard comment block (identical boilerplate copy-pasted at each guard site) to one concise line per site in ConvertTo-DowserIco.ps1, ConvertTo-DowserExe.ps1 (both guards), Get-DowserTemplate.ps1, and Write-Log.ps1 (both guards).
+
+Why:
+- Raven pair audit of the Task #2 changeset passed with four cleanup findings. The Expand-DowserExe -PassThru if/else was dead code that made the switch meaningless; standard -PassThru is silent-by-default with opt-in emit, matching the function's ShouldProcess design and the terminal position it occupies in the documented pipeline examples. Get-DowserProperty carried the exact bare-$IsWindows bug class the sweep fixed everywhere else. The 7-Zip test gave false confidence (no-throw passes regardless of the default value). The duplicated guard comments were AI-slop flagged by the audit.
+
+
+## [2026.06.16.025] - 2026-06-16
+### fix(cross-platform): Audit cleanup: Base64 double-emission, duplicate-output discriminator, trim copy-pasted guard comments
+
+What changed:
+- ConvertTo-DowserBase64: fixed double-emission -- when -OutputFile AND -CopyToClipboard are both set and the clipboard fails (headless), the function no longer emits the base64 blob to the pipeline (the file is the destination); the pipeline fallback now fires only when no -OutputFile was given. Added a Pester case asserting file-written + pipeline-empty under that combination
+- Find-DowserDuplicate: added an OutputType discriminator ('ModeSummary' / 'TopSets') to each emitted summary object so the two different shapes are distinguishable and Export-Csv no longer silently drops columns
+- Trimmed the copy-pasted 2-line canonical-guard comment to one concise line at each guard site in Get-DowserOwnership.ps1 and New-DowserHiddenFolder.ps1 (idiom unchanged)
+- Full Pester suite now 92/92
+
+Why:
+- Raven-pair audit of Task #1 passed with three findings: a confirmed double-emission defect introduced by the clipboard guard, an output-shape ambiguity in Find-DowserDuplicate, and duplicated verbose guard comments (AI-slop). These remediate all three before T1 closes.
+
+
 ## [2026.06.16.024] - 2026-06-16
 ### fix(cross-platform): Find-DowserOrphan output hygiene and ASCII-clean comments in owned Linux-fix files
 
