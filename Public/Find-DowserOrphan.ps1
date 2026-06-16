@@ -146,7 +146,9 @@ function Find-DowserOrphan {
 
     if ($orphans.Count -gt 0) {
         Write-Verbose "`nPotential Orphan Files (No external references found):"
-        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize
+        # Route the formatted preview to Write-Verbose only; the pipeline return
+        # below stays clean FileInfo objects (no Format-Table formatting records).
+        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Verbose
     }
 
     return $orphans

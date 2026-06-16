@@ -46,7 +46,7 @@ function Get-DowserOwnership {
     function Get-FileMetaData {
         <#
         .SYNOPSIS
-        Gets metadata information from a file — similar to what Explorer shows.
+        Gets metadata information from a file -- similar to what Explorer shows.
         .PARAMETER File
         FileName or FileObject
         .PARAMETER HashAlgorithm
