@@ -2,6 +2,33 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.16.022] - 2026-06-16
+### fix(platform-guards): Make Test-DowserIntegrity Pester suite run on pwsh 7 and convert remaining non-ASCII in owned files
+
+What changed:
+- Tests/Test-DowserIntegrity.Tests.ps1: replaced the corrupt-EXE fixture write `[byte[]](...) | Set-Content -Encoding Byte` (the Byte encoding name was removed in PowerShell 6+, so the BeforeAll threw and the whole suite failed at setup on pwsh 7) with the version-agnostic `[System.IO.File]::WriteAllBytes($path, [byte[]](...))`; the suite now runs and passes 11/11 on pwsh 7
+- Get-DowserTemplate.ps1, Get-DowserTopology.ps1, Private/Write-Log.ps1: converted pre-existing non-ASCII characters in comments and comment-based help to ASCII (em-dash -> --, smart double-quotes -> straight quotes); comment/help text only, no logic touched; these three owned files are now ASCII-clean
+
+Why:
+- Folded in two pre-existing issues surfaced during the Task #2 platform-guard sweep that fall inside the full cross-platform scope and live in files this change already owns. The `Set-Content -Encoding Byte` idiom is Windows-PowerShell-5.1-only and broke the integrity test suite at fixture setup on pwsh 7, masking real coverage; WriteAllBytes is correct on both 5.1 and 7+. The module is meant to be ASCII-clean and these em-dashes/smart quotes were the only non-ASCII bytes left in the files touched by this task.
+
+
+## [2026.06.16.021] - 2026-06-16
+### fix(platform-guards): Fix PS 5.1 platform-guard bugs and Windows-only function guards across 7 Public files and Write-Log
+
+What changed:
+- ConvertTo-DowserIco.ps1: converted the bare `if (-not $IsWindows)` guard to the canonical `if ($IsWindows -eq $false)` idiom (was firing wrongly on PS 5.1 where $IsWindows is $null); removed the dead user32.dll DestroyIcon P/Invoke block (compiled via Add-Type but never called)
+- ConvertTo-DowserExe.ps1: converted the ConvertTo-DowserExe guard to the canonical idiom; added a platform guard to ConvertTo-DowserExeConfuserEx (previously unguarded); guarded both `Add-Type -OutputType ConsoleApplication` compile calls behind a PSVersion < 6 check so they no longer throw on pwsh 7, failing clean with a clear 'requires Windows PowerShell 5.1' warning instead
+- Get-DowserTemplate.ps1: converted the bare `if (-not $IsWindows)` Shell.Application guard to the canonical idiom
+- Test-DowserExtractable.ps1, Test-DowserIntegrity.ps1, Expand-DowserExe.ps1: made the $IsWindows-driven default-parameter expressions for -SevenZipPath (and the $expandExe begin-block assignments) 5.1-safe using `if ($IsWindows -eq $false) { '7z' } else { <Windows path> }` so a standalone 5.1 host resolves the Windows 7-Zip/expand.exe path rather than the bare PATH names
+- Get-DowserTopology.ps1: guarded the -InColor PSAnsiFileMap colorization setup behind a PSVersion >= 7 check; on 5.1 it now warns and renders uncolorized instead of null-ref crashing on the PS7-only $global:PSAnsiFileMap
+- Private/Write-Log.ps1: converted the two bare $IsWindows guards (Get-SafeLogIdentity, Get-ExecutionContextInfo) to the canonical idiom; renamed the unapproved-verb Cleanup-LogFiles to Remove-DowserOldLogFiles and updated both internal call sites (Write-Log auto-cleanup, Write-LogFinal); replaced two `Get-Variable -Name logfilepath -ValueOnly` lookups with the already-resolved $Logfile param (Write-Log dir creation) and the $LogFilePath param default (Initialize-Log)
+- Tests/Test-DowserPlatformGuards.Tests.ps1: new Pester 5 suite (10 tests) covering Windows-only graceful-skip on non-Windows, the ConfuserEx guard returning before the throwing Add-Type, Get-DowserTopology -InColor not crashing, and the Cleanup-LogFiles -> Remove-DowserOldLogFiles rename
+
+Why:
+- The cross-platform sweep found platform guards written as bare `if ($IsWindows)` / `if (-not $IsWindows)`, which misfire on Windows PowerShell 5.1 where $IsWindows is $null: the negated form treats 5.1 as non-Windows and skips the Windows code path. The canonical `-ne $false` / `-eq $false` idiom is correct on 5.1 ($null), Windows pwsh ($true), and Linux/macOS ($false). Separately, Add-Type -OutputType was removed in PowerShell 6+, so the EXE compilers threw on pwsh 7 even on Windows, and the -InColor path null-ref crashed on 5.1 because PSAnsiFileMap is PS7-only. Cleanup-LogFiles used an unapproved verb that trips PSScriptAnalyzer and the upcoming manifest export lock-down.
+
+
 ## [2026.06.14.020] - 2026-06-14
 ### docs(project-wide): Reconcile docs to 26-function surface; fix README/INDEX/ARCHITECTURE; fold and de-slop changelog 019
 
