@@ -23,4 +23,6 @@ if (Test-Path $aliasPath) {
     . $aliasPath
 }
 
-Export-ModuleMember -Function $Public.BaseName -Alias *
+# Compare-DowserReport is a public function dot-sourced inside Get-DowserReport.ps1,
+# so it is not a Public/ basename and must be named explicitly to export it.
+Export-ModuleMember -Function ($Public.BaseName + 'Compare-DowserReport') -Alias *

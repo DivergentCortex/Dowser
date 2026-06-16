@@ -8,7 +8,35 @@
     Description       = 'Dowser - filesystem recon and inspection kit. Find what you cannot see. Cross-platform (Windows/Linux/macOS).'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
-    FunctionsToExport = @('*')
+    FunctionsToExport = @(
+        'Compare-DowserReport'
+        'ConvertTo-DowserBase64'
+        'ConvertTo-DowserExe'
+        'ConvertTo-DowserIco'
+        'Expand-DowserExe'
+        'Find-DowserDependency'
+        'Find-DowserDuplicate'
+        'Find-DowserFile'
+        'Find-DowserModified'
+        'Find-DowserOrphan'
+        'Find-DowserRecentLog'
+        'Find-DowserScript'
+        'Find-DowserString'
+        'Get-DowserInfo'
+        'Get-DowserMap'
+        'Get-DowserOwnership'
+        'Get-DowserProperty'
+        'Get-DowserReport'
+        'Get-DowserTemplate'
+        'Get-DowserTopology'
+        'Invoke-DowserFastSearch'
+        'Invoke-DowserNumericSort'
+        'Measure-DowserDirectory'
+        'Measure-DowserDiskUsage'
+        'New-DowserHiddenFolder'
+        'Test-DowserExtractable'
+        'Test-DowserIntegrity'
+    )
     AliasesToExport   = @('*')
     CmdletsToExport   = @()
     VariablesToExport = @()
