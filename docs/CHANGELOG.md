@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.16.027] - 2026-06-16
+### fix(manifest): Lock down export surface to an explicit 27-function list and export Compare-DowserReport
+
+What changed:
+- Dowser.psd1: replaced FunctionsToExport = @('*') with an explicit 27-name list (the 26 Public/ basenames plus Compare-DowserReport). The wildcard declared an open-ended public API; the explicit list is the genuine surface and makes the intent auditable.
+- Dowser.psm1: changed Export-ModuleMember -Function $Public.BaseName to ($Public.BaseName + 'Compare-DowserReport'). Compare-DowserReport is a real public function dot-sourced inside Get-DowserReport.ps1, so it is not a Public/ basename and was never actually exported; naming it explicitly surfaces it and keeps the psm1 consistent with the manifest (the manifest FunctionsToExport intersects with Export-ModuleMember, so the manifest entry alone would have been inert).
+- Get-DowserProperty.ps1 (~line 226): fixed the bare `if ($IsWindows -and $IncludeSignature)` Authenticode-signature guard to `if (($IsWindows -ne $false) -and $IncludeSignature)`. On Windows PowerShell 5.1 $IsWindows is $null, so `$null -and ...` wrongly skipped signature checking on a real Windows platform -- the last instance of the platform-guard bug class. Also converted two pre-existing em-dashes in this file's comments (lines 33, 225) to ASCII.
+- Verified by Import-Module -Force + Get-Command -Module Dowser: exported function count goes 26 -> 27 (the +1 is Compare-DowserReport becoming exported as intended); Compare-DowserReport resolves; all internal helpers (ConvertTo-DowserExeConfuserEx, _Build-DduHtml, _DduTableHtml, Remove-DowserOldLogFiles, Write-LogFinal, Get-SafeLogIdentity, Get-ExecutionContextInfo, Initialize-Log) confirmed not exported; Compare-Object shows the runtime exported set exactly equals the manifest declaration with no extras either way.
+
+Why:
+- FunctionsToExport = @('*') declared an open-ended public API. While Export-ModuleMember -Function $Public.BaseName already limited the effective runtime surface to the 26 basenames (so no helper actually leaked), the wildcard was misleading and the same gate accidentally excluded Compare-DowserReport, a genuine public function that was always meant to be callable. An explicit, audited export list is the correct hygiene: it documents the real API, surfaces the one missing public function, and keeps internal helpers private by name. The line-226 guard was the final undiscovered instance of the PS 5.1 $null-$IsWindows bug class fixed across the rest of the module.
+
+
 ## [2026.06.16.026] - 2026-06-16
 ### fix(platform-guards): Audit cleanup: real -PassThru in Expand-DowserExe, Get-DowserProperty guard, stronger 7z test, trim comments
 
