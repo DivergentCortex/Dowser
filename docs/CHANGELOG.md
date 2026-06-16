@@ -2,6 +2,25 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.16.023] - 2026-06-16
+### fix(cross-platform): Fix Linux-behavior, path-separator, and output-silence defects across nine Public cmdlets
+
+What changed:
+- Get-DowserOwnership: deleted stray [System.IO.DirectoryInfo]$Directory pipeline-leak; guarded Shell.Application COM behind the canonical Windows branch and added a Unix fallback that populates Owner/Group/UnixMode + PlatformNote from .NET FileInfo so ownership returns real data on Linux instead of an empty object
+- New-DowserHiddenFolder: added the non-Windows branch -- dot-prefix the folder leaf for true Linux hiding (Verbose note that NTFS Hidden/System is Windows-only); under -AttributesOnly warn-only with no rename; re-Get-Item after any rename and return the real on-disk Attributes + PlatformNote (never a claimed Hidden,System value)
+- ConvertTo-DowserBase64: removed the function-body $ErrorActionPreference='Stop' scope leak (rely on per-cmdlet -ErrorAction); no-destination branch now Write-Output the base64 string instead of Write-Verbose; Set-Clipboard guarded for headless/no-display sessions, warning and emitting to the pipeline instead of throwing
+- Measure-DowserDirectory: replaced backslash interpolation with Join-Path so the immediate child FileCount is correct on Linux (was always 0)
+- Measure-DowserDiskUsage: the isRoot reparse-point check now uses $dirComparer instead of forced OrdinalIgnoreCase, for case-sensitivity consistency on Linux
+- Find-DowserOrphan: directory exclusion now matches both path separators so exclusions work on Linux
+- Find-DowserDuplicate: $modeSummary and $topSets are now emitted as objects via Write-Output (Format-Table output routed to Write-Verbose) so callers can capture them
+- Find-DowserDependency: default $ExcludePaths is now platform-aware (Windows defaults vs Linux /proc,/sys,/dev,/usr,/.git) instead of Windows-only backslash paths that silently never matched on Linux
+- Get-DowserMap: internal path filtering/comparison now uses the platform separator via ConvertTo-NativeSeparator (replacing ConvertTo-BackslashPath) so Get-ChildItem -LiteralPath calls and include-folder traversal work on Linux; ConvertTo-WslPath keeps local backslash normalization; segment splits use [\\/]; the symlink render feature is preserved (verified)
+- Added Tests/Test-DowserLinuxBehavior.Tests.ps1 (Pester 5) covering all of the above; full suite passes 90/90
+
+Why:
+- A cross-platform sweep found these cmdlets producing silent false success, empty/zero output, or pipeline-only-to-Write-Verbose results on non-Windows PowerShell 7; this fixes the Linux behavior while keeping Windows behavior unchanged via the PS5.1-safe canonical $IsWindows guard.
+
+
 ## [2026.06.16.022] - 2026-06-16
 ### fix(platform-guards): Make Test-DowserIntegrity Pester suite run on pwsh 7 and convert remaining non-ASCII in owned files
 
