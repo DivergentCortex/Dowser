@@ -2,6 +2,18 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.16.024] - 2026-06-16
+### fix(cross-platform): Find-DowserOrphan output hygiene and ASCII-clean comments in owned Linux-fix files
+
+What changed:
+- Find-DowserOrphan: routed the tail Format-Table preview to Write-Verbose via Out-String so the function returns only clean FileInfo objects (no Format-Table formatting records leaking into the pipeline) -- same output-hygiene class as the Find-DowserDuplicate fix
+- Converted 3 pre-existing non-ASCII em-dashes to -- in comment/help text only (Get-DowserOwnership.ps1 synopsis line, New-DowserHiddenFolder.ps1 .PARAMETER AttributesOnly and .NOTES Source) so the owned files are uniformly ASCII-clean
+- Added Pester assertion that Find-DowserOrphan returns FileInfo objects with no format-record pollution; full suite now 91/91
+
+Why:
+- Folding the two known items flagged during review into this pass before the raven audit: the Format-Table-at-tail polluted Find-DowserOrphan's FileInfo return, and the em-dashes broke the module's ASCII-only source standard.
+
+
 ## [2026.06.16.023] - 2026-06-16
 ### fix(cross-platform): Fix Linux-behavior, path-separator, and output-silence defects across nine Public cmdlets
 
