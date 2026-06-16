@@ -45,9 +45,12 @@ BeforeAll {
     'This is a clean text file for baseline + read-access tests.' |
         Set-Content -LiteralPath $script:CleanText -Encoding ASCII
 
-    # Corrupt "EXE": bytes that are not MZ-prefixed
-    [byte[]](0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07) |
-        Set-Content -LiteralPath $script:CorruptExe -Encoding Byte
+    # Corrupt "EXE": bytes that are not MZ-prefixed.
+    # WriteAllBytes is version-agnostic; Set-Content -Encoding Byte was removed in PS6+.
+    [System.IO.File]::WriteAllBytes(
+        $script:CorruptExe,
+        [byte[]](0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)
+    )
 
     'junk' | Set-Content -LiteralPath $script:ThumbsDb -Encoding ASCII
     'junk' | Set-Content -LiteralPath $script:OfficeLock -Encoding ASCII
