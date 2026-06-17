@@ -18,16 +18,17 @@ Single source of truth for what exists in the module. **Read this before adding 
 Dowser runs on PowerShell 5.1 (Windows) and pwsh 7+ (Windows/Linux/macOS).
 
 ### Fully Cross-Platform
-These functions work identically on all supported platforms:
-- `Find-DowserDuplicate`, `Find-DowserFile`, `Find-DowserOrphan`, `Find-DowserDependency`
-- `Invoke-DowserFastSearch`, `Measure-DowserDirectory`, `Measure-DowserDiskUsage`
-- `Get-DowserMap`, `Get-DowserTopology`, `Get-DowserInfo`
+These functions work identically (or with a platform-equivalent path) on all supported platforms:
+- `Find-DowserDuplicate`, `Find-DowserFile`, `Find-DowserModified`, `Find-DowserOrphan`, `Find-DowserDependency`, `Find-DowserScript`, `Find-DowserString`, `Find-DowserRecentLog`
+- `Invoke-DowserFastSearch`, `Invoke-DowserNumericSort`, `Measure-DowserDirectory`, `Measure-DowserDiskUsage`
+- `Get-DowserMap`, `Get-DowserTopology`, `Get-DowserInfo`, `Get-DowserReport`, `Compare-DowserReport`
 - `ConvertTo-DowserBase64`
+- `Get-DowserOwnership` - returns Owner/Group/UnixMode plus a PlatformNote on non-Windows (the Shell.Application extended metadata is the Windows-only enrichment)
+- `New-DowserHiddenFolder` - NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS
 
-### Degraded on Non-Windows
-These functions return partial results (basic metadata without COM-sourced properties):
-- `Get-DowserProperty` - Shell.Application extended properties unavailable
-- `Get-DowserOwnership` - Shell.Application metadata unavailable
+### Reduced on Non-Windows
+These functions run but drop the Windows-only enrichments:
+- `Get-DowserProperty` - Shell.Application extended properties and Authenticode signature unavailable; core metadata, hashes, and PE walk still run
 - `Expand-DowserExe` - requires `7z` on PATH (install via package manager)
 - `Test-DowserExtractable` - CAB/expand.exe detection unavailable
 - `Test-DowserIntegrity` - CAB and Alternate Data Stream checks unavailable
@@ -47,6 +48,9 @@ These functions emit a warning and return `$null` on non-Windows:
 
 ### ConvertTo-DowserBase64
 - Purpose: Converts images to Base64 strings and vice-versa using pure PowerShell.
+- Inputs: `Path` (required, pipeline, ImagePath/FullName aliases), `OutputFile`, `Decode`, `IncludeHeader`, `CopyToClipboard`
+- Outputs: With no `-OutputFile` and no `-CopyToClipboard`, emits the Base64 string to the pipeline. `-OutputFile` writes the string to disk; `-CopyToClipboard` copies it. Decode mode writes the image to `-OutputFile` (required for decode).
+- Note: `-CopyToClipboard` is guarded for headless sessions: if Set-Clipboard is unavailable or fails (common on Linux with no display), it warns and, when no -OutputFile was given, falls back to emitting the Base64 to the pipeline.
 - Source: `ConvertTo-Base64.ps1`
 
 ### ConvertTo-DowserExe
@@ -58,7 +62,9 @@ These functions emit a warning and return `$null` on non-Windows:
 - Source: `ConvertTo-ICO.ps1`
 
 ### New-DowserHiddenFolder
-- Purpose: Modifies directory attributes to Hidden and System.
+- Purpose: Create a folder (or take an existing one) and hide it. Windows: sets NTFS Hidden+System attributes. Linux/macOS: renames the folder with a leading dot, the platform-native way to hide it.
+- Inputs: `Path` (required, pipeline, FullName alias), `Force` (suppress already-exists warning), `AttributesOnly` (apply hiding to an existing folder, no creation). Supports -WhatIf/-Confirm.
+- Outputs: PSCustomObject with Path and Attributes (the real on-disk attributes, re-read after any change). On Linux/macOS also carries a PlatformNote explaining the leading-dot convention. Under -AttributesOnly on Linux/macOS, the folder cannot be renamed, so it warns that the folder is NOT hidden rather than silently doing nothing.
 - Source: `create-hiddenfolder.ps1`
 
 ### Get-DowserTemplate
@@ -102,9 +108,9 @@ These functions emit a warning and return `$null` on non-Windows:
 - Aliases: `dstr`, `dgrep`
 
 ### Get-DowserOwnership
-- Purpose: Gets file ownership and extended Shell.Application metadata for files in a directory (extension-filtered).
-- Inputs: `Directory` (required), `Extension` (wildcard, default `*`)
-- Outputs: PSCustomObject per file with Shell metadata, hashes, signature, version info.
+- Purpose: Gets file ownership and metadata for files in a directory (extension-filtered). On Windows, enriches with Shell.Application extended properties; on Linux/macOS, returns real Unix ownership.
+- Inputs: `Directory` (default `$PWD`), `Extension` (wildcard, default `*`)
+- Outputs: PSCustomObject per file. On Windows: Shell extended properties, version info, attributes. On Linux/macOS: Owner, Group, UnixMode, Attributes, IsReadOnly/IsHidden/IsSystem, plus a PlatformNote stating Shell.Application metadata is Windows-only and was skipped.
 - Related: `Get-DowserProperty` (deeper single-file analysis)
 - Source: `Get-FileOwnership.ps1`
 
@@ -136,7 +142,7 @@ These functions emit a warning and return `$null` on non-Windows:
 - Outputs: PSCustomObject per file with Status and delta fields.
 - Related: `Get-DowserReport`
 - Source: `Public/Get-DowserReport.ps1` (defined in the same file as Get-DowserReport)
-- Note: Dot-sourced into the session with Get-DowserReport but not an independently exported member, because the loader exports one name per file. Call it directly after import.
+- Note: Exported public function. It shares a file with Get-DowserReport so it has no Public/ basename; the loader names it explicitly in Export-ModuleMember and the manifest's FunctionsToExport lists it (27th export). Available immediately after Import-Module.
 
 ### Get-DowserInfo
 - Purpose: Reports Dowser module identity: manifest version, latest changelog entry version and date, public function count, and module root path.
@@ -202,8 +208,9 @@ These functions emit a warning and return `$null` on non-Windows:
 
 ### Expand-DowserExe
 - Purpose: Extracts files from extractable EXE archives using 7-Zip. Runs Test-DowserExtractable first, then 7z x. ShouldProcess support (-WhatIf, -Confirm).
-- Inputs: `Path` (pipeline, FullName alias), `Destination`, `SevenZipPath`, `Force`, `PassThru`
-- Outputs: PSCustomObject per EXE with Path, Destination, ExitCode, Extractable, Classification. Auto-creates destination folder named `<ExeName>_extracted`.
+- Inputs: `Path` (pipeline, FullName alias), `Destination`, `SevenZipPath` (defaults to bare `7z` on non-Windows, the 7-Zip install path on Windows), `Force`, `PassThru`
+- Outputs: Nothing by default (writes a one-line Write-Verbose summary). With `-PassThru`, emits one PSCustomObject per EXE: Path, Destination, Success (bool), ExitCode, Classification, FileCount, ArchiveType, Details. Auto-creates a destination folder named `<ExeName>_extracted` when -Destination is not given.
+- Note: BEHAVIOR -- `-PassThru` is opt-in. Earlier builds always emitted the result object; it is now suppressed unless `-PassThru` is supplied.
 - Related: `Test-DowserExtractable` (classification without extraction), `Test-DowserIntegrity` (corruption detection)
 - Source: Original to Dowser (not ported)
 - Aliases: `dexpand`, `dextract`

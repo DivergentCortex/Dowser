@@ -12,11 +12,11 @@ The module originated as a port of 22 standalone scripts from a General_Scripts 
 Dowser.psd1  -->  Dowser.psm1
                     |
                     +-- Private/*.ps1    (6 helpers, not exported)
-                    +-- Public/*.ps1     (26 functions, one per file, exported)
+                    +-- Public/*.ps1     (26 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  (Set-Alias calls, sourced last)
 ```
 
-The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports only Public function names plus all aliases.
+The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 26 Public/ basenames plus `Compare-DowserReport` (the 27th public function, which lives inside Get-DowserReport.ps1 and so is named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 27-name list, not a wildcard.
 
 One function per file in Public. This keeps diffs clean, prevents agents from stomping each other's work, and makes `Get-ChildItem Public` read like a table of contents.
 
@@ -70,13 +70,17 @@ Platform detection happens at module load time in Dowser.psm1. On PS 5.1 (which 
 Functions that depend on Windows-only capabilities (COM objects, System.Drawing, csc.exe) have platform guards:
 
 - **Windows-only** (return null with warning on non-Windows): ConvertTo-DowserIco, ConvertTo-DowserExe, Get-DowserTemplate
-- **Degraded** (reduced output without COM metadata): Get-DowserProperty, Get-DowserOwnership, Test-DowserExtractable, Expand-DowserExe, Test-DowserIntegrity
+- **Reduced** (run, but drop the Windows-only COM/expand.exe enrichments): Get-DowserProperty, Test-DowserExtractable, Expand-DowserExe, Test-DowserIntegrity
+
+Get-DowserOwnership and New-DowserHiddenFolder are not in the reduced set: each has a real non-Windows path. Get-DowserOwnership reads Owner/Group/UnixMode from the .NET FileInfo and tags the result with a PlatformNote (only the extended Shell.Application metadata is Windows-only). New-DowserHiddenFolder applies NTFS Hidden+System on Windows and, on Linux/macOS, hides the folder by renaming it with a leading dot (under -AttributesOnly it cannot rename, so it warns rather than silently no-op); the returned object always reflects the real on-disk attributes.
+
+The platform guards key off `$IsWindows -ne $false` rather than a bare `if ($IsWindows)`, because PS 5.1 has `$IsWindows = $null` and the bare test would wrongly take the non-Windows branch on a real Windows host. This idiom covers the Shell.Application COM reads in Get-DowserProperty and Get-DowserOwnership, the Authenticode signature read in Get-DowserProperty, and the hidden-folder attribute path.
 
 Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) are inside the function body behind platform guards, not at file scope.
 
 ## Design decisions
 
-**One function per file.** Enforced by convention and the loader's `Get-ChildItem Public/*.ps1` pattern. The single exception is Compare-DowserReport, which is bundled in Get-DowserReport.ps1 because it is tightly coupled to Get-DowserReport's output schema.
+**One function per file.** Enforced by convention and the loader's `Get-ChildItem Public/*.ps1` pattern. The single exception is Compare-DowserReport, which is bundled in Get-DowserReport.ps1 because it is tightly coupled to Get-DowserReport's output schema. It is still a full public export: the loader names it explicitly in `Export-ModuleMember` since it has no Public/ basename, and the manifest lists it.
 
 **No Write-Host in public functions.** All user-facing output uses Write-Verbose, Write-Warning, Write-Information, or Write-Progress. This keeps function output streams clean for pipeline consumers. Find-DowserString uses `Write-Information -InformationAction Continue` for phase banners so users see progress without polluting the output stream.
 

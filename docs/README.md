@@ -10,7 +10,7 @@ Runs on Windows PowerShell 5.1 and PowerShell 7+ (Windows, Linux, macOS). Functi
 # Import from a local clone
 Import-Module ./Dowser/Dowser.psd1 -Force
 
-# Confirm the exported surface (26 functions plus aliases)
+# Confirm the exported surface (27 functions plus aliases)
 Get-Command -Module Dowser
 ```
 
@@ -40,7 +40,7 @@ Get-DowserReport -Path ./src -ExportCsv ./report.csv
 
 ## Exported functions
 
-26 functions, one per file in `Public/`. Each carries one or more short aliases for interactive use.
+27 exported functions. 26 live one-per-file in `Public/`; the 27th, `Compare-DowserReport`, is dot-sourced from `Public/Get-DowserReport.ps1` and exported by name. Each carries one or more short aliases for interactive use.
 
 | Function | Alias | Purpose |
 |----------|-------|---------|
@@ -67,19 +67,20 @@ Get-DowserReport -Path ./src -ExportCsv ./report.csv
 | Invoke-DowserNumericSort | dsort, dnsort | Natural numeric sort (Item-2 before Item-10) |
 | Measure-DowserDirectory | dsize | Directory size and file count summary |
 | Measure-DowserDiskUsage | ddu | WinDirStat-style recursive disk-usage report with HTML treemap |
-| New-DowserHiddenFolder | -- | Set Hidden+System attributes on a directory |
+| New-DowserHiddenFolder | -- | Hide a directory: NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS |
 | Test-DowserExtractable | dtest, dtestexe | Classify EXEs as extractable vs decompile-required |
 | Test-DowserIntegrity | dintegrity, dinteg | Layered corruption and hygiene detection |
+| Compare-DowserReport | -- | Diff two Get-DowserReport snapshots (NEW/CHANGED/REMOVED/UNCHANGED) |
 
-`Compare-DowserReport` ships inside `Public/Get-DowserReport.ps1` and diffs two `Get-DowserReport` snapshots. It is dot-sourced into the session alongside `Get-DowserReport` but is not an independently exported member, because the loader exports one name per file and the two share a file. Call it directly after importing the module.
+`Compare-DowserReport` ships inside `Public/Get-DowserReport.ps1` and diffs two `Get-DowserReport` snapshots. Because it shares a file with `Get-DowserReport` it has no Public/ basename of its own, so the loader exports it by name (`Export-ModuleMember` adds it explicitly) and the manifest's `FunctionsToExport` lists it. It is a normal exported public function.
 
 ## Platform support
 
 All functions run on Windows PowerShell 5.1 and PowerShell 7+. On Linux/macOS (PowerShell 7+ only -- 5.1 is Windows-only), behavior splits three ways:
 
 - **Windows-only** -- emit a warning and return without producing output: ConvertTo-DowserIco, ConvertTo-DowserExe, Get-DowserTemplate. These require System.Drawing/GDI+, the C# compiler, or Shell.Application COM.
-- **Degraded** -- run and return results, minus the Windows-only enrichments (Shell.Application extended metadata, expand.exe CAB handling): Get-DowserProperty, Get-DowserOwnership, Test-DowserExtractable, Expand-DowserExe, Test-DowserIntegrity. The archive functions need `7z` on PATH.
-- **Full cross-platform** -- identical behavior on every supported platform: everything else.
+- **Reduced** -- run and return results, minus the Windows-only enrichments (Shell.Application extended metadata, expand.exe CAB handling): Get-DowserProperty, Test-DowserExtractable, Expand-DowserExe, Test-DowserIntegrity. The archive functions need `7z` on PATH.
+- **Full cross-platform** -- identical or platform-equivalent behavior on every supported platform: everything else, including Get-DowserOwnership (returns Owner/Group/UnixMode plus a PlatformNote on Linux/macOS; the extended Shell.Application metadata is the Windows-only enrichment) and New-DowserHiddenFolder (NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS).
 
 Platform detection happens at module load. PowerShell 5.1 lacks the `$IsWindows`/`$IsLinux`/`$IsMacOS` automatic variables, so the loader defines them (5.1 only runs on Windows, so it sets `$IsWindows = $true`). On PowerShell 7+, the engine's own automatic variables drive the guards.
 
@@ -92,7 +93,7 @@ All exports follow `Verb-DowserNoun` with approved PowerShell verbs and singular
 ```
 Dowser.psd1            Module manifest (v0.2.0)
 Dowser.psm1            Loader: dot-sources Private, Public, Aliases
-Public/                One exported function per file (26 files)
+Public/                Exported functions, one per file (26 files; Get-DowserReport.ps1 also holds Compare-DowserReport)
 Private/               Internal helpers (6 files), not exported
 Aliases/Aliases.ps1    All alias definitions
 Tests/                 Pester suites and test runner

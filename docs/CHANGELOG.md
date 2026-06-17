@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.17.028] - 2026-06-17
+### docs(reconcile): Reconcile README/ARCHITECTURE/INDEX to the verified post-repair cross-platform behavior
+
+What changed:
+- README.md: export count 26 -> 27 (Compare-DowserReport is now an exported public function); flipped its 'not independently exported' paragraph to 'normal exported public function'; added a Compare-DowserReport row to the function table; renamed the 'Degraded' platform bucket to 'Reduced' and moved Get-DowserOwnership and New-DowserHiddenFolder out of it into Full cross-platform with their real non-Windows behavior; updated New-DowserHiddenFolder purpose row and the Public/ layout line
+- ARCHITECTURE.md: described the explicit 27-name Export-ModuleMember + manifest surface and how Compare-DowserReport is named explicitly; renamed Degraded -> Reduced and dropped Get-DowserOwnership from it; added paragraphs on Get-DowserOwnership Unix ownership, New-DowserHiddenFolder dot-prefix hiding (-AttributesOnly warns, no rename), the $IsWindows -ne $false guard idiom (PS 5.1 $null) covering the COM reads, Authenticode, and hidden-folder path; appended an export clause to the one-function-per-file note
+- INDEX.md: rebuilt the Platform Support section (Fully Cross-Platform now lists the finders/measurers/Get-DowserOwnership/New-DowserHiddenFolder; Degraded renamed Reduced with Get-DowserOwnership removed and the Get-DowserProperty Authenticode note added); rewrote the Get-DowserOwnership, New-DowserHiddenFolder, ConvertTo-DowserBase64, and Expand-DowserExe entries with current inputs/outputs; flipped the Compare-DowserReport Note to 'exported public function'; corrected the stale Expand-DowserExe output schema (Success/FileCount/ArchiveType/Details) and documented the opt-in -PassThru behavior change
+- Verified every claim against current code (Dowser.psd1 27-name FunctionsToExport, Dowser.psm1 Export-ModuleMember, Get-DowserOwnership.ps1, New-DowserHiddenFolder.ps1, ConvertTo-DowserBase64.ps1, Expand-DowserExe.ps1, Get-DowserProperty.ps1) before writing; no forward-looking claims, ASCII only
+
+Why:
+- The cross-platform repair pass (slots 2026.06.16.021-.027) changed exported surface and several functions' behavior; the README, ARCHITECTURE, and INDEX still described pre-repair reality (26 exports, Compare-DowserReport unexported, Get-DowserOwnership and New-DowserHiddenFolder as degraded/Windows-attribute-only, stale Expand-DowserExe output schema and always-emit). Stale docs send agents into confident failure, so they ship reconciled with the code in the same window.
+
+
 ## [2026.06.16.027] - 2026-06-16
 ### fix(manifest): Lock down export surface to an explicit 27-function list and export Compare-DowserReport
 
