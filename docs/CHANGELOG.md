@@ -2,6 +2,17 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.17.029] - 2026-06-17
+### docs(index): Add missing Source field to Test-DowserExtractable and Test-DowserIntegrity INDEX entries
+
+What changed:
+- INDEX.md: added a Source line to the Test-DowserExtractable entry (Test-DowserExtractable.ps1, with a pointer to exe-static-classification-reference.md for the classification logic)
+- INDEX.md: added a Source line to the Test-DowserIntegrity entry (Test-DowserIntegrity.ps1)
+
+Why:
+- These were the only two cmdlet entries missing the Source field that the INDEX format block defines and every other entry carries; the gap let a reader miss which Public/ file backs each function. Found during the broader doc-freshness sweep, unrelated to the cross-platform repair reconciliation.
+
+
 ## [2026.06.17.028] - 2026-06-17
 ### docs(reconcile): Reconcile README/ARCHITECTURE/INDEX to the verified post-repair cross-platform behavior
 
