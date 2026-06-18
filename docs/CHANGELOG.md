@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.18.030] - 2026-06-18
+### feat(aliases): add missing short aliases for Get-DowserInfo, Compare-DowserReport, New-DowserHiddenFolder
+
+What changed:
+- Added Set-Alias dinfo -> Get-DowserInfo in Aliases/Aliases.ps1 under # Get-Dowser* group
+- Added Set-Alias dcompare -> Compare-DowserReport in Aliases/Aliases.ps1 under new # Compare-Dowser* group (alphabetically first)
+- Added Set-Alias dhide -> New-DowserHiddenFolder in Aliases/Aliases.ps1 under new # New-Dowser* group (between Invoke and Test groups)
+- Added Tests/Test-DowserAliasCoverage.Tests.ps1: Pester 5 guard asserting every exported function has at least one alias so this gap cannot recur silently
+- Collision check confirmed dinfo, dcompare, dhide were clear of all built-in cmdlets and existing aliases before addition
+
+Why:
+- 24 of 27 exported functions had short aliases; Get-DowserInfo, Compare-DowserReport, and New-DowserHiddenFolder had none. The Pester guard prevents future exported functions from shipping without an alias.
+
+
 ## [2026.06.17.029] - 2026-06-17
 ### docs(index): Add missing Source field to Test-DowserExtractable and Test-DowserIntegrity INDEX entries
 
