@@ -1,6 +1,9 @@
 # Aliases\Aliases.ps1
 # all Dowser short aliases. none defined inside function files.
 
+# Compare-Dowser*
+Set-Alias -Name dcompare  -Value Compare-DowserReport
+
 # ConvertTo-Dowser*
 Set-Alias -Name db64      -Value ConvertTo-DowserBase64
 Set-Alias -Name dexe      -Value ConvertTo-DowserExe
@@ -19,6 +22,7 @@ Set-Alias -Name dstr      -Value Find-DowserString
 Set-Alias -Name dgrep     -Value Find-DowserString
 
 # Get-Dowser*
+Set-Alias -Name dinfo     -Value Get-DowserInfo
 Set-Alias -Name dmap      -Value Get-DowserMap
 Set-Alias -Name dtree     -Value Get-DowserTopology
 Set-Alias -Name down      -Value Get-DowserOwnership
@@ -37,6 +41,9 @@ Set-Alias -Name ddu       -Value Measure-DowserDiskUsage
 Set-Alias -Name dfast     -Value Invoke-DowserFastSearch
 Set-Alias -Name dsort     -Value Invoke-DowserNumericSort
 Set-Alias -Name dnsort    -Value Invoke-DowserNumericSort
+
+# New-Dowser*
+Set-Alias -Name dhide     -Value New-DowserHiddenFolder
 
 # Test-Dowser*
 Set-Alias -Name dtest       -Value Test-DowserExtractable
