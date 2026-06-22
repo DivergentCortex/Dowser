@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.22.031] - 2026-06-22
+### fix(Get-DowserMap): -IncludeHidden now shows hidden dirs (.claude etc); -NoDefaultExcludes propagated to recursive calls
+
+What changed:
+- Public/Get-DowserMap.ps1, Test-ExcludeFolder (~line 442): added early-return guard -- when -IncludeHidden is active and the item has the Hidden file attribute, return $false immediately, skipping the name-based exclude check. Get-ChildItem -Force was enumerating hidden directories correctly but Test-ExcludeFolder discarded them because names like .claude appeared in $defaultExcludes -> $excludeExact. The two mechanisms had no connection.
+- Public/Get-DowserMap.ps1, Test-FolderContainsIncludedFolder (~line 512): applied the same hidden bypass to the inline $excludeExact and $excludeWild checks inside this function -- the only other location where the raw exclude arrays were applied to items without hidden-item awareness.
+- Public/Get-DowserMap.ps1, non-ShowFullPathTree recursive call (~line 706): added -NoDefaultExcludes:$NoDefaultExcludes. This parameter was omitted, causing -NoDefaultExcludes to be silently dropped at depth 1 and beyond; default excludes were re-applied to all subdirectories regardless of the flag.
+- Public/Get-DowserMap.ps1, ShowFullPathTree recursive call (~line 808): same fix applied to the second recursive call site, which had the same omission.
+
+Why:
+- .claude is hardcoded in $defaultExcludes. Test-ExcludeFolder fired after Get-ChildItem -Force enumerated hidden items, then immediately discarded them via $excludeExact -contains $item.Name. -IncludeHidden controlled enumeration and ANSI dimming but never touched the exclude filter -- the two mechanisms were completely disconnected. The hidden bypass in Test-ExcludeFolder threads user intent through: if the user explicitly asked to see hidden items, the name-based default exclude list should not silently discard them. The -NoDefaultExcludes propagation gap was a separate wiring bug: the flag was missing from both recursive call sites so it only applied at the root depth-0 call. .claude remains in $defaultExcludes; normal output without -IncludeHidden is unchanged.
+
+
 ## [2026.06.18.030] - 2026-06-18
 ### feat(aliases): add missing short aliases for Get-DowserInfo, Compare-DowserReport, New-DowserHiddenFolder
 
