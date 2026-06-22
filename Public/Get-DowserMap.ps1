@@ -439,6 +439,9 @@ function Get-DowserMap {
             if (Test-IncludeFolder $item) { return $false }
         }
         if (Test-ExcludeByPath $item) { return $true }
+        # When -IncludeHidden is active, hidden items bypass the name-based exclude list.
+        # The user explicitly asked to see hidden items; defaultExcludes should not silently discard them.
+        if ($IncludeHidden -and (Test-IsHidden $item)) { return $false }
         if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { return $true }
         if ((@($excludeWild).Count -gt 0)) {
             foreach ($pat in $excludeWild) { if ($item.Name -like $pat) { return $true } }
@@ -506,8 +509,10 @@ function Get-DowserMap {
                 foreach ($item in $items) {
                     if (-not $FollowReparse -and (Test-ReparsePoint $item)) { continue }
                     if (Test-ExcludeByPath $item) { continue }
-                    if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { continue }
-                    if ((@($excludeWild).Count -gt 0)) { $skip = $false; foreach ($pat in $excludeWild) { if ($item.Name -like $pat) { $skip = $true; break } } if ($skip) { continue } }
+                    if (-not ($IncludeHidden -and (Test-IsHidden $item))) {
+                        if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { continue }
+                        if ((@($excludeWild).Count -gt 0)) { $skip = $false; foreach ($pat in $excludeWild) { if ($item.Name -like $pat) { $skip = $true; break } } if ($skip) { continue } }
+                    }
                     if (Test-FolderMatchesInclude $item) { $IncludeFolderCache[$cacheKey] = $true; return $true }
                     $stack.Push([PSCustomObject]@{ Path = $item.FullName; Depth = $current.Depth + 1 })
                 }
@@ -698,7 +703,7 @@ function Get-DowserMap {
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
                 $TraversalState.FolderCount++
                 if ($CurrentDepth -lt $MaxDepth) {
-                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 }
             } else {
                 $line = "$Indent$connector $fileChar $($item.Name)"
@@ -800,7 +805,7 @@ function Get-DowserMap {
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
                 $TraversalState.FolderCount++
-                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
             } else {
                 $TraversalState.FolderCount++
