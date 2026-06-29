@@ -1,3 +1,30 @@
+<#
+.SYNOPSIS
+    Smoke-tests the Dowser private size and sort helper functions.
+.NOTES
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    -  Author:        Curtis Leggett                                  -
+    =  Copyright:     2026 Divergent Cortex                           =
+    -  Organization:  Divergent Cortex                                -
+    =  Version:       See docs/CHANGELOG.md                           =
+    =-=-                       =-=-=-=-=-=-=-=                     -=-=
+    -  it is not water they seek, but the truth beneath the trees     -
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+.DESCRIPTION
+    Dot-sources Format-DowserSize, ConvertTo-DowserBytes, and
+    Get-DowserSortKey from the same directory and runs a fixed set of
+    known-input assertions against each. Reports PASSED or FAILED per
+    helper to the information stream, including the observed values when
+    an assertion fails. Run it directly to verify the helpers behave as
+    expected after a change.
+.EXAMPLE
+    ./Test-DowserHelpers.ps1
+
+    Runs all helper assertions and prints a PASSED or FAILED line per helper.
+.OUTPUTS
+    None. Results are written to the information and warning streams.
+#>
+
 $ErrorActionPreference = 'Stop'
 
 . "$PSScriptRoot/Format-DowserSize.ps1"
