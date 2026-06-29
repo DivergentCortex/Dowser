@@ -4,5 +4,20 @@
 # Test reports (regenerated on each run)
 Tests/Reports/
 
-# Firecrawl research cache
+# Logs
+*.log
+logs/
+synapse-daemon.log
+
+# Claude agent state
+.claude/
+
+# Build artifacts
+*.nupkg
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Research cache
 .firecrawl/

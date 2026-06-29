@@ -1,10 +1,10 @@
 @{
     RootModule        = 'Dowser.psm1'
     ModuleVersion     = '0.2.0'
-    GUID              = 'b7e1c9a0-0000-0000-0000-000000000001'
+    GUID              = '64c72862-caae-4d55-9a1f-0d5bf94d3695'
     Author            = 'Curt Leggett'
     CompanyName       = 'Divergent Cortex'
-    Copyright         = '(c) Curt Leggett. All rights reserved.'
+    Copyright         = '(c) 2026 Curt Leggett. Licensed under the MIT License.'
     Description       = 'Dowser - filesystem recon and inspection kit. Find what you cannot see. Cross-platform (Windows/Linux/macOS).'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
@@ -43,7 +43,7 @@
     PrivateData = @{
         PSData = @{
             Tags = @('filesystem','recon','search','utility','dowser','cross-platform','linux')
-            ProjectUri = ''
+            ProjectUri = 'https://github.com/kizer88/Dowser'
         }
     }
 }
