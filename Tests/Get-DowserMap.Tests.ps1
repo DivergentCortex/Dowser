@@ -10,7 +10,10 @@ try {
     $null = New-Item -ItemType Directory -Path $_pt -Force -ErrorAction Stop
     $null = New-Item -ItemType SymbolicLink -Path $_pl -Target $_pt -ErrorAction Stop
     $global:DowserTestCanSymlink = (Test-Path -LiteralPath $_pl)
-} catch { $global:DowserTestCanSymlink = $false }
+}
+catch {
+    $global:DowserTestCanSymlink = $false 
+}
 finally {
     Remove-Item $_pl -Force -ErrorAction SilentlyContinue
     Remove-Item $_pt -Force -Recurse -ErrorAction SilentlyContinue
@@ -24,9 +27,9 @@ Describe 'Get-DowserMap symlink rendering' {
 
         # target lives OUTSIDE the mapped root so traversal of the link is the only way inner.txt appears
         $tmpTarget = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSymTarget'
-        $tmpRoot   = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSymRoot'
+        $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSymRoot'
         $null = New-Item -ItemType Directory -Path $tmpTarget -Force
-        $null = New-Item -ItemType Directory -Path $tmpRoot   -Force
+        $null = New-Item -ItemType Directory -Path $tmpRoot -Force
 
         # plant a file inside the target so traversal is detectable
         [System.IO.File]::WriteAllText((Join-Path $tmpTarget 'inner.txt'), 'y')
@@ -39,7 +42,7 @@ Describe 'Get-DowserMap symlink rendering' {
         # sibling file so the-link is NOT the last child (sorts before z-*)
         [System.IO.File]::WriteAllText((Join-Path $tmpRoot 'z-sibling.txt'), 'x')
 
-        $script:tmpRoot   = $tmpRoot
+        $script:tmpRoot = $tmpRoot
         $script:tmpTarget = $tmpTarget
     }
 

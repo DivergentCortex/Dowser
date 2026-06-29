@@ -25,18 +25,18 @@ Describe 'Measure-DowserDiskUsage' {
         # Root-level files (treemap remainder): 10,000 + 500 = 10,500
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DduTest_$([System.IO.Path]::GetRandomFileName())"
         $null = New-Item -ItemType Directory -Path $tmpRoot -Force
-        $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'BigDir')   -Force
+        $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'BigDir') -Force
         $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'SmallDir') -Force
 
-        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir')   'huge.bin'),   ([byte[]]::new(1000000)))
-        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir')   'medium.bin'), ([byte[]]::new(500000)))
-        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'small.txt'),  ([byte[]]::new(1000)))
-        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'tiny.dat'),   ([byte[]]::new(100)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'root.ps1'),                          ([byte[]]::new(10000)))
-        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'noext'),                             ([byte[]]::new(500)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir') 'huge.bin'), ([byte[]]::new(1000000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'BigDir') 'medium.bin'), ([byte[]]::new(500000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'small.txt'), ([byte[]]::new(1000)))
+        [System.IO.File]::WriteAllBytes((Join-Path (Join-Path $tmpRoot 'SmallDir') 'tiny.dat'), ([byte[]]::new(100)))
+        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'root.ps1'), ([byte[]]::new(10000)))
+        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'noext'), ([byte[]]::new(500)))
 
         $expectedTotal = 1511600
-        $script:tmpRoot       = $tmpRoot
+        $script:tmpRoot = $tmpRoot
         $script:expectedTotal = $expectedTotal
     }
 
@@ -98,7 +98,7 @@ Describe 'Measure-DowserDiskUsage' {
 
         It 'BigDir is ranked before SmallDir' {
             $names = @($script:dirRows | Select-Object -ExpandProperty RelPath)
-            $bigIdx   = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'BigDir' }   | Select-Object -First 1))
+            $bigIdx = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'BigDir' }   | Select-Object -First 1))
             $smallIdx = [array]::IndexOf($names, ($names | Where-Object { $_ -match 'SmallDir' } | Select-Object -First 1))
             $bigIdx | Should -BeLessThan $smallIdx
         }
@@ -272,7 +272,9 @@ Describe 'Measure-DowserDiskUsage' {
             }
             $allWidths.Count | Should -BeGreaterThan 0
             $totalWidth = 0.0
-            foreach ($w in $allWidths) { $totalWidth += $w }
+            foreach ($w in $allWidths) {
+                $totalWidth += $w 
+            }
             # All blocks (immediate children + remainder) must together represent the full
             # tree -- sum should be within 1% of 100 to account for rounding.
             $totalWidth | Should -BeGreaterThan 99

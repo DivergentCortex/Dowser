@@ -17,7 +17,7 @@
 #>
 
 BeforeAll {
-    $script:ModuleRoot   = Split-Path -Parent $PSScriptRoot
+    $script:ModuleRoot = Split-Path -Parent $PSScriptRoot
     $script:ManifestPath = Join-Path $script:ModuleRoot 'Dowser.psd1'
 
     Remove-Module Dowser -Force -ErrorAction SilentlyContinue
