@@ -2,6 +2,18 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.036] - 2026-06-29
+### refactor(Write-Log): Align Write-Log comments and platform-guard tests with the Witness backport
+
+What changed:
+- Removed leftover WHAT-narration comments from the Write-Log function body (caller-info, component-priority, and console sections) so it matches the clean comment style of the canonical DivergentCortex.Witness Write-Log
+- Updated Test-DowserPlatformGuards.Tests.ps1 to the Witness-aligned helper names: Remove-DowserOldLogFiles -> Clear-LogFile, and Get-ExecutionContextInfo -> Get-PlatformContext with the new platform shape (asserts Platform in Linux/macOS instead of SessionType eq NonWindows)
+- Verified via AST parse: no parse errors, all six functions intact
+
+Why:
+- The updated Write-Log.ps1 is a single-file backport of DivergentCortex.Witness; its body still carried pre-backport narration comments and the Pester suite still referenced the old helper names, which would fail after the rename
+
+
 ## [2026.06.29.035] - 2026-06-29
 ### fix(Get-DowserTemplate): Fix phantom process block so the function actually runs on Windows
 
