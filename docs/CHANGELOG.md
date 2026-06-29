@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.033] - 2026-06-29
+### chore(go-public): History purge, GitHub hardening, final sanitization pass
+
+What changed:
+- Purged from all git history via git filter-repo: .claude/ai_forge/, .claude/settings.json, .firecrawl/, synapse-daemon.log, logs/dashboard.log, Tests/Reports/, resources/exeinfope/, resources/exeinfope.zip (62 commits reduced to 47)
+- Expired reflog and ran aggressive GC to remove unreachable objects from local repo
+- Sanitized remaining internal path reference in Public/Measure-DowserDirectory.ps1 .NOTES block (replaced raw personal path with generic porting note)
+- Enabled Dependabot vulnerability alerts and automated security fixes on GitHub via Caledon MCP
+- Secret scanning, private vulnerability reporting, branch protection, CodeQL deferred: require public visibility on free-plan repos
+
+Why:
+- Final remediation pass before public visibility flip. History purge removes internal tooling artifacts that should never appear in a public repo. Dependabot provides automated dependency vulnerability monitoring. Remaining GitHub hardening activates at or after the public flip.
+
+
 ## [2026.06.28.032] - 2026-06-28
 ### chore(go-public): Pre-publication sanitization and repo hardening for open-source release
 

@@ -8,8 +8,7 @@ function Find-DowserScript {
         common scripting extensions (.ps1, .psm1, .py, .vbs, .sh, .bat, .cmd, etc.).
         Optionally filters to files modified within a recency window.
 
-        Replaces Find-Scripts.ps1 / Find-SecureCrtScripts — fully generalized.
-        Source was hardcoded to a specific network share. Generalized.
+        Ported from standalone Find-Scripts.ps1 (was hardcoded to a single network share; now generalized).
 
     .PARAMETER Path
         Root path(s) to search. Accepts pipeline input.
