@@ -70,7 +70,7 @@ function Measure-DowserDirectory {
 
     process {
         foreach ($rootPath in $Path) {
-            Write-Log "Measure-DowserDirectory scanning subdirectories under '$rootPath'"
+            Write-Log "Measure-DowserDirectory scanning subdirectories under '$rootPath'" -Severity Verbose
 
             $directoryItems = $null
             try {

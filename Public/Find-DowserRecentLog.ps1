@@ -84,7 +84,7 @@ function Find-DowserRecentLog {
                 continue
             }
 
-            Write-Log "Searching '$rootPath' for '$FileName'..."
+            Write-Log "Searching '$rootPath' for '$FileName'..." -Severity Verbose
 
             try {
                 $searchParams = @{
@@ -97,7 +97,7 @@ function Find-DowserRecentLog {
 
                 $found = @(Get-ChildItem @searchParams | Sort-Object LastWriteTime -Descending)
 
-                Write-Log "Found $($found.Count) copy/copies of '$FileName' in '$rootPath'"
+                Write-Log "Found $($found.Count) copy/copies of '$FileName' in '$rootPath'" -Severity Verbose
 
                 if ($found.Count -eq 0) {
                     Write-Log "No copies of '$FileName' found under '$rootPath'" -Severity Warning
@@ -115,7 +115,7 @@ function Find-DowserRecentLog {
                 }
                 else {
                     $newest = $found | Select-Object -First 1
-                    Write-Log "Most recent: $($newest.FullName) @ $($newest.LastWriteTime)"
+                    Write-Log "Most recent: $($newest.FullName) @ $($newest.LastWriteTime)" -Severity Verbose
                     [PSCustomObject]@{
                         FullName      = $newest.FullName
                         LastWriteTime = $newest.LastWriteTime

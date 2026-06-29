@@ -111,7 +111,7 @@ function ConvertTo-DowserBase64 {
             return
         }
 
-        Write-Log "Decoding Base64 to image: '$resolvedInput'"
+        Write-Log "Decoding Base64 to image: '$resolvedInput'" -Severity Verbose
 
         try {
             if (Test-Path $resolvedInput) {
@@ -130,14 +130,14 @@ function ConvertTo-DowserBase64 {
 
             $bytes = [Convert]::FromBase64String($b64Str)
             [System.IO.File]::WriteAllBytes($OutputFile, $bytes)
-            Write-Log "Decoded successfully to: '$OutputFile'"
+            Write-Log "Decoded successfully to: '$OutputFile'" -Severity Verbose
         }
         catch {
             Write-Log "ConvertTo-DowserBase64 failed decoding '$resolvedInput' to '$OutputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         }
     }
     else {
-        Write-Log "Encoding image to Base64: '$resolvedInput'"
+        Write-Log "Encoding image to Base64: '$resolvedInput'" -Severity Verbose
 
         try {
             $bytes = [System.IO.File]::ReadAllBytes($resolvedInput)
@@ -173,7 +173,7 @@ function ConvertTo-DowserBase64 {
 
             if ($OutputFile) {
                 Set-Content -Path $OutputFile -Value $b64 -Encoding UTF8 -ErrorAction Stop
-                Write-Log "Saved Base64 output to file: '$OutputFile'"
+                Write-Log "Saved Base64 output to file: '$OutputFile'" -Severity Verbose
             }
 
             # set-clipboard missing in headless sessions, warn not throw
@@ -183,7 +183,7 @@ function ConvertTo-DowserBase64 {
                     try {
                         Set-Clipboard -Value $b64 -ErrorAction Stop
                         $clipboardOk = $true
-                        Write-Log "Base64 copied to clipboard."
+                        Write-Log "Base64 copied to clipboard." -Severity Verbose
                     }
                     catch {
                         Write-Log "ConvertTo-DowserBase64 failed copying to clipboard: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
@@ -193,7 +193,7 @@ function ConvertTo-DowserBase64 {
                     Write-Log "Set-Clipboard is not available on this platform." -Severity Warning
                 }
                 if (-not $clipboardOk -and -not $OutputFile) {
-                    Write-Log "Emitting Base64 to the pipeline as clipboard fallback."
+                    Write-Log "Emitting Base64 to the pipeline as clipboard fallback." -Severity Verbose
                     Write-Output $b64
                 }
             }
@@ -203,7 +203,7 @@ function ConvertTo-DowserBase64 {
                 Write-Output $b64
             }
             elseif (-not $OutputFile) {
-                Write-Log "Base64 length: $($b64.Length) chars."
+                Write-Log "Base64 length: $($b64.Length) chars." -Severity Verbose
             }
 
         }

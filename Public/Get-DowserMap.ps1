@@ -444,7 +444,7 @@ function Get-DowserMap {
 
     # --- Parallel Pre-scan Phase ---
     if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($effectiveIncludePatterns -or $IncludeExtensions -or $IncludeFolders)) {
-        Write-Log "Get-DowserMap starting parallel pre-scan of '$Path' to populate caches"
+        Write-Log "Get-DowserMap starting parallel pre-scan of '$Path' to populate caches" -Severity Verbose
 
         $preScanScript = {
             param($targetPath, $effectiveIncludePatterns, $normInclude, $normExclude, $excludeExactFiles, $excludeWildFiles, $excludeExact, $excludeWild, $excludePaths, $includeExactNames, $includeWildcardNames, $includeExactPaths, $includeWildcardPaths, $IncludeHidden, $MaxDepth, $FollowReparse, $FoldersOnly)
@@ -577,7 +577,7 @@ function Get-DowserMap {
         }
         $pool.Close()
         $pool.Dispose()
-        Write-Log "Get-DowserMap pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
+        Write-Log "Get-DowserMap pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths." -Severity Verbose
     }
 
     # --- Filter helper functions ---

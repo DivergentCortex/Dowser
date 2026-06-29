@@ -106,7 +106,7 @@ function Measure-DowserDiskUsage {
                 Write-Log "Measure-DowserDiskUsage path is not a directory: '$resolvedRoot'" -Severity Warning
                 continue
             }
-            Write-Log "Measure-DowserDiskUsage scanning '$resolvedRoot'"
+            Write-Log "Measure-DowserDiskUsage scanning '$resolvedRoot'" -Severity Verbose
 
             Write-Progress -Activity 'Measure-DowserDiskUsage' `
                 -Status "Enumerating files under $resolvedRoot" -PercentComplete 0
@@ -351,32 +351,32 @@ function Measure-DowserDiskUsage {
             }
 
             $sep = '-' * 70
-            Write-Log "Measure-DowserDiskUsage scan complete: '$resolvedRoot' total $( Format-DowserSize -DataValue $totalBytes ) ($totalCount files)"
-            Write-Log $sep
-            Write-Log "Disk Usage Report: $resolvedRoot"
-            Write-Log ("Total: {0}  ({1} files)" -f (Format-DowserSize -DataValue $totalBytes), $totalCount)
-            Write-Log $sep
+            Write-Log "Measure-DowserDiskUsage scan complete: '$resolvedRoot' total $( Format-DowserSize -DataValue $totalBytes ) ($totalCount files)" -Severity Verbose
+            Write-Log $sep -Severity Verbose
+            Write-Log "Disk Usage Report: $resolvedRoot" -Severity Verbose
+            Write-Log ("Total: {0}  ({1} files)" -f (Format-DowserSize -DataValue $totalBytes), $totalCount) -Severity Verbose
+            Write-Log $sep -Severity Verbose
 
-            Write-Log ' '
-            Write-Log "BIGGEST DIRECTORIES (top $TopN)"
-            Write-Log $sep
+            Write-Log ' ' -Severity Verbose
+            Write-Log "BIGGEST DIRECTORIES (top $TopN)" -Severity Verbose
+            Write-Log $sep -Severity Verbose
             foreach ($d in $dirObjects) {
-                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $d.RelPath, $d.Size, $d.PctOfTotal, $d.Bar)
+                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $d.RelPath, $d.Size, $d.PctOfTotal, $d.Bar) -Severity Verbose
             }
 
-            Write-Log ' '
-            Write-Log "BIGGEST FILES (top $TopN)"
-            Write-Log $sep
+            Write-Log ' ' -Severity Verbose
+            Write-Log "BIGGEST FILES (top $TopN)" -Severity Verbose
+            Write-Log $sep -Severity Verbose
             foreach ($f in $fileObjects) {
-                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $f.RelPath, $f.Size, $f.PctOfTotal, $f.Bar)
+                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $f.RelPath, $f.Size, $f.PctOfTotal, $f.Bar) -Severity Verbose
             }
 
-            Write-Log ' '
-            Write-Log 'BY EXTENSION'
-            Write-Log $sep
+            Write-Log ' ' -Severity Verbose
+            Write-Log 'BY EXTENSION' -Severity Verbose
+            Write-Log $sep -Severity Verbose
             foreach ($e in $extObjects) {
                 Write-Log ("{0,-12} {1,10}  {2,5}%  {3,6} files  [{4}]" -f `
-                        $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar)
+                        $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar) -Severity Verbose
             }
 
             $summaryObject
@@ -392,7 +392,7 @@ function Measure-DowserDiskUsage {
 
             if ($ExportHtml) {
                 try {
-                    Write-Log "Measure-DowserDiskUsage writing HTML report to '$ExportHtml'"
+                    Write-Log "Measure-DowserDiskUsage writing HTML report to '$ExportHtml'" -Severity Verbose
                     $htmlContent = _Build-DduHtml `
                         -SummaryObject $summaryObject `
                         -DirObjects $dirObjects `
@@ -404,7 +404,7 @@ function Measure-DowserDiskUsage {
                         -DirSizes $dirSizes `
                         -DirComparer $dirComparer
                     $htmlContent | Out-File -FilePath $ExportHtml -Encoding UTF8 -ErrorAction Stop
-                    Write-Log "Measure-DowserDiskUsage HTML report written to '$ExportHtml'"
+                    Write-Log "Measure-DowserDiskUsage HTML report written to '$ExportHtml'" -Severity Verbose
                 }
                 catch {
                     Write-Log "Measure-DowserDiskUsage failed writing HTML to '$ExportHtml': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error

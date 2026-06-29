@@ -105,7 +105,7 @@ function Find-DowserFile {
         # bare strings get wrapped, already-wildcarded left alone
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
             $Pattern = "*$Pattern*"
-            Write-Log "Pattern auto-wrapped to: $Pattern"
+            Write-Log "Pattern auto-wrapped to: $Pattern" -Severity Verbose
         }
     }
 
@@ -215,7 +215,7 @@ function Find-DowserFile {
 
             $allPaths = $filesFound.ToArray() | Select-Object -Unique
             $count = @($allPaths).Count
-            Write-Log "Found $count files matching basic criteria."
+            Write-Log "Found $count files matching basic criteria." -Severity Verbose
             
             if ($count -gt 0) {
                 Write-Progress -Activity "Find-DowserFile" -Status "Retrieving file objects..." -PercentComplete -1

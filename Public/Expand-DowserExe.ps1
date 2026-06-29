@@ -98,7 +98,7 @@ function Expand-DowserExe {
             Write-Log "Expand-DowserExe: 7-Zip not found at '$SevenZipPath'. Install 7-Zip or specify -SevenZipPath." -Severity Error
             return
         }
-        Write-Log "Using 7-Zip: '$SevenZipPath'."
+        Write-Log "Using 7-Zip: '$SevenZipPath'." -Severity Verbose
     }
 
     process {
@@ -114,7 +114,7 @@ function Expand-DowserExe {
                 continue
             }
 
-            Write-Log "Checking extractability: '$($file.FullName)'."
+            Write-Log "Checking extractability: '$($file.FullName)'." -Severity Verbose
 
             $testResult = Test-DowserExtractable -Path $file.FullName -SevenZipPath $SevenZipPath
 
@@ -150,10 +150,10 @@ function Expand-DowserExe {
             if ($PSCmdlet.ShouldProcess($file.FullName, "Extract to '$dest'")) {
                 if (-not (Test-Path -LiteralPath $dest)) {
                     New-Item -ItemType Directory -Path $dest -Force | Out-Null
-                    Write-Log "Created destination directory: '$dest'."
+                    Write-Log "Created destination directory: '$dest'." -Severity Verbose
                 }
 
-                Write-Log "Extracting '$($file.Name)' to '$dest'."
+                Write-Log "Extracting '$($file.Name)' to '$dest'." -Severity Verbose
                 $7zArgs = @('x', $file.FullName, "-o$dest", '-y')
                 if ($Force) {
                     $7zArgs += '-aoa'
@@ -171,7 +171,7 @@ function Expand-DowserExe {
                 $success = ($exitCode -eq 0)
                 if ($success) {
                     $extractedCount = (Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue).Count
-                    Write-Log "Extraction complete: $extractedCount file(s) extracted to '$dest'."
+                    Write-Log "Extraction complete: $extractedCount file(s) extracted to '$dest'." -Severity Verbose
                 }
                 else {
                     Write-Log "Expand-DowserExe: 7-Zip returned exit code $exitCode for '$($file.Name)'." -Severity Warning
@@ -202,7 +202,7 @@ function Expand-DowserExe {
                     $extractResult
                 }
                 else {
-                    Write-Log "$($file.Name): $($extractResult.Details)."
+                    Write-Log "$($file.Name): $($extractResult.Details)." -Severity Verbose
                 }
             }
         }

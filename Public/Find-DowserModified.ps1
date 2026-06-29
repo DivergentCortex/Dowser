@@ -65,13 +65,13 @@ function Find-DowserModified {
                 continue
             }
 
-            Write-Log "Searching '$rootPath' for files modified on $($Date.ToString('yyyy-MM-dd'))..."
+            Write-Log "Searching '$rootPath' for files modified on $($Date.ToString('yyyy-MM-dd'))..." -Severity Verbose
 
             try {
                 $files = Get-ChildItem -Path $rootPath -Recurse:$Recurse -File -ErrorAction SilentlyContinue |
                     Where-Object { $_.LastWriteTime.Date -eq $Date.Date }
 
-                Write-Log "Found $(@($files).Count) files modified on $($Date.ToString('yyyy-MM-dd'))"
+                Write-Log "Found $(@($files).Count) files modified on $($Date.ToString('yyyy-MM-dd'))" -Severity Verbose
 
                 foreach ($file in $files) {
                     [PSCustomObject]@{

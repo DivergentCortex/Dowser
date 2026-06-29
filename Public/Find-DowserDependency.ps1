@@ -121,10 +121,10 @@ function Find-DowserDependency {
     $results = @()
 
     Write-Log "Starting Find-DowserDependency"
-    Write-Log "Search Patterns: $($patterns -join ', ')"
+    Write-Log "Search Patterns: $($patterns -join ', ')" -Severity Verbose
 
     foreach ($path in $searchPaths) {
-        Write-Log "Scanning path: $path"
+        Write-Log "Scanning path: $path" -Severity Verbose
         
         $files = Get-ChildItem -Path $path -Recurse -Filter "*.ps1" -ErrorAction SilentlyContinue | 
             Where-Object { 
@@ -182,12 +182,12 @@ function Find-DowserDependency {
     Write-Progress -Activity "Scanning Files" -Completed
 
     if ($results.Count -eq 0) {
-        Write-Log "No dependencies found."
+        Write-Log "No dependencies found." -Severity Verbose
         Write-Log "Ending Find-DowserDependency"
         return
     }
 
-    Write-Log "Found $($results.Count) dependencies across $(@($results.SourceFile | Select-Object -Unique).Count) files"
+    Write-Log "Found $($results.Count) dependencies across $(@($results.SourceFile | Select-Object -Unique).Count) files" -Severity Verbose
 
     $groupedResults = $results | Group-Object SourceFile
 
@@ -203,9 +203,9 @@ function Find-DowserDependency {
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $exportPath = Join-Path $PWD "DependencyScan_$timestamp.csv"
         try {
-            Write-Log "Exporting results to CSV: $exportPath"
+            Write-Log "Exporting results to CSV: $exportPath" -Severity Verbose
             $results | Export-Csv -Path $exportPath -NoTypeInformation -ErrorAction Stop
-            Write-Log "Exported $($results.Count) rows to: $exportPath"
+            Write-Log "Exported $($results.Count) rows to: $exportPath" -Severity Verbose
         }
         catch {
             Write-Log "Find-DowserDependency failed exporting CSV '$exportPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error

@@ -91,11 +91,11 @@ function ConvertTo-DowserIco {
     $tempFile = $null
     if ($InputFilePath -like '\\*') {
         $tempFile = Join-Path $env:TEMP "$([System.IO.Path]::GetRandomFileName())"
-        Write-Log "UNC path detected. Copying to temp: '$tempFile'."
+        Write-Log "UNC path detected. Copying to temp: '$tempFile'." -Severity Verbose
         try {
             Copy-Item -Path $InputFilePath -Destination $tempFile -Force -ErrorAction Stop
             $InputFilePath = $tempFile
-            Write-Log "UNC file staged to temp successfully."
+            Write-Log "UNC file staged to temp successfully." -Severity Verbose
         }
         catch {
             Write-Log "ConvertTo-DowserIco failed copying UNC file '$InputFilePath' to temp: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
@@ -217,7 +217,7 @@ function ConvertTo-DowserIco {
         $bw.Close()
         $fs.Close()
 
-        Write-Log "Wrote icon: '$OutputFile'."
+        Write-Log "Wrote icon: '$OutputFile'." -Severity Verbose
         Write-Log "Ending ConvertTo-DowserIco"
         return $true
     }
@@ -231,7 +231,7 @@ function ConvertTo-DowserIco {
         if ($bitmap) { $bitmap.Dispose() }
         if ($tempFile -and (Test-Path $tempFile)) {
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            Write-Log "Temp file cleaned up."
+            Write-Log "Temp file cleaned up." -Severity Verbose
         }
     }
 }

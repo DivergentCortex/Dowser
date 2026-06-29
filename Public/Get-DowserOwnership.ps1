@@ -207,10 +207,10 @@ function Get-DowserOwnership {
         }
     }
 
-    Write-Log "Get-DowserOwnership scanning '$Directory' for extension '$Extension'"
+    Write-Log "Get-DowserOwnership scanning '$Directory' for extension '$Extension'" -Severity Verbose
     try {
         $DirectoryFiles = Get-ChildItem $Directory -Recurse -Force -ErrorAction Stop
-        Write-Log "Get-DowserOwnership scan complete: $(@($DirectoryFiles).Count) items found"
+        Write-Log "Get-DowserOwnership scan complete: $(@($DirectoryFiles).Count) items found" -Severity Verbose
     }
     catch {
         Write-Log "Get-DowserOwnership failed scanning '$Directory': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error

@@ -68,7 +68,7 @@ function Get-DowserTemplate {
 
         $shell = $null
         try {
-            Write-Log "Get-DowserTemplate querying Shell.Application for '$resolvedPath'"
+            Write-Log "Get-DowserTemplate querying Shell.Application for '$resolvedPath'" -Severity Verbose
             $shell = New-Object -ComObject Shell.Application
             $folder = $shell.Namespace($resolvedPath)
 
@@ -93,7 +93,7 @@ function Get-DowserTemplate {
                 }
             }
             Write-Progress -Activity "Get-DowserTemplate" -Completed
-            Write-Log "Get-DowserTemplate found $($columns.Count) column(s) for '$resolvedPath'"
+            Write-Log "Get-DowserTemplate found $($columns.Count) column(s) for '$resolvedPath'" -Severity Verbose
 
             [PSCustomObject]@{
                 Path     = $resolvedPath

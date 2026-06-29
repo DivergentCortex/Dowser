@@ -350,7 +350,7 @@ function Get-DowserTopology {
     }
 
     process {
-        Write-Log "Get-DowserTopology detected parameter set '$($PSCmdlet.ParameterSetName)'"
+        Write-Log "Get-DowserTopology detected parameter set '$($PSCmdlet.ParameterSetName)'" -Severity Verbose
         if ($PSCmdlet.ParameterSetName -eq "Path") {
             $resolvedPaths = @($Path | Resolve-Path | ForEach-Object { $_.Path })
         }
@@ -359,7 +359,7 @@ function Get-DowserTopology {
         }
 
         foreach ($rPath in $resolvedPaths) {
-            Write-Log "Get-DowserTopology rendering '$rPath'"
+            Write-Log "Get-DowserTopology rendering '$rPath'" -Severity Verbose
             $showParams = @{
                 Path  = $rPath
                 Color = $colorize

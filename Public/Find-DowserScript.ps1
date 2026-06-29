@@ -84,12 +84,12 @@ function Find-DowserScript {
                 continue
             }
 
-            Write-Log "Scanning '$rootPath' for script files..."
+            Write-Log "Scanning '$rootPath' for script files..." -Severity Verbose
 
             $cutoff = $null
             if ($ModifiedWithin -and $ModifiedWithin -gt 0) {
                 $cutoff = (Get-Date).AddDays(-$ModifiedWithin)
-                Write-Log "Recency filter: modified within $ModifiedWithin days (after $($cutoff.ToString('yyyy-MM-dd')))"
+                Write-Log "Recency filter: modified within $ModifiedWithin days (after $($cutoff.ToString('yyyy-MM-dd')))" -Severity Verbose
             }
 
             try {

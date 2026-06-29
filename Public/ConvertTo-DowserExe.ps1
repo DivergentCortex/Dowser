@@ -100,10 +100,10 @@ namespace PowerShellWrapper
     $outputFile = [System.IO.Path]::GetFileNameWithoutExtension($ScriptPath) + ".exe"
     # Add-Type -OutputType was removed in PS 6+
     if ($PSVersionTable.PSVersion.Major -lt 6) {
-        Write-Log "Compiling '$ScriptPath' to '$outputFile'."
+        Write-Log "Compiling '$ScriptPath' to '$outputFile'." -Severity Verbose
         try {
             Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication -ErrorAction Stop
-            Write-Log "Compiled '$outputFile' successfully."
+            Write-Log "Compiled '$outputFile' successfully." -Severity Verbose
         }
         catch {
             Write-Log "ConvertTo-DowserExe failed compiling '$outputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
@@ -224,10 +224,10 @@ namespace PowerShellWrapper
         return $null
     }
 
-    Write-Log "Compiling '$ScriptPath' to '$outputFile'."
+    Write-Log "Compiling '$ScriptPath' to '$outputFile'." -Severity Verbose
     try {
         Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication -ErrorAction Stop
-        Write-Log "Compiled '$outputFile' successfully."
+        Write-Log "Compiled '$outputFile' successfully." -Severity Verbose
     }
     catch {
         Write-Log "ConvertTo-DowserExeConfuserEx failed compiling '$outputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
@@ -236,14 +236,14 @@ namespace PowerShellWrapper
 
     $confuserCliExe = Join-Path -Path $ConfuserExPath -ChildPath "Confuser.CLI.exe"
     $confuserExConfig = Join-Path -Path $ConfuserExPath -ChildPath "ConfuserEx.crproj"
-    Write-Log "Running ConfuserEx on '$outputFile'."
+    Write-Log "Running ConfuserEx on '$outputFile'." -Severity Verbose
     try {
         & $confuserCliExe -n $outputFile -o $outputFile --project $confuserExConfig
         if ($LASTEXITCODE -ne 0) {
             Write-Log "ConvertTo-DowserExeConfuserEx: ConfuserEx exited with code $LASTEXITCODE for '$outputFile'." -Severity Warning
         }
         else {
-            Write-Log "ConfuserEx obfuscation complete for '$outputFile'."
+            Write-Log "ConfuserEx obfuscation complete for '$outputFile'." -Severity Verbose
         }
     }
     catch {

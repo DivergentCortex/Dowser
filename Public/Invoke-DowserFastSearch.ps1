@@ -93,7 +93,7 @@ function Invoke-DowserFastSearch {
     begin {
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         Write-Log "Starting Invoke-DowserFastSearch"
-        Write-Log "Invoke-DowserFastSearch: pattern '$SearchString', threads $Threads"
+        Write-Log "Invoke-DowserFastSearch: pattern '$SearchString', threads $Threads" -Severity Verbose
     }
 
     process {
@@ -104,7 +104,7 @@ function Invoke-DowserFastSearch {
             return
         }
 
-        Write-Log "Invoke-DowserFastSearch: found $($files.Count) file(s) to search"
+        Write-Log "Invoke-DowserFastSearch: found $($files.Count) file(s) to search" -Severity Verbose
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, $Threads)
         $runspacePool.Open()
@@ -187,7 +187,7 @@ function Invoke-DowserFastSearch {
         }
 
         $stopwatch.Stop()
-        Write-Log "Invoke-DowserFastSearch: search complete - $($results.Count) match(es) across $totalFiles file(s) in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s"
+        Write-Log "Invoke-DowserFastSearch: search complete - $($results.Count) match(es) across $totalFiles file(s) in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s" -Severity Verbose
         Write-Log "Ending Invoke-DowserFastSearch"
 
         $results

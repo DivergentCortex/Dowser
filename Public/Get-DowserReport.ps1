@@ -144,7 +144,7 @@ function Get-DowserReport {
         }
 
         Write-Log "Starting Get-DowserReport"
-        Write-Log "Get-DowserReport params: Threads=$ThreadCount Depth=$Depth UseRunspaces=$UseRunspaces"
+        Write-Log "Get-DowserReport params: Threads=$ThreadCount Depth=$Depth UseRunspaces=$UseRunspaces" -Severity Verbose
     }
 
     process {
@@ -669,10 +669,10 @@ function Get-DowserReport {
         Write-Log "" -Severity Verbose
 
         if ($ExportCsv) {
-            Write-Log "Get-DowserReport exporting CSV to '$ExportCsv'"
+            Write-Log "Get-DowserReport exporting CSV to '$ExportCsv'" -Severity Verbose
             try {
                 $sortedResults | Export-Csv -Path $ExportCsv -NoTypeInformation -ErrorAction Stop
-                Write-Log "Get-DowserReport CSV exported to '$ExportCsv'"
+                Write-Log "Get-DowserReport CSV exported to '$ExportCsv'" -Severity Verbose
             }
             catch {
                 Write-Log "Get-DowserReport failed exporting CSV to '$ExportCsv': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
@@ -680,7 +680,7 @@ function Get-DowserReport {
         }
 
         if ($ExportHtml) {
-            Write-Log "Get-DowserReport exporting HTML report to '$ExportHtml'"
+            Write-Log "Get-DowserReport exporting HTML report to '$ExportHtml'" -Severity Verbose
             try {
                 $htmlHead = @"
 <style>
@@ -736,7 +736,7 @@ function Get-DowserReport {
 </html>
 "@
                 $fullHtml | Out-File -FilePath $ExportHtml -Encoding UTF8 -ErrorAction Stop
-                Write-Log "Get-DowserReport HTML report exported to '$ExportHtml'"
+                Write-Log "Get-DowserReport HTML report exported to '$ExportHtml'" -Severity Verbose
             }
             catch {
                 Write-Log "Get-DowserReport failed exporting HTML to '$ExportHtml': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
