@@ -59,7 +59,8 @@ namespace PowerShellWrapper
     # Add-Type -OutputType was removed in PS 6+
     if ($PSVersionTable.PSVersion.Major -lt 6) {
         Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
-    } else {
+    }
+    else {
         Write-Warning "ConvertTo-DowserExe requires Windows PowerShell 5.1 (Add-Type -OutputType was removed in PowerShell 6+). Run this under powershell.exe."
         return $null
     }

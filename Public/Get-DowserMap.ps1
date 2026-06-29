@@ -89,9 +89,13 @@ function Get-DowserMap {
         [hashtable]$PsCountCache
     )
 
-    if (-not $PSBoundParameters.ContainsKey('ShowFullPathTree')) { $ShowFullPathTree = $true }
+    if (-not $PSBoundParameters.ContainsKey('ShowFullPathTree')) {
+        $ShowFullPathTree = $true 
+    }
 
-    if ($MarkdownFile) { $AsMarkdown = $true }
+    if ($MarkdownFile) {
+        $AsMarkdown = $true 
+    }
     if ($AsHtml -and $AsMarkdown) {
         Write-Warning 'Cannot use -AsHtml and -AsMarkdown together. Pick one.'
         return
@@ -99,9 +103,16 @@ function Get-DowserMap {
 
     function ConvertTo-NormalizedExtension {
         param([string]$ext)
-        if ([string]::IsNullOrEmpty($ext)) { return '' }
+        if ([string]::IsNullOrEmpty($ext)) {
+            return '' 
+        }
         $ext = $ext.ToLowerInvariant()
-        if ($ext -notmatch '^\.') { return ".$ext" } else { return $ext }
+        if ($ext -notmatch '^\.') {
+            return ".$ext" 
+        }
+        else {
+            return $ext 
+        }
     }
 
     function Get-FolderAnnotation {
@@ -114,8 +125,13 @@ function Get-DowserMap {
                 try {
                     $measured = Get-ChildItem -LiteralPath $folderPath -Recurse -File -Force -ErrorAction SilentlyContinue |
                         Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue
-                    if ($measured.Sum) { $sizeBytes = $measured.Sum }
-                } catch { Write-Verbose "Size measurement failed for '$folderPath': $_" }
+                    if ($measured.Sum) {
+                        $sizeBytes = $measured.Sum 
+                    }
+                }
+                catch {
+                    Write-Verbose "Size measurement failed for '$folderPath': $_" 
+                }
                 $SizeCache[$folderPath] = $sizeBytes
             }
             $formatted = Format-DowserSize $SizeCache[$folderPath]
@@ -129,7 +145,10 @@ function Get-DowserMap {
                     $counted = Get-ChildItem -LiteralPath $folderPath -Recurse -Filter '*.ps1' -File -Force -ErrorAction SilentlyContinue |
                         Measure-Object
                     $count = $counted.Count
-                } catch { Write-Verbose "PS1 count failed for '$folderPath': $_" }
+                }
+                catch {
+                    Write-Verbose "PS1 count failed for '$folderPath': $_" 
+                }
                 $PsCountCache[$folderPath] = $count
             }
             $cnt = $PsCountCache[$folderPath]
@@ -140,7 +159,9 @@ function Get-DowserMap {
     }
 
     $normInclude = @()
-    if ($IncludeExtensions) { $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormalizedExtension $_ }) }
+    if ($IncludeExtensions) {
+        $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
+    }
 
     $defaultExcludeExts = @(
         '.pyc', '.pyo', '.pyd', '.so', '.dll', '.dylib', '.obj', '.o', '.a', '.lib',
@@ -150,11 +171,17 @@ function Get-DowserMap {
         '.cache', '.eslintcache', '.parcel-cache'
     )
     $allExcludeExts = @()
-    if (-not $NoDefaultExcludes) { $allExcludeExts += $defaultExcludeExts }
-    if ($ExcludeExtensions) { $allExcludeExts += @($ExcludeExtensions) }
+    if (-not $NoDefaultExcludes) {
+        $allExcludeExts += $defaultExcludeExts 
+    }
+    if ($ExcludeExtensions) {
+        $allExcludeExts += @($ExcludeExtensions) 
+    }
     $allExcludeExts = $allExcludeExts | Select-Object -Unique
     $normExclude = @()
-    if ($allExcludeExts) { $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) }
+    if ($allExcludeExts) {
+        $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
+    }
 
     # folder exclude defaults, bypass with -NoDefaultExcludes
     $defaultExcludes = @(
@@ -169,38 +196,52 @@ function Get-DowserMap {
         'site-packages', 'dist-info', '.dist-info', '.claude'
     )
     $allExcludes = @()
-    if (-not $NoDefaultExcludes) { $allExcludes += $defaultExcludes }
-    if ($ExcludeFolders) { $allExcludes += @($ExcludeFolders) }
+    if (-not $NoDefaultExcludes) {
+        $allExcludes += $defaultExcludes 
+    }
+    if ($ExcludeFolders) {
+        $allExcludes += @($ExcludeFolders) 
+    }
     $allExcludes = $allExcludes | Select-Object -Unique
 
     $excludeExact = @()
-    $excludeWild  = @()
+    $excludeWild = @()
     if ($allExcludes) {
         $excludeExact = @($allExcludes | Where-Object { $_ -notmatch '[\*\?\[\]]' })
-        $excludeWild  = @($allExcludes | Where-Object { $_ -match     '[\*\?\[\]]' })
+        $excludeWild = @($allExcludes | Where-Object { $_ -match '[\*\?\[\]]' })
     }
 
     $defaultExcludeFiles = @( 'settings.local.json', '.env', 'sccm.code-workspace', '*.code-workspace' )
     $allExcludeFiles = @()
-    if (-not $NoDefaultExcludes) { $allExcludeFiles += $defaultExcludeFiles }
-    if ($ExcludeFiles) { $allExcludeFiles += @($ExcludeFiles) }
+    if (-not $NoDefaultExcludes) {
+        $allExcludeFiles += $defaultExcludeFiles 
+    }
+    if ($ExcludeFiles) {
+        $allExcludeFiles += @($ExcludeFiles) 
+    }
     $allExcludeFiles = $allExcludeFiles | Select-Object -Unique
 
     $excludeExactFiles = @()
-    $excludeWildFiles  = @()
+    $excludeWildFiles = @()
     if ($allExcludeFiles) {
         $excludeExactFiles = @($allExcludeFiles | Where-Object { $_ -notmatch '[\*\?\[\]]' })
-        $excludeWildFiles  = @($allExcludeFiles | Where-Object { $_ -match     '[\*\?\[\]]' })
+        $excludeWildFiles = @($allExcludeFiles | Where-Object { $_ -match '[\*\?\[\]]' })
     }
 
     $effectiveIncludePatterns = @()
     if ($IncludeFilePatterns) {
         foreach ($pattern in $IncludeFilePatterns) {
-            if ([string]::IsNullOrWhiteSpace($pattern)) { continue }
+            if ([string]::IsNullOrWhiteSpace($pattern)) {
+                continue 
+            }
             $p = $pattern.Trim()
             if ($p -notmatch '[\*\?\[\]]') {
-                if ($p.StartsWith('.')) { $p = "*$p" }
-                else { $p = "*$p*" }
+                if ($p.StartsWith('.')) {
+                    $p = "*$p" 
+                }
+                else {
+                    $p = "*$p*" 
+                }
             }
             $effectiveIncludePatterns += $p
         }
@@ -208,58 +249,103 @@ function Get-DowserMap {
 
     # native separator so path compares stay valid on linux and windows
     $sep = [string][IO.Path]::DirectorySeparatorChar
-    function ConvertTo-NativeSeparator { param([string]$s) if ($null -eq $s) { return $null } if ($sep -eq '/') { return ($s -replace '\\', '/') } else { return ($s -replace '/', '\') } }
+    function ConvertTo-NativeSeparator {
+        param([string]$s) if ($null -eq $s) {
+            return $null 
+        } if ($sep -eq '/') {
+            return ($s -replace '\\', '/') 
+        }
+        else {
+            return ($s -replace '/', '\') 
+        } 
+    }
     # regex needs backslash input so normalize locally
     function ConvertTo-WslPath {
         param([string]$inputPath)
-        if ([string]::IsNullOrWhiteSpace($inputPath)) { return $inputPath }
+        if ([string]::IsNullOrWhiteSpace($inputPath)) {
+            return $inputPath 
+        }
         $normalized = ($inputPath -replace '/', '\')
         if ($normalized -match '^[\\]{2}(?<server>[^\\]+)\\(?<share>[^\\]+)(?<rest>.*)$') {
             $server = $matches.server; $share = $matches.share
             $rest = $matches.rest -replace '^[\\/]+', ''
-            if ($rest) { $rest = '/' + ($rest -replace '\\', '/') } else { $rest = '' }
+            if ($rest) {
+                $rest = '/' + ($rest -replace '\\', '/') 
+            }
+            else {
+                $rest = '' 
+            }
             return "/mnt/unc/$server/$share$rest"
         }
         if ($normalized -match '^(?<drive>[a-zA-Z]):[\\/]?(?<rest>.*)$') {
             $driveLetter = $matches.drive.ToLowerInvariant()
             $rest = $matches.rest -replace '^[\\/]+', '' -replace '\\', '/'
-            if ($rest) { return "/mnt/$driveLetter/$rest" }
+            if ($rest) {
+                return "/mnt/$driveLetter/$rest" 
+            }
             return "/mnt/$driveLetter"
         }
         return ($normalized -replace '\\', '/')
     }
 
     $rootFull = $Path
-    try { $rootFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath } catch { }
+    try {
+        $rootFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath 
+    }
+    catch { 
+    }
     $rootFull = ConvertTo-NativeSeparator $rootFull
-    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length-1] -ne $sep[0]) { $rootFull += $sep }
+    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length - 1] -ne $sep[0]) {
+        $rootFull += $sep 
+    }
 
     $excludePaths = @()
-    if ($ExcludePathPatterns) { $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) }
+    if ($ExcludePathPatterns) {
+        $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) 
+    }
 
     $includeExactNames = @(); $includeWildcardNames = @()
     $includeExactPaths = @(); $includeWildcardPaths = @()
     if ($IncludeFolders) {
         foreach ($entry in $IncludeFolders) {
-            if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+            if ([string]::IsNullOrWhiteSpace($entry)) {
+                continue 
+            }
             $normalizedEntry = (ConvertTo-NativeSeparator $entry).Trim()
             if ($normalizedEntry -match '[\\/]') {
                 $normalizedEntry = $normalizedEntry.Trim($sep[0])
                 if ($normalizedEntry) {
-                    if ($normalizedEntry -notmatch '[\*\?\[\]]') { $includeExactPaths += $normalizedEntry.ToLowerInvariant() }
-                    else { $includeWildcardPaths += $normalizedEntry }
+                    if ($normalizedEntry -notmatch '[\*\?\[\]]') {
+                        $includeExactPaths += $normalizedEntry.ToLowerInvariant() 
+                    }
+                    else {
+                        $includeWildcardPaths += $normalizedEntry 
+                    }
                 }
-            } else {
-                if ($normalizedEntry -notmatch '[\*\?\[\]]') { $includeExactNames += $normalizedEntry.ToLowerInvariant() }
-                else { $includeWildcardNames += $normalizedEntry }
+            }
+            else {
+                if ($normalizedEntry -notmatch '[\*\?\[\]]') {
+                    $includeExactNames += $normalizedEntry.ToLowerInvariant() 
+                }
+                else {
+                    $includeWildcardNames += $normalizedEntry 
+                }
             }
         }
     }
 
-    if (-not $MatchCache) { $MatchCache = @{} }
-    if (-not $IncludeFolderCache) { $IncludeFolderCache = @{} }
-    if (-not $SizeCache) { $SizeCache = @{} }
-    if (-not $PsCountCache) { $PsCountCache = @{} }
+    if (-not $MatchCache) {
+        $MatchCache = @{} 
+    }
+    if (-not $IncludeFolderCache) {
+        $IncludeFolderCache = @{} 
+    }
+    if (-not $SizeCache) {
+        $SizeCache = @{} 
+    }
+    if (-not $PsCountCache) {
+        $PsCountCache = @{} 
+    }
     if (-not $TraversalState) {
         $TraversalState = @{
             FolderCount    = 0
@@ -279,30 +365,63 @@ function Get-DowserMap {
             $matchPaths = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
             $folderPaths = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
 
-            function Get-NormalizedExtension { param($ext) if ([string]::IsNullOrEmpty($ext)) { return '' } $ext = $ext.ToLowerInvariant(); if ($ext -notmatch '^\.') { return ".$ext" } else { return $ext } }
+            function Get-NormalizedExtension {
+                param($ext) if ([string]::IsNullOrEmpty($ext)) {
+                    return '' 
+                } $ext = $ext.ToLowerInvariant(); if ($ext -notmatch '^\.') {
+                    return ".$ext" 
+                }
+                else {
+                    return $ext 
+                } 
+            }
 
             $params = @{ LiteralPath = $targetPath; File = $true; Recurse = $true; ErrorAction = 'SilentlyContinue'; Force = $IncludeHidden }
-            if ($MaxDepth -gt 0) { $params['Depth'] = $MaxDepth }
+            if ($MaxDepth -gt 0) {
+                $params['Depth'] = $MaxDepth 
+            }
 
             Get-ChildItem @params | ForEach-Object {
                 $file = $_
                 $isMatch = $true
                 $ext = Get-NormalizedExtension $file.Extension
-                if ($normInclude -and ($normInclude -notcontains $ext)) { $isMatch = $false }
-                if ($isMatch -and $normExclude -and ($normExclude -contains $ext)) { $isMatch = $false }
+                if ($normInclude -and ($normInclude -notcontains $ext)) {
+                    $isMatch = $false 
+                }
+                if ($isMatch -and $normExclude -and ($normExclude -contains $ext)) {
+                    $isMatch = $false 
+                }
 
                 $matchedByPattern = $false
                 if ($isMatch -and $effectiveIncludePatterns) {
-                    foreach ($p in $effectiveIncludePatterns) { if ($file.Name -like $p) { $matchedByPattern = $true; break } }
-                    if (-not $matchedByPattern) { $isMatch = $false }
+                    foreach ($p in $effectiveIncludePatterns) {
+                        if ($file.Name -like $p) {
+                            $matchedByPattern = $true; break 
+                        } 
+                    }
+                    if (-not $matchedByPattern) {
+                        $isMatch = $false 
+                    }
                 }
                 if ($isMatch -and -not $matchedByPattern) {
-                    if ($excludeExactFiles -and ($excludeExactFiles -contains $file.Name)) { $isMatch = $false }
-                    if ($isMatch -and $excludeWildFiles) { foreach ($p in $excludeWildFiles) { if ($file.Name -like $p) { $isMatch = $false; break } } }
+                    if ($excludeExactFiles -and ($excludeExactFiles -contains $file.Name)) {
+                        $isMatch = $false 
+                    }
+                    if ($isMatch -and $excludeWildFiles) {
+                        foreach ($p in $excludeWildFiles) {
+                            if ($file.Name -like $p) {
+                                $isMatch = $false; break 
+                            } 
+                        } 
+                    }
                 }
                 if ($isMatch -and $excludePaths) {
                     $full = $file.FullName
-                    foreach ($p in $excludePaths) { if ($full -like "*$p*") { $isMatch = $false; break } }
+                    foreach ($p in $excludePaths) {
+                        if ($full -like "*$p*") {
+                            $isMatch = $false; break 
+                        } 
+                    }
                 }
                 if ($isMatch) {
                     $curr = $file.DirectoryName
@@ -317,7 +436,9 @@ function Get-DowserMap {
 
         $topLevelItems = Get-ChildItem -LiteralPath $Path -Directory -ErrorAction SilentlyContinue
         $scanTargets = @($Path)
-        if ($topLevelItems) { $scanTargets += @($topLevelItems.FullName) }
+        if ($topLevelItems) {
+            $scanTargets += @($topLevelItems.FullName) 
+        }
 
         $pool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
         $pool.Open()
@@ -347,61 +468,100 @@ function Get-DowserMap {
             [void]$jobs.Add([PSCustomObject]@{ Pipe = $ps; Result = $ps.BeginInvoke() })
         }
 
-        while (@($jobs | Where-Object { -not $_.Result.IsCompleted }).Count -gt 0) { Start-Sleep -Milliseconds 100 }
+        while (@($jobs | Where-Object { -not $_.Result.IsCompleted }).Count -gt 0) {
+            Start-Sleep -Milliseconds 100 
+        }
 
         foreach ($j in $jobs) {
             try {
                 $res = $j.Pipe.EndInvoke($j.Result)
                 if ($res.MatchPaths) {
-                    foreach ($p in $res.MatchPaths) { $MatchCache[$p.ToLowerInvariant()] = $true }
+                    foreach ($p in $res.MatchPaths) {
+                        $MatchCache[$p.ToLowerInvariant()] = $true 
+                    }
                 }
-            } catch {
+            }
+            catch {
                 Write-Verbose "Error in pre-scan thread: $_"
-            } finally { $j.Pipe.Dispose() }
+            }
+            finally {
+                $j.Pipe.Dispose() 
+            }
         }
         $pool.Close()
         $pool.Dispose()
         Write-Verbose "Pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
     }
 
-    function ConvertTo-RelativePath { param([string]$full)
-        if ([string]::IsNullOrEmpty($rootFull)) { return $full }
+    function ConvertTo-RelativePath {
+        param([string]$full)
+        if ([string]::IsNullOrEmpty($rootFull)) {
+            return $full 
+        }
         if ($full -and $full.Length -ge $rootFull.Length) {
-            if ($full.Substring(0, $rootFull.Length) -ieq $rootFull) { return $full.Substring($rootFull.Length) }
+            if ($full.Substring(0, $rootFull.Length) -ieq $rootFull) {
+                return $full.Substring($rootFull.Length) 
+            }
         }
         return $full
     }
-    function Test-MatchAny { param([string]$value, [string[]]$patterns)
-        if (-not $patterns -or (@($patterns).Count -eq 0)) { return $false }
-        foreach ($p in $patterns) { if ($value -like $p) { return $true } }
+    function Test-MatchAny {
+        param([string]$value, [string[]]$patterns)
+        if (-not $patterns -or (@($patterns).Count -eq 0)) {
+            return $false 
+        }
+        foreach ($p in $patterns) {
+            if ($value -like $p) {
+                return $true 
+            } 
+        }
         return $false
     }
-    function Test-ExcludeByPath { param($item)
-        if (-not $excludePaths -or (@($excludePaths).Count -eq 0)) { return $false }
+    function Test-ExcludeByPath {
+        param($item)
+        if (-not $excludePaths -or (@($excludePaths).Count -eq 0)) {
+            return $false 
+        }
         $full = ConvertTo-NativeSeparator $item.FullName
-        $rel  = ConvertTo-RelativePath $full
-        if (Test-MatchAny -value $full -patterns $excludePaths) { return $true }
-        if (Test-MatchAny -value $rel  -patterns $excludePaths) { return $true }
+        $rel = ConvertTo-RelativePath $full
+        if (Test-MatchAny -value $full -patterns $excludePaths) {
+            return $true 
+        }
+        if (Test-MatchAny -value $rel -patterns $excludePaths) {
+            return $true 
+        }
         return $false
     }
     function Test-FolderMatchesInclude {
         param($item)
-        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) { return $true }
+        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) {
+            return $true 
+        }
         $nameKey = $item.Name.ToLowerInvariant()
-        if ((@($includeExactNames).Count -gt 0) -and ($includeExactNames -contains $nameKey)) { return $true }
+        if ((@($includeExactNames).Count -gt 0) -and ($includeExactNames -contains $nameKey)) {
+            return $true 
+        }
         if ((@($includeWildcardNames).Count -gt 0)) {
-            foreach ($pattern in $includeWildcardNames) { if ($item.Name -like $pattern) { return $true } }
+            foreach ($pattern in $includeWildcardNames) {
+                if ($item.Name -like $pattern) {
+                    return $true 
+                } 
+            }
         }
         if ((@($includeExactPaths).Count -gt 0)) {
             foreach ($path in $includeExactPaths) {
                 $firstSegment = ($path -split '[\\/]')[0]
-                if ($firstSegment -eq $nameKey) { return $true }
+                if ($firstSegment -eq $nameKey) {
+                    return $true 
+                }
             }
         }
         if ((@($includeWildcardPaths).Count -gt 0)) {
             foreach ($pattern in $includeWildcardPaths) {
                 $firstPattern = ($pattern -split '[\\/]')[0]
-                if ($item.Name -like $firstPattern) { return $true }
+                if ($item.Name -like $firstPattern) {
+                    return $true 
+                }
             }
         }
         return $false
@@ -409,73 +569,136 @@ function Get-DowserMap {
     function Test-IncludeFile {
         param($item)
         $ext = ConvertTo-NormalizedExtension $item.Extension
-        if ($normInclude -and ($normInclude -notcontains $ext)) { return $false }
-        if ($normExclude -and ($normExclude -contains $ext)) { return $false }
+        if ($normInclude -and ($normInclude -notcontains $ext)) {
+            return $false 
+        }
+        if ($normExclude -and ($normExclude -contains $ext)) {
+            return $false 
+        }
         if ($effectiveIncludePatterns -and (@($effectiveIncludePatterns).Count -gt 0)) {
             $matched = $false
-            foreach ($pattern in $effectiveIncludePatterns) { if ($item.Name -like $pattern) { $matched = $true; break } }
-            if (-not $matched) { return $false }
+            foreach ($pattern in $effectiveIncludePatterns) {
+                if ($item.Name -like $pattern) {
+                    $matched = $true; break 
+                } 
+            }
+            if (-not $matched) {
+                return $false 
+            }
             return $true
         }
-        if (@($excludeExactFiles).Count -gt 0 -and ($excludeExactFiles -contains $item.Name)) { return $false }
+        if (@($excludeExactFiles).Count -gt 0 -and ($excludeExactFiles -contains $item.Name)) {
+            return $false 
+        }
         if (@($excludeWildFiles).Count -gt 0) {
-            foreach ($pattern in $excludeWildFiles) { if ($item.Name -like $pattern) { return $false } }
+            foreach ($pattern in $excludeWildFiles) {
+                if ($item.Name -like $pattern) {
+                    return $false 
+                } 
+            }
         }
         return $true
     }
     function Test-ExcludeFolder {
         param($item)
         if ($IncludeFolders -and (@($IncludeFolders).Count -gt 0) -and $CurrentDepth -eq 0) {
-            if (Test-IncludeFolder $item) { return $false }
+            if (Test-IncludeFolder $item) {
+                return $false 
+            }
         }
-        if (Test-ExcludeByPath $item) { return $true }
+        if (Test-ExcludeByPath $item) {
+            return $true 
+        }
         # includehidden was asked for so dont let excludes drop hidden items
-        if ($IncludeHidden -and (Test-IsHidden $item)) { return $false }
-        if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { return $true }
+        if ($IncludeHidden -and (Test-IsHidden $item)) {
+            return $false 
+        }
+        if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) {
+            return $true 
+        }
         if ((@($excludeWild).Count -gt 0)) {
-            foreach ($pat in $excludeWild) { if ($item.Name -like $pat) { return $true } }
+            foreach ($pat in $excludeWild) {
+                if ($item.Name -like $pat) {
+                    return $true 
+                } 
+            }
         }
         return $false
     }
     function Test-IncludeFolder {
         param($item)
-        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) { return $true }
-        if (Test-FolderMatchesInclude $item) { return $true }
-        if (Test-FolderContainsIncludedFolder $item.FullName) { return $true }
+        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) {
+            return $true 
+        }
+        if (Test-FolderMatchesInclude $item) {
+            return $true 
+        }
+        if (Test-FolderContainsIncludedFolder $item.FullName) {
+            return $true 
+        }
         return $false
     }
     function Test-ReparsePoint {
         param($item)
-        try { return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 } catch { return $false }
+        try {
+            return ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 
+        }
+        catch {
+            return $false 
+        }
     }
     function Test-IsHidden {
         param($item)
-        try { return ($item.Attributes -band [IO.FileAttributes]::Hidden) -ne 0 } catch { return $false }
+        try {
+            return ($item.Attributes -band [IO.FileAttributes]::Hidden) -ne 0 
+        }
+        catch {
+            return $false 
+        }
     }
 
     function Test-FolderContainsMatchingFiles {
         param([string]$folderPath, [int]$maxDepthToCheck = 50)
-        if (-not $effectiveIncludePatterns -and -not $IncludeExtensions) { return $true }
+        if (-not $effectiveIncludePatterns -and -not $IncludeExtensions) {
+            return $true 
+        }
         $normalizedPath = ConvertTo-NativeSeparator $folderPath
         $cacheKey = $normalizedPath.ToLowerInvariant()
-        if ($MatchCache.ContainsKey($cacheKey)) { return $MatchCache[$cacheKey] }
+        if ($MatchCache.ContainsKey($cacheKey)) {
+            return $MatchCache[$cacheKey] 
+        }
 
         $stack = New-Object 'System.Collections.Generic.Stack[PSObject]'
         $stack.Push([PSCustomObject]@{ Path = $normalizedPath; Depth = 0 })
         while ($stack.Count -gt 0) {
             $current = $stack.Pop()
-            if ($current.Depth -ge $maxDepthToCheck) { continue }
+            if ($current.Depth -ge $maxDepthToCheck) {
+                continue 
+            }
             try {
-                $items = if ($IncludeHidden) { Get-ChildItem -LiteralPath $current.Path -Force -ErrorAction Stop } else { Get-ChildItem -LiteralPath $current.Path -ErrorAction Stop }
+                $items = if ($IncludeHidden) {
+                    Get-ChildItem -LiteralPath $current.Path -Force -ErrorAction Stop 
+                }
+                else {
+                    Get-ChildItem -LiteralPath $current.Path -ErrorAction Stop 
+                }
                 foreach ($item in $items) {
                     if (-not $item.PSIsContainer) {
-                        if (Test-IncludeFile $item) { $MatchCache[$cacheKey] = $true; return $true }
-                    } elseif (-not (Test-ExcludeFolder $item) -and (-not (Test-ReparsePoint $item) -or $FollowReparse)) {
-                        if ($CurrentDepth -eq 0 -and -not (Test-IncludeFolder $item)) { continue }
+                        if (Test-IncludeFile $item) {
+                            $MatchCache[$cacheKey] = $true; return $true 
+                        }
+                    }
+                    elseif (-not (Test-ExcludeFolder $item) -and (-not (Test-ReparsePoint $item) -or $FollowReparse)) {
+                        if ($CurrentDepth -eq 0 -and -not (Test-IncludeFolder $item)) {
+                            continue 
+                        }
                         $stack.Push([PSCustomObject]@{ Path = $item.FullName; Depth = $current.Depth + 1 })
                     }
                 }
-            } catch { Write-Verbose "Match-cache scan failed for '$($current.Path)': $_" }
+            }
+            catch {
+                Write-Verbose "Match-cache scan failed for '$($current.Path)': $_" 
+            }
         }
         $MatchCache[$cacheKey] = $false
         return $false
@@ -483,82 +706,190 @@ function Get-DowserMap {
 
     function Test-FolderContainsIncludedFolder {
         param([string]$folderPath, [int]$maxDepthToCheck = 50)
-        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) { return $true }
+        if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) {
+            return $true 
+        }
         $normalizedPath = ConvertTo-NativeSeparator $folderPath
         $cacheKey = $normalizedPath.ToLowerInvariant()
-        if ($IncludeFolderCache.ContainsKey($cacheKey)) { return $IncludeFolderCache[$cacheKey] }
+        if ($IncludeFolderCache.ContainsKey($cacheKey)) {
+            return $IncludeFolderCache[$cacheKey] 
+        }
 
         $stack = New-Object 'System.Collections.Generic.Stack[PSObject]'
         $stack.Push([PSCustomObject]@{ Path = $normalizedPath; Depth = 0 })
         while ($stack.Count -gt 0) {
             $current = $stack.Pop()
-            if ($current.Depth -ge $maxDepthToCheck) { continue }
+            if ($current.Depth -ge $maxDepthToCheck) {
+                continue 
+            }
             try {
-                $items = if ($IncludeHidden) { Get-ChildItem -LiteralPath $current.Path -Force -Directory -ErrorAction Stop } else { Get-ChildItem -LiteralPath $current.Path -Directory -ErrorAction Stop }
+                $items = if ($IncludeHidden) {
+                    Get-ChildItem -LiteralPath $current.Path -Force -Directory -ErrorAction Stop 
+                }
+                else {
+                    Get-ChildItem -LiteralPath $current.Path -Directory -ErrorAction Stop 
+                }
                 foreach ($item in $items) {
-                    if (-not $FollowReparse -and (Test-ReparsePoint $item)) { continue }
-                    if (Test-ExcludeByPath $item) { continue }
-                    if (-not ($IncludeHidden -and (Test-IsHidden $item))) {
-                        if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { continue }
-                        if ((@($excludeWild).Count -gt 0)) { $skip = $false; foreach ($pat in $excludeWild) { if ($item.Name -like $pat) { $skip = $true; break } } if ($skip) { continue } }
+                    if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
+                        continue 
                     }
-                    if (Test-FolderMatchesInclude $item) { $IncludeFolderCache[$cacheKey] = $true; return $true }
+                    if (Test-ExcludeByPath $item) {
+                        continue 
+                    }
+                    if (-not ($IncludeHidden -and (Test-IsHidden $item))) {
+                        if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) {
+                            continue 
+                        }
+                        if ((@($excludeWild).Count -gt 0)) {
+                            $skip = $false; foreach ($pat in $excludeWild) {
+                                if ($item.Name -like $pat) {
+                                    $skip = $true; break 
+                                } 
+                            } if ($skip) {
+                                continue 
+                            } 
+                        }
+                    }
+                    if (Test-FolderMatchesInclude $item) {
+                        $IncludeFolderCache[$cacheKey] = $true; return $true 
+                    }
                     $stack.Push([PSCustomObject]@{ Path = $item.FullName; Depth = $current.Depth + 1 })
                 }
-            } catch { Write-Verbose "Include-folder scan failed for '$($current.Path)': $_" }
+            }
+            catch {
+                Write-Verbose "Include-folder scan failed for '$($current.Path)': $_" 
+            }
         }
         $IncludeFolderCache[$cacheKey] = $false
         return $false
     }
 
-    if (-not $PSBoundParameters.ContainsKey('AsHtml') -and $OutputFile -and ($OutputFile -match '\.html?$')) { $AsHtml = $true }
+    if (-not $PSBoundParameters.ContainsKey('AsHtml') -and $OutputFile -and ($OutputFile -match '\.html?$')) {
+        $AsHtml = $true 
+    }
 
     $output = @()
-    $patternCount = if ($effectiveIncludePatterns) { @($effectiveIncludePatterns).Count } else { 0 }
-    $extCount = if ($IncludeExtensions) { @($IncludeExtensions).Count } else { 0 }
+    $patternCount = if ($effectiveIncludePatterns) {
+        @($effectiveIncludePatterns).Count 
+    }
+    else {
+        0 
+    }
+    $extCount = if ($IncludeExtensions) {
+        @($IncludeExtensions).Count 
+    }
+    else {
+        0 
+    }
     $fileFilterActive = ($patternCount -gt 0 -or $extCount -gt 0)
 
     # best effort UTF-8 for console unicode rendering
     try {
         if (-not $AsHtml -and -not $Ascii) {
             $isUtf8 = $false
-            try { $isUtf8 = ([Console]::OutputEncoding.WebName -eq 'utf-8') } catch {}
-            if (-not $isUtf8) { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) }
+            try {
+                $isUtf8 = ([Console]::OutputEncoding.WebName -eq 'utf-8') 
+            }
+            catch {
+            }
+            if (-not $isUtf8) {
+                [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) 
+            }
         }
-    } catch {}
+    }
+    catch {
+    }
 
     if ($Ascii) {
         $treeChars = @{ Branch = '+-'; Last = '\\-'; Pipe = '| '; Space = '  ' }
         $fileChar = '-'; $folderChar = '+'; $errorChar = 'X'
         $linkChar = '>'; $targetChar = '~'
-    } else {
-        $branch = if ($AsHtml) { '&#x251C;&#x2500;' } else { [string]([char]0x251C) + [char]0x2500 }
-        $last   = if ($AsHtml) { '&#x2514;&#x2500;' } else { [string]([char]0x2514) + [char]0x2500 }
-        $pipe   = if ($AsHtml) { '&#x2502; '     } else { [string]([char]0x2502) + ' ' }
+    }
+    else {
+        $branch = if ($AsHtml) {
+            '&#x251C;&#x2500;' 
+        }
+        else {
+            [string]([char]0x251C) + [char]0x2500 
+        }
+        $last = if ($AsHtml) {
+            '&#x2514;&#x2500;' 
+        }
+        else {
+            [string]([char]0x2514) + [char]0x2500 
+        }
+        $pipe = if ($AsHtml) {
+            '&#x2502; '     
+        }
+        else {
+            [string]([char]0x2502) + ' ' 
+        }
         $treeChars = @{ Branch = $branch; Last = $last; Pipe = $pipe; Space = '  ' }
-        $fileChar   = if ($AsHtml) { '&#x00B7;' } else { [char]0x00B7 }
-        $folderChar = if ($AsHtml) { '&#x25A0;' } else { [char]0x25A0 }
-        $errorChar  = if ($AsHtml) { '&#x00D7;' } else { [char]0x00D7 }
-        $linkChar   = if ($AsHtml) { '&#x2192;' } else { [char]0x2192 }
-        $targetChar = if ($AsHtml) { '&#x21B3;' } else { [char]0x21B3 }
+        $fileChar = if ($AsHtml) {
+            '&#x00B7;' 
+        }
+        else {
+            [char]0x00B7 
+        }
+        $folderChar = if ($AsHtml) {
+            '&#x25A0;' 
+        }
+        else {
+            [char]0x25A0 
+        }
+        $errorChar = if ($AsHtml) {
+            '&#x00D7;' 
+        }
+        else {
+            [char]0x00D7 
+        }
+        $linkChar = if ($AsHtml) {
+            '&#x2192;' 
+        }
+        else {
+            [char]0x2192 
+        }
+        $targetChar = if ($AsHtml) {
+            '&#x21B3;' 
+        }
+        else {
+            [char]0x21B3 
+        }
     }
     $esc = [char]0x1b
     $ansiGray = "$esc[90m"; $ansiReset = "$esc[0m"
-    if ($AsHtml) { $ansiGray = $null; $ansiReset = $null }
+    if ($AsHtml) {
+        $ansiGray = $null; $ansiReset = $null 
+    }
 
     function Format-HiddenLine {
         param([string]$Line, [bool]$IsHidden)
-        if (-not $IncludeHidden -or -not $IsHidden) { return $Line }
-        if ($AsHtml) { return "<span style='color:#888888'>$Line</span>" }
-        if ($null -ne $ansiGray -and $null -ne $ansiReset) { return "$ansiGray$Line$ansiReset" }
+        if (-not $IncludeHidden -or -not $IsHidden) {
+            return $Line 
+        }
+        if ($AsHtml) {
+            return "<span style='color:#888888'>$Line</span>" 
+        }
+        if ($null -ne $ansiGray -and $null -ne $ansiReset) {
+            return "$ansiGray$Line$ansiReset" 
+        }
         return $Line
     }
-    $folderSuffix = if ($LinuxPaths) { '/' } else { [string][char]92 }
+    $folderSuffix = if ($LinuxPaths) {
+        '/' 
+    }
+    else {
+        [string][char]92 
+    }
 
     function Get-Children {
         param([string]$p)
-        if ($IncludeHidden) { $allItems = @(Get-ChildItem -Path $p -Force -ErrorAction Stop) }
-        else { $allItems = @(Get-ChildItem -Path $p -ErrorAction Stop) }
+        if ($IncludeHidden) {
+            $allItems = @(Get-ChildItem -Path $p -Force -ErrorAction Stop) 
+        }
+        else {
+            $allItems = @(Get-ChildItem -Path $p -ErrorAction Stop) 
+        }
         $folders = @($allItems | Where-Object { $_.PSIsContainer } | Sort-Object Name)
         $files = @($allItems | Where-Object { -not $_.PSIsContainer } | Sort-Object Name)
         return @($folders + $files)
@@ -566,11 +897,17 @@ function Get-DowserMap {
 
     function Complete-DirectoryMapOutput {
         param([string[]]$Lines, [string[]]$TreeLines)
-        if (-not $TreeLines) { $TreeLines = $Lines }
+        if (-not $TreeLines) {
+            $TreeLines = $Lines 
+        }
         $filteredLines = @()
-        if ($Lines) { $filteredLines = $Lines | Where-Object { $_ -and $_.Trim() -ne '' } }
+        if ($Lines) {
+            $filteredLines = $Lines | Where-Object { $_ -and $_.Trim() -ne '' } 
+        }
         $treeOnly = @()
-        if ($TreeLines) { $treeOnly = $TreeLines | Where-Object { $_ -and $_.Trim() -ne '' } }
+        if ($TreeLines) {
+            $treeOnly = $TreeLines | Where-Object { $_ -and $_.Trim() -ne '' } 
+        }
 
         $summaryLines = @(); $summaryBullets = @()
         if ($CurrentDepth -eq 0 -and $EmitSummary) {
@@ -583,46 +920,89 @@ function Get-DowserMap {
             if ($skippedFolderCount -gt 0 -or $skippedFileCount -gt 0) {
                 $summaryLines += "  Skipped: $skippedFolderCount folders, $skippedFileCount files"
             }
-            if ($linkCount -gt 0) { $summaryLines += "  Symlinks: $linkCount" }
+            if ($linkCount -gt 0) {
+                $summaryLines += "  Symlinks: $linkCount" 
+            }
             $summaryBullets += "- Folders: $($TraversalState.FolderCount)"
             $summaryBullets += "- Files: $($TraversalState.FileCount)"
             if ($skippedFolderCount -gt 0 -or $skippedFileCount -gt 0) {
                 $summaryBullets += "- Skipped: $skippedFolderCount folders, $skippedFileCount files"
             }
-            if ($linkCount -gt 0) { $summaryBullets += "- Symlinks: $linkCount" }
+            if ($linkCount -gt 0) {
+                $summaryBullets += "- Symlinks: $linkCount" 
+            }
         }
-        $finalLines = if ($summaryLines.Count -gt 0) { $filteredLines + $summaryLines } else { $filteredLines }
+        $finalLines = if ($summaryLines.Count -gt 0) {
+            $filteredLines + $summaryLines 
+        }
+        else {
+            $filteredLines 
+        }
 
         if ($CurrentDepth -eq 0) {
             $markdownTarget = $null; $writeTextToOutputFile = $false
             if ($OutputFile) {
-                if ($AsMarkdown -and -not $MarkdownFile) { $markdownTarget = $OutputFile }
-                else { $writeTextToOutputFile = $true }
+                if ($AsMarkdown -and -not $MarkdownFile) {
+                    $markdownTarget = $OutputFile 
+                }
+                else {
+                    $writeTextToOutputFile = $true 
+                }
             }
-            if ($MarkdownFile) { $markdownTarget = $MarkdownFile }
+            if ($MarkdownFile) {
+                $markdownTarget = $MarkdownFile 
+            }
 
             if ($writeTextToOutputFile) {
                 try {
                     $outDir = Split-Path -Path $OutputFile -Parent
-                    if ($outDir -and -not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+                    if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
+                        New-Item -ItemType Directory -Path $outDir -Force | Out-Null 
+                    }
                     $finalLines | Out-File -FilePath $OutputFile -Encoding UTF8
-                } catch { Write-Verbose "Failed to write output file: $_" }
+                }
+                catch {
+                    Write-Verbose "Failed to write output file: $_" 
+                }
             }
             if ($markdownTarget) {
                 try {
                     $mdDir = Split-Path -Path $markdownTarget -Parent
-                    if ($mdDir -and -not (Test-Path -LiteralPath $mdDir)) { New-Item -ItemType Directory -Path $mdDir -Force | Out-Null }
-                    if ($LinuxPaths) { $displayRoot = ConvertTo-WslPath $Path }
-                    else { $displayRoot = if ($rootFull) { $rootFull.TrimEnd($sep[0]) } else { ConvertTo-NativeSeparator $Path } }
-                    if (-not $displayRoot) { $displayRoot = $Path }
+                    if ($mdDir -and -not (Test-Path -LiteralPath $mdDir)) {
+                        New-Item -ItemType Directory -Path $mdDir -Force | Out-Null 
+                    }
+                    if ($LinuxPaths) {
+                        $displayRoot = ConvertTo-WslPath $Path 
+                    }
+                    else {
+                        $displayRoot = if ($rootFull) {
+                            $rootFull.TrimEnd($sep[0]) 
+                        }
+                        else {
+                            ConvertTo-NativeSeparator $Path 
+                        } 
+                    }
+                    if (-not $displayRoot) {
+                        $displayRoot = $Path 
+                    }
                     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
                     $mdLines = @( '# Directory Map', '', ('**Root:** `{0}`' -f $displayRoot), ('**Generated:** {0}' -f $timestamp) )
-                    if ($summaryBullets.Count -gt 0) { $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets }
+                    if ($summaryBullets.Count -gt 0) {
+                        $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets 
+                    }
                     $mdLines += ''; $mdLines += '```text'
-                    if ($treeOnly.Count -gt 0) { $mdLines += $treeOnly } else { $mdLines += '(no entries)' }
+                    if ($treeOnly.Count -gt 0) {
+                        $mdLines += $treeOnly 
+                    }
+                    else {
+                        $mdLines += '(no entries)' 
+                    }
                     $mdLines += '```'
                     $mdLines | Set-Content -Path $markdownTarget -Encoding UTF8
-                } catch { Write-Verbose "Failed to write markdown file: $_" }
+                }
+                catch {
+                    Write-Verbose "Failed to write markdown file: $_" 
+                }
             }
         }
         return $finalLines
@@ -631,10 +1011,17 @@ function Get-DowserMap {
     if (-not $ShowFullPathTree) {
         $rawItems = @()
         $itemsLoaded = $true
-        try { $rawItems = Get-Children -p $Path }
+        try {
+            $rawItems = Get-Children -p $Path 
+        }
         catch {
             $itemsLoaded = $false
-            $deniedPath = if ($LinuxPaths) { ConvertTo-WslPath $Path } else { $Path }
+            $deniedPath = if ($LinuxPaths) {
+                ConvertTo-WslPath $Path 
+            }
+            else {
+                $Path 
+            }
             $errorLines = @("$Indent$errorChar ACCESS DENIED: $deniedPath")
         }
         if (-not $itemsLoaded) {
@@ -649,18 +1036,32 @@ function Get-DowserMap {
                 continue
             }
             if (Test-ExcludeByPath $item) {
-                if ($item.PSIsContainer) { $TraversalState.SkippedFolders++ } else { $TraversalState.SkippedFiles++ }
+                if ($item.PSIsContainer) {
+                    $TraversalState.SkippedFolders++ 
+                }
+                else {
+                    $TraversalState.SkippedFiles++ 
+                }
                 continue
             }
             if ($item.PSIsContainer) {
                 if (($effectiveIncludePatterns -or $IncludeExtensions)) {
-                    if (-not (Test-FolderContainsMatchingFiles $item.FullName)) { $TraversalState.SkippedFolders++; continue }
+                    if (-not (Test-FolderContainsMatchingFiles $item.FullName)) {
+                        $TraversalState.SkippedFolders++; continue 
+                    }
                 }
-                if (Test-ExcludeFolder $item) { $TraversalState.SkippedFolders++; continue }
-                if (-not (Test-IncludeFolder $item)) { $TraversalState.SkippedFolders++; continue }
+                if (Test-ExcludeFolder $item) {
+                    $TraversalState.SkippedFolders++; continue 
+                }
+                if (-not (Test-IncludeFolder $item)) {
+                    $TraversalState.SkippedFolders++; continue 
+                }
                 $filteredFolders += $item
-            } elseif (-not $FoldersOnly -or $fileFilterActive) {
-                if (-not (Test-IncludeFile $item)) { $TraversalState.SkippedFiles++; continue }
+            }
+            elseif (-not $FoldersOnly -or $fileFilterActive) {
+                if (-not (Test-IncludeFile $item)) {
+                    $TraversalState.SkippedFiles++; continue 
+                }
                 $filteredFiles += $item
             }
         }
@@ -671,18 +1072,31 @@ function Get-DowserMap {
         for ($i = 0; $i -lt $count; $i++) {
             $item = $items[$i]
             $isLast = $i -eq ($count - 1)
-            $connector = if ($isLast) { $treeChars.Last } else { $treeChars.Branch }
-            $nextIndent = if ($isLast) { "$Indent$($treeChars.Space)" } else { "$Indent$($treeChars.Pipe)" }
+            $connector = if ($isLast) {
+                $treeChars.Last 
+            }
+            else {
+                $treeChars.Branch 
+            }
+            $nextIndent = if ($isLast) {
+                "$Indent$($treeChars.Space)" 
+            }
+            else {
+                "$Indent$($treeChars.Pipe)" 
+            }
 
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
                 $linkTarget = $item.Target
-                if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
+                if ([string]::IsNullOrWhiteSpace($linkTarget)) {
+                    $linkTarget = '(broken link)' 
+                }
                 $line1 = "$Indent$connector $linkChar $($item.Name)"
                 $line2 = "$nextIndent $targetChar $linkTarget"
                 $output += Format-HiddenLine -Line $line1 -IsHidden:(Test-IsHidden $item)
                 $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
                 $TraversalState.LinkCount++
-            } elseif ($item.PSIsContainer) {
+            }
+            elseif ($item.PSIsContainer) {
                 $annotation = Get-FolderAnnotation -folderPath $item.FullName
                 $line = "$Indent$connector $folderChar $($item.Name)$folderSuffix$annotation"
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
@@ -690,7 +1104,8 @@ function Get-DowserMap {
                 if ($CurrentDepth -lt $MaxDepth) {
                     $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 }
-            } else {
+            }
+            else {
                 $line = "$Indent$connector $fileChar $($item.Name)"
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
                 $TraversalState.FileCount++
@@ -703,26 +1118,49 @@ function Get-DowserMap {
     if ($LinuxPaths) {
         $displayPath = ConvertTo-WslPath $Path
         if ($displayPath) {
-            if ($displayPath.StartsWith('/')) { $segments += '/' }
+            if ($displayPath.StartsWith('/')) {
+                $segments += '/' 
+            }
             $remaining = $displayPath.TrimStart('/')
-            if ($remaining) { $segments += $remaining -split '/' }
+            if ($remaining) {
+                $segments += $remaining -split '/' 
+            }
         }
-    } elseif ($Path -match '^(\\\\|//)([^\\/]+)[\\/]+([^\\/]+)[\\/]*(.*)') {
+    }
+    elseif ($Path -match '^(\\\\|//)([^\\/]+)[\\/]+([^\\/]+)[\\/]*(.*)') {
         $segments += $matches[2]; $segments += $matches[3]
-        if ($matches[4]) { $segments += $matches[4] -split '[\\/]' }
-    } elseif ($Path -match '^([a-zA-Z]:)[\\/]*(.*)') {
+        if ($matches[4]) {
+            $segments += $matches[4] -split '[\\/]' 
+        }
+    }
+    elseif ($Path -match '^([a-zA-Z]:)[\\/]*(.*)') {
         $segments += $matches[1]
-        if ($matches[2]) { $segments += $matches[2] -split '[\\/]' }
-    } else { $segments += $Path -split '[\\/]' }
+        if ($matches[2]) {
+            $segments += $matches[2] -split '[\\/]' 
+        }
+    }
+    else {
+        $segments += $Path -split '[\\/]' 
+    }
     $segments = $segments | Where-Object { $_ -ne '' -or $_ -eq '/' }
 
     $currentPathSegmentIndent = ""
-    $segmentSlash = if ($LinuxPaths) { '/' } else { [string][char]92 }
+    $segmentSlash = if ($LinuxPaths) {
+        '/' 
+    }
+    else {
+        [string][char]92 
+    }
     for ($i = 0; $i -lt @($segments).Count; $i++) {
         $segmentName = $segments[$i]
         $connector = $treeChars.Last + " "
         $isLastSegment = ($i -eq @($segments).Count - 1)
-        $slash = if (-not $isLastSegment -and $segmentName -ne '/') { $segmentSlash } else { '' }
+        $slash = if (-not $isLastSegment -and $segmentName -ne '/') {
+            $segmentSlash 
+        }
+        else {
+            '' 
+        }
         $output += "$currentPathSegmentIndent$connector$folderChar $segmentName$slash"
         $currentPathSegmentIndent += "    "
     }
@@ -730,10 +1168,17 @@ function Get-DowserMap {
     $childrenBaseIndent = $currentPathSegmentIndent
     $children = @()
     $childrenLoaded = $true
-    try { $children = Get-Children -p $Path }
+    try {
+        $children = Get-Children -p $Path 
+    }
     catch {
         $childrenLoaded = $false
-        $deniedPath = if ($LinuxPaths) { ConvertTo-WslPath $Path } else { $Path }
+        $deniedPath = if ($LinuxPaths) {
+            ConvertTo-WslPath $Path 
+        }
+        else {
+            $Path 
+        }
         $errorLines = @("$childrenBaseIndent$errorChar ACCESS DENIED: $deniedPath")
     }
     if (-not $childrenLoaded) {
@@ -742,23 +1187,41 @@ function Get-DowserMap {
 
     $folders = @(); $links = @()
     foreach ($child in $children) {
-        if (-not $child.PSIsContainer) { continue }
-        if (-not $FollowReparse -and (Test-ReparsePoint $child)) { $links += $child; continue }
-        if (Test-ExcludeByPath $child) { $TraversalState.SkippedFolders++; continue }
-        if (($effectiveIncludePatterns -or $IncludeExtensions)) {
-            if (-not (Test-FolderContainsMatchingFiles $child.FullName)) { $TraversalState.SkippedFolders++; continue }
+        if (-not $child.PSIsContainer) {
+            continue 
         }
-        if (Test-ExcludeFolder $child) { $TraversalState.SkippedFolders++; continue }
-        if (-not (Test-IncludeFolder $child)) { $TraversalState.SkippedFolders++; continue }
+        if (-not $FollowReparse -and (Test-ReparsePoint $child)) {
+            $links += $child; continue 
+        }
+        if (Test-ExcludeByPath $child) {
+            $TraversalState.SkippedFolders++; continue 
+        }
+        if (($effectiveIncludePatterns -or $IncludeExtensions)) {
+            if (-not (Test-FolderContainsMatchingFiles $child.FullName)) {
+                $TraversalState.SkippedFolders++; continue 
+            }
+        }
+        if (Test-ExcludeFolder $child) {
+            $TraversalState.SkippedFolders++; continue 
+        }
+        if (-not (Test-IncludeFolder $child)) {
+            $TraversalState.SkippedFolders++; continue 
+        }
         $folders += $child
     }
 
     $files = @()
     if (-not $FoldersOnly -or $fileFilterActive) {
         foreach ($child in $children) {
-            if ($child.PSIsContainer) { continue }
-            if (Test-ExcludeByPath $child) { $TraversalState.SkippedFiles++; continue }
-            if (-not (Test-IncludeFile $child)) { $TraversalState.SkippedFiles++; continue }
+            if ($child.PSIsContainer) {
+                continue 
+            }
+            if (Test-ExcludeByPath $child) {
+                $TraversalState.SkippedFiles++; continue 
+            }
+            if (-not (Test-IncludeFile $child)) {
+                $TraversalState.SkippedFiles++; continue 
+            }
             $files += $child
         }
     }
@@ -768,31 +1231,53 @@ function Get-DowserMap {
     for ($i = 0; $i -lt $count; $i++) {
         $item = $all[$i]
         $isLast = $i -eq ($count - 1)
-        $connector = if ($isLast) { $treeChars.Last } else { $treeChars.Branch }
-        $additionalIndent = if ($isLast) { $treeChars.Space } else { $treeChars.Pipe }
+        $connector = if ($isLast) {
+            $treeChars.Last 
+        }
+        else {
+            $treeChars.Branch 
+        }
+        $additionalIndent = if ($isLast) {
+            $treeChars.Space 
+        }
+        else {
+            $treeChars.Pipe 
+        }
         $recursiveIndent = $childrenBaseIndent + $additionalIndent
 
         if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
             $linkTarget = $item.Target
-            if ([string]::IsNullOrWhiteSpace($linkTarget)) { $linkTarget = '(broken link)' }
+            if ([string]::IsNullOrWhiteSpace($linkTarget)) {
+                $linkTarget = '(broken link)' 
+            }
             $line1 = "$childrenBaseIndent$connector $linkChar $($item.Name)"
             $line2 = "$recursiveIndent $targetChar $linkTarget"
             $output += Format-HiddenLine -Line $line1 -IsHidden:(Test-IsHidden $item)
             $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
             $TraversalState.LinkCount++
-        } elseif ($item.PSIsContainer) {
+        }
+        elseif ($item.PSIsContainer) {
+            $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
+            $TraversalState.LinkCount++
+        }
+        elseif ($item.PSIsContainer) {
+            # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
             $annotation = Get-FolderAnnotation -folderPath $item.FullName
             $line = "$childrenBaseIndent$connector $folderChar $($item.Name)$folderSuffix$annotation"
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
+             
                 $TraversalState.FolderCount++
                 $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
-            } else {
+            }
+            else {
+         
                 $TraversalState.FolderCount++
                 $output += $line
             }
-        } else {
+        }
+        else {
             $line = "$childrenBaseIndent$connector $fileChar $($item.Name)"
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             $TraversalState.FileCount++
