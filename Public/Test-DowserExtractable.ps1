@@ -189,7 +189,6 @@ function Test-DowserExtractable {
         # Max file size for full byte read (100 MB)
         $maxReadSize = 104857600
 
-        # Helper: match byte sequence at offset
         function Test-ByteMatch {
             param([byte[]]$Source, [int]$Offset, [byte[]]$Pattern)
             if ($Offset + $Pattern.Length -gt $Source.Length) { return $false }
@@ -199,7 +198,6 @@ function Test-DowserExtractable {
             return $true
         }
 
-        # Helper: scan byte range for pattern
         function Find-BytePattern {
             param([byte[]]$Source, [int]$Start, [int]$End, [byte[]]$Pattern)
             $pLen = $Pattern.Length
@@ -217,7 +215,6 @@ function Test-DowserExtractable {
 
     process {
         foreach ($inputPath in $Path) {
-            # Resolve to actual EXE files
             $exeFiles = @()
             if (Test-Path -LiteralPath $inputPath -PathType Container) {
                 $gciParams = @{
@@ -287,7 +284,7 @@ function Test-DowserExtractable {
                     continue
                 }
 
-                # For large files, read just the first 4KB for headers
+                # large file, headers only to skip a full read
                 if (-not $fullRead) {
                     try {
                         $headerStream = [System.IO.File]::OpenRead($file.FullName)
@@ -445,7 +442,6 @@ function Test-DowserExtractable {
                 if ($result.HasOverlay -and $fullRead -and $overlayOffset -lt $bytes.Length) {
                     $ovAvailable = $bytes.Length - $overlayOffset
 
-                    # Check overlay start for known archive signatures
                     foreach ($ovSig in $overlaySignatures) {
                         if (Test-ByteMatch $bytes $overlayOffset $ovSig.Bytes) {
                             $result.Detections.Add("$($ovSig.Name)_SFX: signature at overlay offset $overlayOffset [HIGH_CONFIDENCE]")
@@ -460,7 +456,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # Inno Setup string at overlay start
                     if (-not $result.ArchiveType -and $ovAvailable -ge 50) {
                         $ovStr = [System.Text.Encoding]::ASCII.GetString($bytes, $overlayOffset, [Math]::Min(50, $ovAvailable))
                         if ($ovStr -match 'Inno Setup Setup Data') {
@@ -476,7 +471,7 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # ZIP EOCD backward scan (last 65557 bytes, validated with commentLen)
+                    # backward eocd scan, validate via commentLen to land on real eocd
                     if (-not $result.ArchiveType) {
                         $eocdSearchStart = [Math]::Max(0, $bytes.Length - 65557)
                         for ($i = $bytes.Length - 22; $i -ge $eocdSearchStart; $i--) {
@@ -499,7 +494,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # PyInstaller MEI magic (last 4096 bytes)
                     $pyiStart = [Math]::Max(0, $bytes.Length - 4096)
                     $pyiOffset = Find-BytePattern $bytes $pyiStart ($bytes.Length - 1) $pyiMagic
                     if ($pyiOffset -ge 0) {
@@ -515,7 +509,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # AutoIt AU3!EA06 magic (scan overlay region)
                     $auOffset = Find-BytePattern $bytes $overlayOffset ([Math]::Min($overlayOffset + 1048576, $bytes.Length - 1)) $autoItMagic
                     if ($auOffset -ge 0) {
                         $result.Detections.Add("AutoIt: AU3!EA06 signature at offset $auOffset [HIGH_CONFIDENCE]")
@@ -546,7 +539,7 @@ function Test-DowserExtractable {
                     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
                     $allVersionText = $versionFields -join ' '
 
-                    # Check OriginalFilename separately (very reliable)
+                    # originalfilename is the most reliable version field
                     $origFn = $versionInfo.OriginalFilename
                     if ($origFn -and $originalFilenameFingerprints.ContainsKey($origFn)) {
                         $ofFp = $originalFilenameFingerprints[$origFn]
@@ -561,7 +554,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # Check all version text against framework patterns
                     if ($allVersionText) {
                         foreach ($fw in $frameworkFingerprints.GetEnumerator()) {
                             $matched = $false
@@ -596,14 +588,12 @@ function Test-DowserExtractable {
                     $scanEnd = [Math]::Min($bytes.Length, 1048576)
                     $tailStart = [Math]::Max(0, $bytes.Length - 1048576)
 
-                    # Extract ASCII strings from scan regions for pattern matching
                     $headStr = [System.Text.Encoding]::ASCII.GetString($bytes, 0, $scanEnd)
                     $tailStr = if ($tailStart -gt 0) {
                         [System.Text.Encoding]::ASCII.GetString($bytes, $tailStart, $bytes.Length - $tailStart)
                     } else { '' }
                     $scanText = $headStr + $tailStr
 
-                    # Go binary: buildinf magic or .go.buildinfo string
                     if ($scanText.Contains([char]0xFF + ' Go buildinf:') -or $scanText.Contains('.go.buildinfo')) {
                         $result.Detections.Add('Go binary: buildinf marker [HIGH_CONFIDENCE]')
                         if (-not $result.InstallerType) {
@@ -616,7 +606,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # Rust binary: panic string
                     if ($scanText.Contains('panicked at') -and $scanText.Contains('unwrap()')) {
                         $result.Detections.Add('Rust binary: panic string [HEURISTIC]')
                         if (-not $result.InstallerType) {
@@ -629,7 +618,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # Electron
                     if ($scanText.Contains('ELECTRON_RUN_AS_NODE')) {
                         $result.Detections.Add('Electron: ELECTRON_RUN_AS_NODE string [HIGH_CONFIDENCE]')
                         if (-not $result.InstallerType) {
@@ -642,7 +630,6 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # Node.js SEA
                     if ($scanText.Contains('SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2')) {
                         $result.Detections.Add('Node.js SEA: fuse string [HIGH_CONFIDENCE]')
                         if (-not $result.InstallerType) {
@@ -655,7 +642,7 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # PyInstaller _MEIPASS string (backup if trailer wasn't found)
+                    # fallback when the pkg trailer scan missed it
                     if ($scanText.Contains('_MEIPASS') -and -not ($result.InstallerType -eq 'PyInstaller')) {
                         $result.Detections.Add('PyInstaller: _MEIPASS string [HIGH_CONFIDENCE]')
                         if (-not $result.InstallerType) {
@@ -668,7 +655,7 @@ function Test-DowserExtractable {
                         }
                     }
 
-                    # AutoIt text marker (backup)
+                    # fallback when the au3 magic scan missed it
                     if ($scanText.Contains('This is a compiled AutoIt script') -and -not ($result.InstallerType -eq 'AutoIt')) {
                         $result.Detections.Add('AutoIt: compiled script text marker [HIGH_CONFIDENCE]')
                         if (-not $result.InstallerType) {
@@ -685,7 +672,6 @@ function Test-DowserExtractable {
                 # =============================================================
                 # Step 7: Native Windows Detection (no third-party tools)
                 # =============================================================
-                # Try System.IO.Compression.ZipFile for embedded ZIP
                 if ($result.Classification -eq 'Unknown' -or $result.Detections.Count -eq 0) {
                     try {
                         Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
@@ -705,11 +691,10 @@ function Test-DowserExtractable {
                         }
                     }
                     catch {
-                        # Not a valid ZIP - that's fine, continue
+                        # not a zip, expected
                     }
                 }
 
-                # Try expand.exe for embedded CAB
                 if ($hasExpand -and ($result.Classification -eq 'Unknown' -or $result.Detections.Count -eq 0)) {
                     try {
                         $expandOutput = & $expandExe '-D' $file.FullName 2>&1 | Out-String
@@ -725,7 +710,7 @@ function Test-DowserExtractable {
                         }
                     }
                     catch {
-                        # expand.exe failed - not a CAB, continue
+                        # not a cab, expected
                     }
                 }
 
@@ -737,7 +722,6 @@ function Test-DowserExtractable {
                         $7zOutput = & $SevenZipPath l $file.FullName 2>&1 | Out-String
                         $7zLines = $7zOutput -split "`r?`n"
 
-                        # Parse all Type= lines
                         $foundTypes = @()
                         foreach ($line in $7zLines) {
                             if ($line -match '^\s*Type\s*=\s*(.+)$') {
@@ -745,7 +729,6 @@ function Test-DowserExtractable {
                             }
                         }
 
-                        # Parse file listing between separator lines
                         $separatorIndices = @()
                         for ($idx = 0; $idx -lt $7zLines.Count; $idx++) {
                             if ($7zLines[$idx] -match '^-{10,}') { $separatorIndices += $idx }
@@ -767,7 +750,6 @@ function Test-DowserExtractable {
                             }
                         }
 
-                        # Classify: real payload vs PE sections
                         $realFiles = @()
                         $peSections = @()
                         foreach ($name in $listedFileNames) {
@@ -778,7 +760,6 @@ function Test-DowserExtractable {
                             if ($isPeSec) { $peSections += $name } else { $realFiles += $name }
                         }
 
-                        # Check for extractable archive type
                         $detectedArchiveType = $null
                         foreach ($t in $foundTypes) {
                             if ($t -in $extractable7zTypes) {
@@ -787,7 +768,7 @@ function Test-DowserExtractable {
                             }
                         }
 
-                        # 7-Zip verdict (overrides earlier tiers)
+                        # 7z is the oracle, it overrides every earlier tier
                         if ($detectedArchiveType -or $realFiles.Count -gt 0) {
                             $result.Extractable = $true
                             $result.Classification = 'Extractable'
@@ -859,7 +840,6 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # Convert Detections list to array for cleaner output
                 $result.Detections = @($result.Detections)
                 $result
             }

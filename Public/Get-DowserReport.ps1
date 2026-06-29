@@ -60,7 +60,7 @@
 #>
 
 # two-phase parallel file report. gather dirs first, analyze chunks in phase 2.
-# runspace block has its own size formatter (FormatSizeLocal) — cant reach Format-DowserSize from there.
+# runspace block has its own size formatter, cant reach Format-DowserSize from there
 # ConvertTo-DowserBytes handles MinSize/MaxSize string parsing from module Private.
 
 function Get-DowserReport {
@@ -102,11 +102,10 @@ function Get-DowserReport {
         $script:allResults = [System.Collections.ArrayList]::Synchronized((New-Object System.Collections.ArrayList))
         $script:errorCount = 0
 
-        # size string parsing delegated to Private helper
         $minBytes = if ($MinSize) { ConvertTo-DowserBytes -SizeString $MinSize } else { $null }
         $maxBytes = if ($MaxSize) { ConvertTo-DowserBytes -SizeString $MaxSize } else { $null }
 
-        # Auto-wrap bare strings in wildcards so partial names match.
+        # wrap bare strings so partial names match
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
             $Pattern = "*$Pattern*"
             Write-Verbose "Pattern auto-wrapped to: $Pattern"
@@ -305,9 +304,7 @@ function Get-DowserReport {
             # PHASE 2: FILE ANALYSIS (runspace pool, chunked processing)
             # ================================================================
 
-            # NOTE: FormatSizeLocal is an inline formatter because module-scope
-            # Format-DowserSize is not reachable from inside a runspace thread.
-            # Do not remove or redirect to Format-DowserSize here.
+            # inline formatter, runspace cant reach Format-DowserSize, dont redirect
             $analyzeScriptBlock = {
                 param($FilePaths, $DoIncludeOwner, $ScanRoot)
 
@@ -349,7 +346,7 @@ function Get-DowserReport {
                         catch { $owner = "ACCESS DENIED" }
                     }
 
-                    # local inline formatter — cannot call Format-DowserSize from runspace scope
+                    # cant reach Format-DowserSize from runspace scope
                     $bytes        = $fileItem.Length
                     $sizeFormatted = "$bytes B"
                     if ($bytes -ge 1TB)      { $sizeFormatted = "{0:N2} TB" -f ($bytes / 1TB) }
@@ -472,7 +469,7 @@ function Get-DowserReport {
             $sortedResults = $script:allResults | Sort-Object @sortParams
         }
 
-        # grouped display for multi-directory scans — group by RelativeFolder
+        # grouped view only for multi-dir scans
         if ($Depth -ne 0) {
             $groupedType = 'FileReport.GroupedResult'
             $ownerHeader = ''
@@ -542,7 +539,6 @@ function Get-DowserReport {
 
         $sortedResults | Write-Output
 
-        # summary stats
         $duration      = New-TimeSpan -Start $script:startTime -End (Get-Date)
         $totalFiles    = @($sortedResults).Count
         $totalSize     = ($sortedResults | Measure-Object -Property Size -Sum).Sum
@@ -709,7 +705,6 @@ function Compare-DowserReport {
         $afterMap = @{}
         foreach ($item in $After) { $afterMap[$item.Name] = $item }
 
-        # new files
         foreach ($name in $afterMap.Keys) {
             if (-not $beforeMap.ContainsKey($name)) {
                 $a = $afterMap[$name]
@@ -733,7 +728,6 @@ function Compare-DowserReport {
             }
         }
 
-        # removed files
         foreach ($name in $beforeMap.Keys) {
             if (-not $afterMap.ContainsKey($name)) {
                 $b = $beforeMap[$name]
@@ -757,7 +751,6 @@ function Compare-DowserReport {
             }
         }
 
-        # changed and unchanged
         foreach ($name in $afterMap.Keys) {
             if ($beforeMap.ContainsKey($name)) {
                 $b = $beforeMap[$name]

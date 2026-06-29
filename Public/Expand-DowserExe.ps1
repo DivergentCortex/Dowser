@@ -80,7 +80,6 @@ function Expand-DowserExe {
 
     process {
         foreach ($inputPath in $Path) {
-            # Resolve the file
             if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) {
                 Write-Warning "File not found: $inputPath"
                 continue
@@ -94,7 +93,6 @@ function Expand-DowserExe {
 
             Write-Verbose "Checking: $($file.FullName)"
 
-            # Run extractability test
             $testResult = Test-DowserExtractable -Path $file.FullName -SevenZipPath $SevenZipPath
 
             if (-not $testResult.Extractable) {
@@ -114,7 +112,6 @@ function Expand-DowserExe {
                 continue
             }
 
-            # Determine destination folder
             $dest = if ($Destination) {
                 $Destination
             }
@@ -122,14 +119,12 @@ function Expand-DowserExe {
                 Join-Path $file.DirectoryName "$($file.BaseName)_extracted"
             }
 
-            # Check existing destination
             if ((Test-Path -LiteralPath $dest) -and -not $Force) {
                 Write-Warning "Destination already exists: $dest. Use -Force to overwrite."
                 continue
             }
 
             if ($PSCmdlet.ShouldProcess($file.FullName, "Extract to '$dest'")) {
-                # Create destination if needed
                 if (-not (Test-Path -LiteralPath $dest)) {
                     New-Item -ItemType Directory -Path $dest -Force | Out-Null
                     Write-Verbose "Created destination: $dest"

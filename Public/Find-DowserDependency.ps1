@@ -28,10 +28,7 @@ function Find-DowserDependency {
         [switch]$ExportResults
     )
 
-    # Default exclusions are platform-specific. The historic Windows defaults
-    # (\Windows\, \Program Files, ...) never match Linux paths, so populate
-    # sensible per-platform defaults only when the caller did not supply any.
-    # Canonical guard: $IsWindows is $null on PS 5.1, so -ne $false means Windows.
+    # IsWindows is null on ps 5.1 so -ne false means windows
     if (-not $PSBoundParameters.ContainsKey('ExcludePaths')) {
         if ($IsWindows -ne $false) {
             $ExcludePaths = @(
@@ -53,13 +50,11 @@ function Find-DowserDependency {
         }
     }
 
-    # Combine all search paths
     $searchPaths = @($SearchPath)
     if ($AdditionalPaths) {
         $searchPaths += $AdditionalPaths
     }
 
-    # If no specific functions provided, look for dot-sourcing and function calls
     if (-not $FunctionNames) {
         $patterns = @(
             '\. ["''].*\.ps1["'']',
@@ -80,7 +75,6 @@ function Find-DowserDependency {
     foreach ($path in $searchPaths) {
         Write-Verbose "`nScanning path: $path"
         
-        # Get all PS1 files, excluding specified paths
         $files = Get-ChildItem -Path $path -Recurse -Filter "*.ps1" -ErrorAction SilentlyContinue | 
             Where-Object { 
                 $file = $_
@@ -136,7 +130,6 @@ function Find-DowserDependency {
 
     Write-Progress -Activity "Scanning Files" -Completed
 
-    # Display results
     if ($results.Count -eq 0) {
         Write-Verbose "`nNo dependencies found."
         return
@@ -144,7 +137,6 @@ function Find-DowserDependency {
 
     Write-Verbose "`nFound $($results.Count) dependencies across $($results.SourceFile | Select-Object -Unique | Measure-Object).Count files"
 
-    # Group results by source file for cleaner output
     $groupedResults = $results | Group-Object SourceFile
 
     foreach ($group in $groupedResults) {
@@ -162,7 +154,6 @@ function Find-DowserDependency {
         }
     }
 
-    # Export results if requested
     if ($ExportResults) {
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $exportPath = Join-Path $PWD "DependencyScan_$timestamp.csv"
