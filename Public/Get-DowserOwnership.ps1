@@ -15,8 +15,8 @@
 .EXAMPLE
     Get-DowserOwnership -Directory "C:\Logs"
 .NOTES
-    Author: Curtis Leggett / PowerShell Codesmith
-    Ported from: Get-FileOwnership.ps1 (General_Scripts)
+    Author: Curtis Leggett / Divergent Cortex
+    Ported from: Get-FileOwnership.ps1 (standalone scripts)
     Uses: Private\Format-DowserSize for human-readable sizes
 #>
 

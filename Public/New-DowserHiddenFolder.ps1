@@ -31,7 +31,7 @@ function New-DowserHiddenFolder {
         New-DowserHiddenFolder -Path 'D:\Existing\.config' -AttributesOnly
 
     .NOTES
-        Source: create-hiddenfolder (General_Scripts -- was hardcoded to X:\synapse-sql-v3.3\.$svcconf)
+        Source: create-hiddenfolder (standalone scripts -- was hardcoded to an internal project path)
         Rewritten to accept -Path parameter; no hardcoded paths.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]

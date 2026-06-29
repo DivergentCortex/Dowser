@@ -54,7 +54,7 @@
     } -ArgumentList @('TODO') -UseProgressQueue
 
 .NOTES
-    Author: PowerShell Codesmith
+    Author: Curtis Leggett / Divergent Cortex
     Created: 2026-04-11
 #>
 

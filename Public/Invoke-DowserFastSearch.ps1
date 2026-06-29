@@ -40,7 +40,7 @@
 
 .NOTES
     Alias: dfast
-    Source: Invoke-FastTextSearch.ps1 (General_Scripts)
+    Source: Invoke-FastTextSearch.ps1 (standalone scripts)
     Related: Find-DowserString (multi-pattern, Aho-Corasick, multiple output modes)
 #>
 function Invoke-DowserFastSearch {

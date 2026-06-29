@@ -19,7 +19,7 @@
     Path to Dowser.psd1. Defaults to parent of this script's directory.
 
 .PARAMETER TestDataPath
-    Root path for large-tree timing tests. Default: /mnt/d/_REPOS/General_Scripts
+    Root path for large-tree timing tests. Default: $PSScriptRoot
 
 .PARAMETER ReportDir
     Output directory for HTML/CSV reports. Default: <ScriptDir>\Reports
@@ -143,7 +143,7 @@ if (-not $modulesDir -or -not (Test-Path (Join-Path $modulesDir "Dowser.psd1")))
     $modulesDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 }
     [string]$ModulePath   = (Join-Path $ModulesDir "Dowser.psd1")
-    [string]$TestDataPath = "H:\WebReporting\spi\sccm"
+    [string]$TestDataPath = $PSScriptRoot
     [string]$ReportDir    = Join-Path $ScriptPath "Reports"
 
 

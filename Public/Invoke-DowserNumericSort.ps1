@@ -40,7 +40,7 @@
 
 .NOTES
     Alias: dsort, dnsort
-    Source: Invoke-NumericalSorting.ps1 (General_Scripts) - Sort-Numerical function
+    Source: Invoke-NumericalSorting.ps1 (standalone scripts) - Sort-Numerical function
     Private helper: Get-DowserSortKey (extracted from source Get-SortKey)
     Related: Find-DowserFile, Find-DowserDuplicate
 #>

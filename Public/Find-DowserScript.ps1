@@ -9,7 +9,7 @@ function Find-DowserScript {
         Optionally filters to files modified within a recency window.
 
         Replaces Find-Scripts.ps1 / Find-SecureCrtScripts — fully generalized.
-        Source was hardcoded to a specific SecureCRT network share. That's gone.
+        Source was hardcoded to a specific network share. Generalized.
 
     .PARAMETER Path
         Root path(s) to search. Accepts pipeline input.
@@ -35,7 +35,7 @@ function Find-DowserScript {
 
     .NOTES
         Alias: dscript
-        Source: Find-Scripts.ps1 (General_Scripts — Find-SecureCrtScripts, hardcoded to SecureCRT share)
+        Source: Find-Scripts.ps1 (standalone scripts -- was hardcoded to a network share)
         Generalized: path, extensions, recency window all parameterized.
     #>
     [CmdletBinding()]

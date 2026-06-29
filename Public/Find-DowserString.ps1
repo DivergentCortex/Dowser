@@ -68,7 +68,7 @@
     Find-DowserString -Path D:\repos -Patterns 'Write-Host' -Extensions '*.ps1' -OutputMode files
 
 .NOTES
-    Ported from General_Scripts\find-stringinfiles.ps1
+    Ported from standalone scripts\find-stringinfiles.ps1
     Threading via Invoke-DowserRunspacePool (Private helper)
     Aho-Corasick compiled inline (C# Add-Type) — shared across runspaces via AppDomain
 #>

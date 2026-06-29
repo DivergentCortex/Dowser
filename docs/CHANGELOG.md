@@ -2,6 +2,32 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.28.032] - 2026-06-28
+### chore(go-public): Pre-publication sanitization and repo hardening for open-source release
+
+What changed:
+- Removed synapse-daemon.log, logs/dashboard.log, resources/exeinfope/ directory, and resources/exeinfope.zip from working tree
+- Untracked Tests/Reports/ via git rm --cached (reports regenerated on each run)
+- Expanded .gitignore: added *.log, logs/, .claude/, *.nupkg, .DS_Store, Thumbs.db; removed comment revealing AI tooling
+- Removed General_Scripts folder entry from Dowser.code-workspace
+- Generated real GUID (64c72862-caae-4d55-9a1f-0d5bf94d3695) replacing placeholder in Dowser.psd1
+- Set ProjectUri to https://github.com/kizer88/Dowser in manifest
+- Updated Copyright field to MIT license text
+- Added MIT LICENSE file at repo root (copyright 2026 Curt Leggett)
+- Created root README.md from docs/README.md with adjusted links; removed exeinfope references from project layout
+- Removed exeinfope references from docs/README.md and docs/ARCHITECTURE.md
+- Replaced hardcoded paths in Tests/Invoke-DowserTestSuite.ps1 and Tests/Test-DowserRunspacePool.ps1 with $PSScriptRoot-relative paths
+- Sanitized internal infra names (synapse-sql, SecureCRT share) in .NOTES blocks across Public/*.ps1
+- Replaced 'comprehensive' with concrete language in Get-DowserProperty.ps1 synopsis and verbose output
+- Standardized author attribution to 'Curtis Leggett / Divergent Cortex' across all .ps1 files (6 files)
+- Replaced Write-Host with Write-Information/Write-Warning in Private/Test-DowserHelpers.ps1 and Tests/Test-DowserRunspacePool.ps1
+- Replaced all General_Scripts references with 'standalone scripts' across source and docs
+- Redacted CHANGELOG: removed agent names from headings, WSL/runtime_cortex paths, internal process jargon, research tool run IDs; normalized heading format; enforced ASCII throughout
+
+Why:
+- Preparing repository for public visibility on GitHub. Removes private infrastructure references, internal tooling names, hardcoded paths, placeholder values, and third-party bundled binaries that should not ship in an open-source release.
+
+
 ## [2026.06.22.031] - 2026-06-22
 ### fix(Get-DowserMap): -IncludeHidden now shows hidden dirs (.claude etc); -NoDefaultExcludes propagated to recursive calls
 
@@ -76,7 +102,7 @@ What changed:
 - Trimmed the duplicated two-line canonical-guard comment block (identical boilerplate copy-pasted at each guard site) to one concise line per site in ConvertTo-DowserIco.ps1, ConvertTo-DowserExe.ps1 (both guards), Get-DowserTemplate.ps1, and Write-Log.ps1 (both guards).
 
 Why:
-- Raven pair audit of the Task #2 changeset passed with four cleanup findings. The Expand-DowserExe -PassThru if/else was dead code that made the switch meaningless; standard -PassThru is silent-by-default with opt-in emit, matching the function's ShouldProcess design and the terminal position it occupies in the documented pipeline examples. Get-DowserProperty carried the exact bare-$IsWindows bug class the sweep fixed everywhere else. The 7-Zip test gave false confidence (no-throw passes regardless of the default value). The duplicated guard comments were AI-slop flagged by the audit.
+- Code review of the Task #2 changeset passed with four cleanup findings. The Expand-DowserExe -PassThru if/else was dead code that made the switch meaningless; standard -PassThru is silent-by-default with opt-in emit, matching the function's ShouldProcess design and the terminal position it occupies in the documented pipeline examples. Get-DowserProperty carried the exact bare-$IsWindows bug class the sweep fixed everywhere else. The 7-Zip test gave false confidence (no-throw passes regardless of the default value). The duplicated guard comments were copy-paste boilerplate flagged by the review.
 
 
 ## [2026.06.16.025] - 2026-06-16
@@ -89,7 +115,7 @@ What changed:
 - Full Pester suite now 92/92
 
 Why:
-- Raven-pair audit of Task #1 passed with three findings: a confirmed double-emission defect introduced by the clipboard guard, an output-shape ambiguity in Find-DowserDuplicate, and duplicated verbose guard comments (AI-slop). These remediate all three before T1 closes.
+- Code review of Task #1 passed with three findings: a confirmed double-emission defect introduced by the clipboard guard, an output-shape ambiguity in Find-DowserDuplicate, and duplicated verbose guard comments (copy-paste boilerplate). These remediate all three before T1 closes.
 
 
 ## [2026.06.16.024] - 2026-06-16
@@ -101,7 +127,7 @@ What changed:
 - Added Pester assertion that Find-DowserOrphan returns FileInfo objects with no format-record pollution; full suite now 91/91
 
 Why:
-- Folding the two known items flagged during review into this pass before the raven audit: the Format-Table-at-tail polluted Find-DowserOrphan's FileInfo return, and the em-dashes broke the module's ASCII-only source standard.
+- Folding the two known items flagged during review into this pass before the code review: the Format-Table-at-tail polluted Find-DowserOrphan's FileInfo return, and the em-dashes broke the module's ASCII-only source standard.
 
 
 ## [2026.06.16.023] - 2026-06-16
@@ -157,7 +183,7 @@ What changed:
 - README.md: added the missing Measure-DowserDiskUsage row, corrected the function count from 25 to 26 (matches Public/ file count), rewrote the Compare-DowserReport note to state accurately that it is dot-sourced with Get-DowserReport but not an independently exported member, expanded the platform-support section, and added a Measure-DowserDiskUsage quick-start example
 - INDEX.md: added the missing Find-DowserString entry (a headline function that had no entry), and recharacterized Compare-DowserReport to note it is not an independent export
 - ARCHITECTURE.md: corrected Public/ function count from 25 to 26
-- CHANGELOG.md: consolidated the Get-DowserMap symlink-render feature and its same-day regression fix (originally two adjacent same-day entries) into the single 2026.06.14.019 feat entry, since the fix corrected a defect introduced earlier the same day with no release between them; trimmed the combined entry to standard length and removed AI-slop and internal references (line numbers, internal variable names, 'set at glyph-var init time', 'caught by the raven pair audit'). The 2026.06.14.020 slot freed by that consolidation is reused by this documentation-reconciliation entry.
+- CHANGELOG.md: consolidated the Get-DowserMap symlink-render feature and its same-day regression fix (originally two adjacent same-day entries) into the single 2026.06.14.019 feat entry, since the fix corrected a defect introduced earlier the same day with no release between them; trimmed the combined entry to standard length and removed internal references (line numbers, internal variable names, implementation noise). The 2026.06.14.020 slot freed by that consolidation is reused by this documentation-reconciliation entry.
 
 Why:
 - Docs had drifted behind the code: the README undercounted functions and omitted Measure-DowserDiskUsage, INDEX was missing Find-DowserString, and both treated Compare-DowserReport ambiguously. The symlink-feature changelog entry was roughly 3x normal length and carried implementation noise and internal references that mean nothing to a reader; its same-day regression fix corrected unshipped code from the same feature, so the two belong as one entry (2026.06.14.019) rather than separate historical events.
@@ -188,7 +214,7 @@ What changed:
 - Tests: all Join-Path paths use nested form for cross-platform correctness; added extensionless file noext and <none> extension assertions; added treemap-proportionality assertions (block widths sum to ~100%, largest block >= 98%, remainder block present); added symlink-root test (skipped on Windows or when symlink creation is not permitted)
 
 Why:
-- Codex review (FIX-THEN-SHIP) identified three real defects: the treemap drew overlapping nested dirs producing misleading area proportions, a symlinked root was silently skipped producing empty results, and $dirSizes used OrdinalIgnoreCase on case-sensitive Linux filesystems causing sibling dirs with different casing to merge into one bucket
+- Code review identified three real defects: the treemap drew overlapping nested dirs producing misleading area proportions, a symlinked root was silently skipped producing empty results, and $dirSizes used OrdinalIgnoreCase on case-sensitive Linux filesystems causing sibling dirs with different casing to merge into one bucket
 
 
 ## [2026.06.07.017] - 2026-06-07
@@ -287,7 +313,7 @@ Why:
 - ModuleVersion bumped from 0.1.0 to 0.2.0
 - Module description updated to note cross-platform support
 
-## [2026.05.04.012] - [2026-05-04] - Find-DowserString: single-file mode
+## [2026.05.04.012] - 2026-05-04 -- Find-DowserString: single-file mode
 
 ### Fixed
 - `Public/Find-DowserString.ps1` - When `-Path` is a file (not a directory), the function
@@ -306,29 +332,29 @@ Why:
   with whitespace collapsed and content clipped at 160 chars. Tail line indicates how
   many additional match rows exist if the cap was hit.
 
-## [2026.04.29.011] - [2026-04-29] - Find-DowserString: grouped output mode (new default)
+## [2026.04.29.011] - 2026-04-29 -- Find-DowserString: grouped output mode (new default)
 
 ### Changed
 - `Public/Find-DowserString.ps1` - Output reorganized to group results by parent directory.
 
   Was: default `OutputMode = 'counts'` emitted one PSCustomObject per file. PowerShell's
-  default table formatter then truncated the FilePath column on long UNC paths,
+  default table formatter then truncated the FilePath column on long paths,
   producing rows like:
 
-      \\wsl.localhost\...\runtime_cortex\dist\comm...
-      \\wsl.localhost\...\runtime_cortex\dist\comm...
+      \\some-host\...\deep\nested\path\comm...
+      \\some-host\...\deep\nested\path\comm...
 
   with the same parent dir repeated and the actual filename clipped.
 
   Now: new `OutputMode = 'grouped'` is the default. Output is text (Write-Output strings),
   formatted as a directory header with files listed underneath:
 
-      \\wsl.localhost\...\runtime_cortex\dist  (5 files, 14 matches)
+      C:\Projects\SomeApp\dist  (5 files, 14 matches)
           commands-registry-BKukdIJg.js                         [   1]  line 584
           commands-registry-DaH1KNEE.js                         [   1]  line 544
           pi-embedded-CblkcCno.js                               [   6]  lines 41772, 42016, 42032, 42044, 42050, 42058
 
-      \\wsl.localhost\...\runtime_cortex\dist\plugin-sdk  (2 files, 7 matches)
+      C:\Projects\SomeApp\dist\plugin-sdk  (2 files, 7 matches)
           commands-registry-DfTR18y4.js                         [   1]  line 584
           reply-BbVFaxrJ.js                                     [   6]  lines 43591, 70345, 79000, ...
 
@@ -346,7 +372,7 @@ Why:
 
 ---
 
-## [2026.04.29.010] - [2026-04-29] - Find-DowserString: phase banners + streaming directory enumeration
+## [2026.04.29.010] - 2026-04-29 -- Find-DowserString: phase banners + streaming directory enumeration
 
 ### Changed
 - `Public/Find-DowserString.ps1` - 3-phase status model with immediate visible feedback.
@@ -391,7 +417,7 @@ Why:
 
 ---
 
-## [2026.04.21.009] - [2026-04-21] - Corrupted File Detection (Test-DowserIntegrity)
+## [2026.04.21.009] - 2026-04-21 -- Corrupted File Detection (Test-DowserIntegrity)
 
 ### Added
 - `Public/Test-DowserIntegrity.ps1` - Layered file-corruption detection.
@@ -443,13 +469,12 @@ Why:
 
 ---
 
-## [2026.04.15.008] - [2026-04-15] - Canonical EXE Static-Analysis Reference (document-consolidator)
+## [2026.04.15.008] - 2026-04-15 -- Canonical EXE Static-Analysis Reference
 
 ### Added
-- `docs/exe-static-classification-reference.md` — Canonical merged technical reference for static
+- `docs/exe-static-classification-reference.md` -- Canonical merged technical reference for static
   classification of Windows .EXE files as Extractable vs Requires Decompilation.
-  Merges two independent deep-research outputs: verityvulture run 2026-04-15__1410 and
-  verityfactseeker artifact dowser-pe-static-analysis-reference.md v2026.04.15.001.
+  Merges two independent research outputs covering the same domain from different angles.
   Covers: hex signatures for ZIP/7z/CAB/RAR/WIM/GZIP/BZIP2/ZSTD/LZMA; installer framework
   fingerprints for NSIS/Inno/InstallShield/WiX/AdvancedInstaller/IExpress/WinRAR SFX/7z SFX;
   script-to-EXE detection for ps2exe/AutoIt/AutoHotkey/PyInstaller/cx_Freeze/Nuitka/pkg/Electron/
@@ -465,7 +490,7 @@ Why:
 
 ---
 
-## [2026.04.15.007] - [2026-04-15] - [2026-04-15] - EXE Extractability Detection + Extraction (Powershell-Codesmith)
+## [2026.04.15.007] - 2026-04-15 -- EXE Extractability Detection + Extraction
 
 ### Added
 - `Public/Test-DowserExtractable.ps1` - Tests whether an EXE is simply extractable or requires decompilation.
@@ -492,7 +517,7 @@ Why:
 
 ---
 
-## [2026.04.12.006] - [2026-04-12] - Invoke-DowserTestSuite interactive path fallback + ASCII sweep (Powershell-Codesmith)
+## [2026.04.12.006] - 2026-04-12 -- Invoke-DowserTestSuite interactive path fallback + ASCII sweep
 
 ### Fixed
 - `Tests/Invoke-DowserTestSuite.ps1` - Fixed param default path resolution when run outside script context.
@@ -510,7 +535,7 @@ Why:
 
 ---
 
-## [2026-04-12] - Unicode Em Dash Purge (Powershell-Codesmith)
+## [2026-04-12] - Unicode Em Dash Purge
 
 ### Fixed
 - `Tests/Invoke-DowserTestSuite.ps1` - Replaced all 13 Unicode em dashes (U+2014) with ASCII hyphen "-".
@@ -519,59 +544,59 @@ Why:
 - `Tests/Reports/*.csv` and `*.html` (12 files) - Replaced 48 additional em dashes in generated report output.
   Note: reports are regenerated on each test run; the PS1 fix is the root source.
 - Syntax check: PASS (0 errors).
-- Verification: grep -r "—" returns 0 hits across PS1 and all Reports files.
+- Verification: grep -r "--" returns 0 hits across PS1 and all Reports files.
 
 ---
 
-## [2026.04.12.005] - [2026-04-12] — Test Suite + Inline Fixes (Powershell-Codesmith)
+## [2026.04.12.005] - 2026-04-12 -- Test Suite + Inline Fixes
 
 ### Added
-- `Tests/Invoke-DowserTestSuite.ps1` — Comprehensive test suite covering all 21 cmdlets (131 total tests).
+- `Tests/Invoke-DowserTestSuite.ps1` -- Comprehensive test suite covering all 21 cmdlets (131 total tests).
   Tests: syntax (T-00), module import (T-01), help blocks (T-02), pipeline support (T-03),
   functional tests (T-04), timing benchmarks small/medium/large (T-05), edge cases (T-06).
   Reports: CSV + HTML written to `Tests/Reports/`. Parameterized: -ModulePath, -TestDataPath, -ReportDir, -SkipSlow.
   Final run: Total=131 PASS=112 FAIL=0 WARN=15 SKIP=4. Pass rate (excl skips): 88.2%.
-  WARNs: 14 cmdlets have .SYNOPSIS but no .EXAMPLE blocks (ported without help rewrites — cosmetic).
+  WARNs: 14 cmdlets have .SYNOPSIS but no .EXAMPLE blocks (ported without help rewrites -- cosmetic).
   SKIPs: ConvertTo-DowserExe (needs Windows csc), ConvertTo-DowserIco (System.Drawing), Get-DowserTemplate (COM), LargeTree bench.
 
 ### Fixed
-- `Public/Find-DowserScript.ps1` — **REWRITTEN**. Previous version had empty `Find-DowserScript { param() }` outer
+- `Public/Find-DowserScript.ps1` -- **REWRITTEN**. Previous version had empty `Find-DowserScript { param() }` outer
   function with `Find-SecureCrtScripts` nested inside (hardcoded network path, no params). Calling
   `Find-DowserScript` did nothing. Rewrote with `-Path`, `-Extensions`, `-ModifiedWithin`, `-Recurse`;
   emits PSCustomObjects with Name/FullName/Extension/LastWriteTime/Size.
-- `Public/Find-DowserRecentLog.ps1` — **REWRITTEN**. Previous version had bare script code inside
+- `Public/Find-DowserRecentLog.ps1` -- **REWRITTEN**. Previous version had bare script code inside
   empty-param function body; contained backtick `` `$PWD `` literal bug. Rewrote with mandatory `-FileName`,
   `-Path`, `-All`, `-Recurse` params. Returns PSCustomObject per match, newest-first.
-- `Public/New-DowserHiddenFolder.ps1` — **REWRITTEN**. Previous version had hardcoded paths
-  `X:\synapse-sql-v3.3\.$svcconf` that don't exist anywhere else. Rewrote as general-purpose cmdlet
+- `Public/New-DowserHiddenFolder.ps1` -- **REWRITTEN**. Previous version had hardcoded paths
+  to an internal project directory that don't exist anywhere else. Rewrote as general-purpose cmdlet
   with `-Path`, `-Force`, `-AttributesOnly`; SupportsShouldProcess; emits PSCustomObject.
-- `Public/Find-DowserModified.ps1` — **REWRITTEN**. Previous version had backtick `` `$PWD `` literal bug,
+- `Public/Find-DowserModified.ps1` -- **REWRITTEN**. Previous version had backtick `` `$PWD `` literal bug,
   hardcoded default date `"2025-01-14"`, and no `-Path` param (searched `D:\` hardcoded). Rewrote
   with `-Path`, `-Date` (default today), `-Recurse`; emits PSCustomObject per file.
-- `Public/Get-DowserTemplate.ps1` — **REWRITTEN**. Previous version had live execution code
-  (`$template = Get-FolderTemplate -folderPath "D:"`) OUTSIDE the function body — ran on module import.
+- `Public/Get-DowserTemplate.ps1` -- **REWRITTEN**. Previous version had live execution code
+  (`$template = Get-FolderTemplate -folderPath "D:"`) OUTSIDE the function body -- ran on module import.
   Missing `[CmdletBinding()]`. Rewrote with `-Path`, Write-Progress, proper COM error handling,
   PSCustomObject output with Path/ViewMode/Columns.
-- `Public/ConvertTo-DowserBase64.ps1` — Added `[CmdletBinding()]` (was missing). Renamed `-ImagePath`
+- `Public/ConvertTo-DowserBase64.ps1` -- Added `[CmdletBinding()]` (was missing). Renamed `-ImagePath`
   to `-Path` with `[Alias('ImagePath','FullName')]` per porting outline. Added `ValueFromPipeline`,
   `ValueFromPipelineByPropertyName`. Fixed all 3 remaining `$ImagePath` references in body.
-- `Public/Find-DowserDuplicate.ps1` — Added `ValueFromPipeline = $true` and `ValueFromPipelineByPropertyName = $true`
+- `Public/Find-DowserDuplicate.ps1` -- Added `ValueFromPipeline = $true` and `ValueFromPipelineByPropertyName = $true`
   to mandatory `-Path` parameter. Added `[Alias('FullName')]`.
-- `Public/Find-DowserString.ps1` — Added `ValueFromPipeline = $true`, `ValueFromPipelineByPropertyName = $true`,
+- `Public/Find-DowserString.ps1` -- Added `ValueFromPipeline = $true`, `ValueFromPipelineByPropertyName = $true`,
   `[Alias('FullName')]` to `-Path` parameter. Also changed `${PWD}` to `$PWD` (minor).
-- `Public/Get-DowserMap.ps1` — Added `ValueFromPipeline = $true`, `ValueFromPipelineByPropertyName = $true`,
+- `Public/Get-DowserMap.ps1` -- Added `ValueFromPipeline = $true`, `ValueFromPipelineByPropertyName = $true`,
   `[Alias('FullName')]` to mandatory `-Path` parameter.
-- `Public/Measure-DowserDirectory.ps1` — Fixed `[PSCustomObject]::New([Ordered]@{...})` → `[PSCustomObject][Ordered]@{...}`.
+- `Public/Measure-DowserDirectory.ps1` -- Fixed `[PSCustomObject]::New([Ordered]@{...})` -> `[PSCustomObject][Ordered]@{...}`.
   The `::New()` static constructor does not accept an OrderedDictionary; output objects had zero properties.
   All 9 output props (Directory, DataSize, FileCount, LargestFile, LargestFileName, NewestFileName,
   NewestFileDate, OldestFileName, OldestFileDate) now verified present.
-- `Public/Get-DowserOwnership.ps1` — Two fixes:
+- `Public/Get-DowserOwnership.ps1` -- Two fixes:
   (1) Added `[Parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]`, `[Alias('Path','FullName')]`
   to `$Directory` param (was bare undecorated param; test called with `-Path` which failed).
-  (2) Wrapped `New-Object -ComObject Shell.Application` in try/catch — on Linux/PSCore, `-ComObject`
+  (2) Wrapped `New-Object -ComObject Shell.Application` in try/catch -- on Linux/PSCore, `-ComObject`
   is not a valid parameter of `New-Object` and threw an uncaught terminating error. Now gracefully
   skips COM metadata on non-Windows and returns available data.
-- `Aliases/Aliases.ps1` — Added all 22 missing aliases (only 4 Phase-4 aliases were previously active;
+- `Aliases/Aliases.ps1` -- Added all 22 missing aliases (only 4 Phase-4 aliases were previously active;
   db64, dexe, dico, ddupe, dfile, dfind, dmod, dlog, dorphan, ddep, dscript, dstr, dgrep, dmap,
   dtree, down, dprop, dreport, dtemplate, dtopo, pstree, shtree now all defined).
 
@@ -584,11 +609,11 @@ Why:
 - Get-DowserTemplate / ConvertTo-DowserExe / ConvertTo-DowserIco: Windows-only features (COM, csc,
   System.Drawing). Tests SKIP on Linux. Function correctly when run on Windows.
 
-## [2026.04.12.004] - [2026-04-12] — Phase 4: Final 3 cmdlets + Blocker 24 resolution (21/21 complete)
+## [2026.04.12.004] - 2026-04-12 -- Phase 4: Final 3 cmdlets + Blocker 24 resolution (21/21 complete)
 
 ### Added
-- `Public\Invoke-DowserFastSearch.ps1` — Port of `General_Scripts\Invoke-FastTextSearch.ps1` (117 lines → 161 lines).
-  - Renames `Invoke-FastTextSearch` → `Invoke-DowserFastSearch`.
+- `Public\Invoke-DowserFastSearch.ps1` -- Port of `standalone scripts\Invoke-FastTextSearch.ps1` (117 lines -> 161 lines).
+  - Renames `Invoke-FastTextSearch` -> `Invoke-DowserFastSearch`.
   - Added `#Requires -Version 5.1`, full comment-based help block.
   - Added `ValueFromPipeline = $true` to `-Path` parameter (source had no pipeline support).
   - Added `-Pattern` alias for `-SearchString` (consistency with Find-DowserString).
@@ -596,28 +621,28 @@ Why:
   - Added elapsed time to completion Verbose output.
   - Results returned to pipeline as before; no functional logic changed.
   - Syntax check: PASS (0 errors).
-- `Public\Invoke-DowserNumericSort.ps1` — Port of `General_Scripts\Invoke-NumericalSorting.ps1` (125 lines → 137 lines).
-  - Renames `Sort-Numerical` → `Invoke-DowserNumericSort` (outline naming decision).
+- `Public\Invoke-DowserNumericSort.ps1` -- Port of `standalone scripts\Invoke-NumericalSorting.ps1` (125 lines -> 137 lines).
+  - Renames `Sort-Numerical` -> `Invoke-DowserNumericSort` (outline naming decision).
   - Removed `$script:capturedInput = $null` module-scope artifact from source (testing leftover).
   - Removed inline `Get-SortKey` function; calls `Get-DowserSortKey` from Private\ instead
-    (extracted in a prior phase — already present at `Private\Get-DowserSortKey.ps1`).
+    (extracted in a prior phase -- already present at `Private\Get-DowserSortKey.ps1`).
   - Replaced `throw "No input data provided..."` with `Write-Error` + `return` per module standards.
   - `Register-ArgumentCompleter` updated: CommandName changed to `Invoke-DowserNumericSort`;
     removed `$script:capturedInput` branch (the AST-inspection branch still works).
   - Syntax check: PASS (0 errors).
-- `Public\Measure-DowserDirectory.ps1` — Port of `General_Scripts\Get-DirectorySizeCounts.ps1` (84 lines → 100 lines).
-  - **BLOCKER RESOLVED:** Removed line 2 dot-source: `. "E:\_Local-H\'._\_.'funkshenz\Set-WriteAlias.ps1"` — hardcoded absolute path to a local-only helper that does not exist in any other environment.
+- `Public\Measure-DowserDirectory.ps1` -- Port of `standalone scripts\Get-DirectorySizeCounts.ps1` (84 lines -> 100 lines).
+  - **BLOCKER RESOLVED:** Removed line 2 dot-source of a hardcoded absolute path to a local-only helper that does not exist in any other environment.
   - **BLOCKER RESOLVED:** All write-alias calls (WHY, WHM, WHG, WHB, WH) replaced with `Write-Verbose`. Zero alias calls remain in executable code.
-  - Renames `Get-DirectorySizeCounts` → `Measure-DowserDirectory` (correct verb for sizing operation).
-  - Removed inline `ConvertFrom-Bytes` (note: source had a typo — `COnvertFrom-Bytes`). All byte formatting now routed through `Format-DowserSize -DataValue` (Private\).
+  - Renames `Get-DirectorySizeCounts` -> `Measure-DowserDirectory` (correct verb for sizing operation).
+  - Removed inline `ConvertFrom-Bytes` (note: source had a typo -- `COnvertFrom-Bytes`). All byte formatting now routed through `Format-DowserSize -DataValue` (Private\).
   - Output improved: NewestFile and OldestFile were single concatenated strings ("name -=- date"); split into separate `NewestFileName`/`NewestFileDate` and `OldestFileName`/`OldestFileDate` properties.
   - Added outer `foreach` loop so multiple `-Path` values all process (source only handled one).
   - Removed SAPIEN PowerShell Studio header block; replaced with standard Dowser help block.
   - Syntax check: PASS (0 errors). Blocker audit: 0 E:\ references in code, 0 alias calls.
 
 ### Changed
-- `Aliases\Aliases.ps1` — Added active (uncommented) Set-Alias entries for Phase 4 cmdlets:
-  `dfast` → Invoke-DowserFastSearch, `dsort`/`dnsort` → Invoke-DowserNumericSort, `dsize` → Measure-DowserDirectory.
+- `Aliases\Aliases.ps1` -- Added active (uncommented) Set-Alias entries for Phase 4 cmdlets:
+  `dfast` -> Invoke-DowserFastSearch, `dsort`/`dnsort` -> Invoke-DowserNumericSort, `dsize` -> Measure-DowserDirectory.
 
 ### Notes
 - Module is now 21/21 cmdlets complete per the PORTING_OUTLINE.md target.
@@ -626,36 +651,36 @@ Why:
   functionality was partially absorbed by Get-DowserMap (-IncludeSize, -IncludePsCount switches
   added during Phase 3). Get-DowserTree as a standalone merge target is lower priority.
 
-## [2026.04.12.003] - [2026-04-12] — Phase 3 Inspection-Class cmdlets
+## [2026.04.12.003] - 2026-04-12 -- Phase 3 Inspection-Class cmdlets
 
 ### Added
-- `Public\Get-DowserOwnership.ps1` — Port of `General_Scripts\Get-FileOwnership.ps1` (118 lines).
-  - Renames outer function `Get-FileOwnership` → `Get-DowserOwnership`.
+- `Public\Get-DowserOwnership.ps1` -- Port of `standalone scripts\Get-FileOwnership.ps1` (118 lines).
+  - Renames outer function `Get-FileOwnership` -> `Get-DowserOwnership`.
   - Removed inner `Get-FileSize` helper; replaced all calls with `Format-DowserSize -DataValue`.
   - Preserves: `Get-FileInformation`, `Get-FileMetaData` inner helpers; Shell.Application COM path;
     optional hash and authenticode signature fields; all original parameters (`Directory`, `Extension`).
   - Added `[CmdletBinding()]` and `#Requires -Version 5.1` header; minimal refactor otherwise.
   - Syntax check: PASS (0 errors).
-- `Public\Get-DowserProperty.ps1` — Port of `General_Scripts\Get-FilePropertyDetails.ps1` (313 lines).
-  - Renames `Get-FilePropertyDetails` → `Get-DowserProperty`.
+- `Public\Get-DowserProperty.ps1` -- Port of `standalone scripts\Get-FilePropertyDetails.ps1` (313 lines).
+  - Renames `Get-FilePropertyDetails` -> `Get-DowserProperty`.
   - Replaces `"{0:N2} MB" -f ($FileItem.Length / 1MB)` with `Format-DowserSize -DataValue`.
-  - Source already had `[CmdletBinding()]`, full help block, and `Write-Verbose` throughout — preserved as-is.
+  - Source already had `[CmdletBinding()]`, full help block, and `Write-Verbose` throughout -- preserved as-is.
   - Covers: basic metadata, VersionInfo, Shell.Application extended props (0-500), MD5/SHA1/SHA256 hashes,
     Authenticode signature (opt-in), .NET assembly info, PE header MachineType/Architecture.
   - Added `#Requires -Version 5.1` and Dowser header comment.
   - Syntax check: PASS (0 errors).
-- `Public\Get-DowserTopology.ps1` — Port of `General_Scripts\Get-TreeTopology.ps1` (324 lines).
-  - Renames `Get-TreeTopology` → `Get-DowserTopology`.
+- `Public\Get-DowserTopology.ps1` -- Port of `standalone scripts\Get-TreeTopology.ps1` (324 lines).
+  - Renames `Get-TreeTopology` -> `Get-DowserTopology`.
   - Preserves aliases `pstree`, `shtree` on the function.
   - No byte-to-string logic present; no Format-DowserSize needed.
-  - Source was already fully `[CmdletBinding()]` with `Write-Verbose` throughout — preserved as-is.
+  - Source was already fully `[CmdletBinding()]` with `Write-Verbose` throughout -- preserved as-is.
   - Supports: FileSystem and arbitrary PSProvider paths; DynamicParam InColor/-ansi for ANSI colorization
     on FileSystem paths; `-ShowItem` (files); `-ShowProperty` (item properties inline); `-Depth`.
   - Added `#Requires -Version 5.1` and Dowser header comment.
   - Syntax check: PASS (0 errors).
-- `Public\Get-DowserReport.ps1` — Port of `General_Scripts\Get-FileReport.ps1` (1,010 lines → 648 lines ported).
-  - Renames `Get-FileReport` → `Get-DowserReport`; `Compare-FileReport` → `Compare-DowserReport`.
-  - Upgraded `#requires -Version 2.0` → `#Requires -Version 5.1`.
+- `Public\Get-DowserReport.ps1` -- Port of `standalone scripts\Get-FileReport.ps1` (1,010 lines -> 648 lines ported).
+  - Renames `Get-FileReport` -> `Get-DowserReport`; `Compare-FileReport` -> `Compare-DowserReport`.
+  - Upgraded `#requires -Version 2.0` -> `#Requires -Version 5.1`.
   - Replaced inline `ConvertTo-Bytes` function with calls to `ConvertTo-DowserBytes` (Private).
   - Replaced inline `Format-FileSize` function with calls to `Format-DowserSize -DataValue` (Private).
   - Replaced all `Write-Host` (summary blocks + export notifications) with `Write-Verbose`.
@@ -666,10 +691,10 @@ Why:
     single-file mode; grouped table view for multi-level scans; CSV/HTML export; Compare-DowserReport diff.
   - Syntax check: PASS (0 errors).
 
-## [2026.04.12.002] - [2026-04-12]
+## [2026.04.12.002] - 2026-04-12
 
 ### Added
-- `Public\Get-DowserMap.ps1` — Port of `General_Scripts\Get-DirectoryMap.ps1` (823 lines).
+- `Public\Get-DowserMap.ps1` -- Port of `standalone scripts\Get-DirectoryMap.ps1` (823 lines).
   - Visual tree renderer: Unicode/ASCII box-drawing, HTML/Markdown output, full-path trunk display.
   - Added `-IncludeSize` switch: appends `[1.2 GB]` to each folder using `Format-DowserSize` (logic from Get-FolderTree.ps1).
   - Added `-IncludePsCount` switch: appends `[14 .ps1]` to each folder (logic from Get-DirectoryTreeOutputAndFileCount.ps1).
@@ -678,7 +703,7 @@ Why:
   - Preserves: MaxDepth, parallel pre-scan, extension/folder filtering, ShowFullPathTree trunk, reparse/hidden support.
   - Self-recursive function with DontShow internal params for recursion state.
   - Syntax check: PASS (0 errors). Write-Host audit: 0 calls.
-- Ported Phase 1 (Utilities) and Phase 2 (Hunter-Class) scripts from `General_Scripts` to `Dowser\Public`:
+- Ported Phase 1 (Utilities) and Phase 2 (Hunter-Class) scripts from `standalone scripts` to `Dowser\Public`:
   - `ConvertTo-DowserBase64.ps1` (from ConvertTo-Base64)
   - `ConvertTo-DowserExe.ps1` (from ConvertTo-Exe)
   - `ConvertTo-DowserIco.ps1` (from ConvertTo-ICO)
@@ -696,22 +721,22 @@ Why:
 - Removed absolute path hardcoding (`C:\`, `D:\`) in favor of `$PWD`.
 
 ### Added
-- `Private\Write-Log.ps1` — Mandatory CMTrace-compatible logging helper deployed from canonical source (`General_Scripts\Write-Log.ps1` v2026.03.24.010).
-  - Auto-dot-sourced by `Dowser.psm1` loader via `Private\*.ps1` glob — no explicit import needed.
+- `Private\Write-Log.ps1` -- Mandatory CMTrace-compatible logging helper deployed from canonical source (`standalone scripts\Write-Log.ps1` v2026.03.24.010).
+  - Auto-dot-sourced by `Dowser.psm1` loader via `Private\*.ps1` glob -- no explicit import needed.
   - `Write-Log` function now available in module scope; accessible to all Public and Private cmdlets including `Invoke-DowserRunspacePool` and `Find-DowserString`.
   - Syntax check passed (PS parser, zero errors).
 
 ### Added
-- `Public\Find-DowserString.ps1` — Port of `General_Scripts\find-stringinfiles.ps1`.
+- `Public\Find-DowserString.ps1` -- Port of `standalone scripts\find-stringinfiles.ps1`.
   - Multi-threaded file gathering and string searching via `Invoke-DowserRunspacePool` (replaces inline RunspacePool code).
   - Aho-Corasick string matching (inline C# via `Add-Type`) for multi-pattern literal search; compiled once into shared AppDomain, available to all worker runspaces.
   - Zero `Write-Host` usage; all status via `Write-Verbose` and `Write-Progress` (handled by `Invoke-DowserRunspacePool`).
-  - No legacy write aliases (WHY/WHM/etc.) — were never in this file; source aliases not ported.
+  - No legacy write aliases (WHY/WHM/etc.) -- were never in this file; source aliases not ported.
   - OutputMode: `counts` (default), `files`, `matches`; `IncludeLineContent` adds line text to match rows.
   - SearchMode: `auto` (picks aho for multi-pattern literal), `aho`, `manual`, `select` (compat stub).
   - Verified test run: 9 .ps1 files across 6 dirs, 74 match rows, 2.5s via 7 parallel threads.
 
-## [2026.04.11.001] - [2026-04-15] - [2026-04-11]
+## [2026.04.11.001] - 2026-04-11
 
 ### Added
-- `Private\Format-DowserSize.ps1` — Extracted and generalized `ConvertFrom-Bytes` logic from `Get-DirectorySizeCou
+- `Private\Format-DowserSize.ps1` -- Extracted and generalized `ConvertFrom-Bytes` logic from `Get-DirectorySizeCou

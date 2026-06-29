@@ -30,7 +30,7 @@ function Find-DowserModified {
 
     .NOTES
         Alias: dmod
-        Source: Find-FilesModifiedOn.ps1 (General_Scripts — hardcoded D:\ + date default)
+        Source: Find-FilesModifiedOn.ps1 (standalone scripts — hardcoded D:\ + date default)
         Fixed: added -Path parameter; changed default date from hardcoded to (Get-Date).Date.
     #>
     [CmdletBinding()]

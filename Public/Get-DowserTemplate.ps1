@@ -24,7 +24,7 @@ function Get-DowserTemplate {
 
     .NOTES
         Alias: dtemplate
-        Source: Get-FolderTemplate.ps1 (General_Scripts -- had live execution code outside function)
+        Source: Get-FolderTemplate.ps1 (standalone scripts -- had live execution code outside function)
         Fixed: live execution code removed; -folderPath renamed to -Path; [CmdletBinding()] added.
         Shell.Application GetDetailsOf loop (0..500) can be slow -- Write-Progress included.
     #>

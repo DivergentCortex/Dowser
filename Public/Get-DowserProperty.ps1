@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Gets comprehensive file details from any file including executables, DLLs, and other types.
+    Gets detailed file metadata from any file including executables, DLLs, and other types.
 .DESCRIPTION
     Extracts all possible metadata, version information, extended properties, and file
     attributes from a given file using multiple methods: .NET classes, COM objects, and
@@ -24,8 +24,8 @@
 .EXAMPLE
     Get-ChildItem D:\Scripts -Filter *.ps1 | Get-DowserProperty
 .NOTES
-    Author: Curtis Leggett / PowerShell Codesmith
-    Ported from: Get-FilePropertyDetails.ps1 (General_Scripts)
+    Author: Curtis Leggett / Divergent Cortex
+    Ported from: Get-FilePropertyDetails.ps1 (standalone scripts)
     Uses: Private\Format-DowserSize for human-readable file sizes
 #>
 
@@ -50,7 +50,7 @@ function Get-DowserProperty {
     )
 
     begin {
-        Write-Verbose "Starting comprehensive file analysis"
+        Write-Verbose "Starting file analysis"
     }
 
     process {

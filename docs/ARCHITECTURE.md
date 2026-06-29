@@ -4,7 +4,7 @@
 
 Dowser is a PowerShell module that consolidates filesystem recon and inspection tools into one importable kit. It answers questions about directory trees: what exists, what is duplicated, what is orphaned, what changed, what depends on what, who owns files, how large things are, and whether files are corrupt. It does not move or modify files (with the narrow exceptions of ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, and Expand-DowserExe).
 
-The module originated as a port of 22 standalone scripts from a General_Scripts collection into a single cohesive module with consistent naming, pipeline support, and shared infrastructure.
+The module originated as a port of 22 standalone scripts into a single cohesive module with consistent naming, pipeline support, and shared infrastructure.
 
 ## Module structure
 
@@ -93,10 +93,6 @@ Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) 
 ## Naming law
 
 `Verb-DowserNoun`. Approved verbs only (the output of `Get-Verb` is the whitelist). Singular nouns. The `Dowser` prefix on the noun ensures tab-completion on `-Dowser` surfaces the entire module. Aliases carry the personality; cmdlets stay boring and compliant.
-
-## Bundled resources
-
-The `resources/` directory contains exeinfope, a third-party PE analysis tool. This is used as a reference alongside the module's own PE analysis capabilities in Test-DowserExtractable and Test-DowserIntegrity.
 
 ## Further reading
 

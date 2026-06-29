@@ -34,7 +34,7 @@ function Find-DowserRecentLog {
 
     .NOTES
         Alias: dlog
-        Source: Find-MostRecentLog.ps1 (General_Scripts) — bare script, no params, hardcoded.
+        Source: Find-MostRecentLog.ps1 (standalone scripts) — bare script, no params, hardcoded.
         Full function rewrite. Logic preserved: find, sort newest-first, emit PSCustomObject.
     #>
     [CmdletBinding()]

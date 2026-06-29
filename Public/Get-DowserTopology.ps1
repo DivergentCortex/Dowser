@@ -27,8 +27,8 @@
 .EXAMPLE
     Get-DowserTopology D:\Scripts -InColor -ShowItem
 .NOTES
-    Author: Curtis Leggett / PowerShell Codesmith
-    Ported from: Get-TreeTopology.ps1 (General_Scripts)
+    Author: Curtis Leggett / Divergent Cortex
+    Ported from: Get-TreeTopology.ps1 (standalone scripts)
     Aliases preserved: pstree, shtree
 #>
 

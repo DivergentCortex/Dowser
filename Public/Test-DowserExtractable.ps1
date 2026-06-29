@@ -57,7 +57,7 @@
     Author: Curtis Leggett / Divergent Cortex
     Alias: dtest, dtestexe
     Related: Expand-DowserExe, Get-DowserProperty
-    Source: docs/exe-static-classification-reference.md (verityvulture + verityfactseeker merge)
+    Source: docs/exe-static-classification-reference.md
 #>
 
 # EXE extractability probe. multi-tier static analysis + optional 7-Zip oracle.

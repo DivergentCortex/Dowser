@@ -98,7 +98,6 @@ Private/               Internal helpers (6 files), not exported
 Aliases/Aliases.ps1    All alias definitions
 Tests/                 Pester suites and test runner
 docs/                  Project documentation
-resources/             Bundled tools (exeinfope)
 ```
 
 ## Further reading
@@ -106,4 +105,4 @@ resources/             Bundled tools (exeinfope)
 - [ARCHITECTURE.md](ARCHITECTURE.md) -- component design, data flow, design decisions
 - [INDEX.md](INDEX.md) -- per-function inventory with inputs, outputs, and relationships
 - [CHANGELOG.md](CHANGELOG.md) -- full change history
-- [exe-static-classification-reference.md](exe-static-classification-reference.md) -- EXE static-analysis reference behind Test-DowserExtractable
+- [exe-static-classification-reference.md](exe-static-classification-reference.md) -- EXE static-analysis reference for Test-DowserExtractable

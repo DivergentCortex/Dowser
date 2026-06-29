@@ -33,7 +33,7 @@
 
 .NOTES
     Alias: dsize
-    Source: Get-DirectorySizeCounts.ps1 (General_Scripts — Curtis Leggett)
+    Source: Get-DirectorySizeCounts.ps1 (standalone scripts — Curtis Leggett)
     Blocker resolved: removed dot-source of E:\_Local-H\...\Set-WriteAlias.ps1 (line 2 of source).
     Blocker resolved: replaced WHY/WHM/WHG/WHB/WH write-alias calls with Write-Verbose.
     Output improved: NewestFile/OldestFile split into separate Name/Date properties instead

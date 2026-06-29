@@ -22,8 +22,8 @@
 .EXAMPLE
     Get-DowserMap -Path D:\Scripts -IncludePsCount -FoldersOnly
 .NOTES
-    Author: Curtis Leggett / PowerShell Codesmith
-    Ported from: Get-DirectoryMap.ps1 (General_Scripts)
+    Author: Curtis Leggett / Divergent Cortex
+    Ported from: Get-DirectoryMap.ps1 (standalone scripts)
     Absorbs data features from: Get-FolderTree.ps1, Get-DirectoryTreeOutputAndFileCount.ps1
 #>
 

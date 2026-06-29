@@ -51,8 +51,8 @@
 .OUTPUTS
     PSCustomObject — structured file metrics for downstream processing.
 .NOTES
-    Author: Curtis Leggett / PowerShell Codesmith
-    Ported from: Get-FileReport.ps1 (General_Scripts)
+    Author: Curtis Leggett / Divergent Cortex
+    Ported from: Get-FileReport.ps1 (standalone scripts)
     Uses: Private\Format-DowserSize, Private\ConvertTo-DowserBytes
     Note: The runspace analyzeScriptBlock contains a local inline size formatter
           (FormatSizeLocal) because module-scope functions are not reachable from
