@@ -1,5 +1,23 @@
 #Requires -Version 5.1
-# Dowser root module - dot-sources Public/Private/Aliases
+## =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+#
+#      |                                
+#   _` |   _ \ \ \  \ / (_-<   -_)   _| 
+# \__,_| \___/  \_/\_/  ___/ \___| _|  
+#
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -  Created on:    04/23/2023                                      -
+# =  Author:        Curtis Leggett                                  =
+# -  Copyright:     2026 Divergent Cortex                           -
+# =  Organization:  Divergent Cortex                                =
+# -  Version:       1.0.1                                           -
+# =-=-                       =-=-=-=-=-=-=-=                     -=-=
+# -     it is not water they seek,                                  -
+# =                    the path to truth                            =
+# -                            is hidden beneath the trees          -
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
 
 # Platform compat: PS 5.1 lacks $IsWindows/$IsLinux/$IsMacOS automatic variables.
 # Set at module scope so dot-sourced functions can read them via scope resolution.

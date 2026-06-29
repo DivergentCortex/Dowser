@@ -1,5 +1,5 @@
 # Dowser
-
+ 
 Filesystem recon and inspection module for PowerShell. Point it at a path and get answers: what is there, what is duplicated, what is orphaned, what changed, what depends on what, who owns it, how big it is, and whether files are corrupt. This is a tracker's kit, not a mover's kit -- it reads and reports, it does not move your files (the only writers are ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, and Expand-DowserExe).
 
 Runs on Windows PowerShell 5.1 and PowerShell 7+ (Windows, Linux, macOS). Functions that depend on Windows-only facilities degrade or warn rather than crash on Linux/macOS; see [Platform support](#platform-support).
