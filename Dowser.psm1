@@ -1,20 +1,18 @@
 #Requires -Version 5.1
-## =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 #
 #      |                                
 #   _` |   _ \ \ \  \ / (_-<   -_)   _| 
 # \__,_| \___/  \_/\_/  ___/ \___| _|  
 #
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# -  Created on:    04/23/2023                                      -
-# =  Author:        Curtis Leggett                                  =
-# -  Copyright:     2026 Divergent Cortex                           -
-# =  Organization:  Divergent Cortex                                =
-# -  Version:       1.0.1                                           -
+#   Author:  Curtis Leggett / Divergent Cortex
+#
+#   Every folder is a grave pretending to be a drawer.
+#
 # =-=-                       =-=-=-=-=-=-=-=                     -=-=
-# -     it is not water they seek,                                  -
-# =                    the path to truth                            =
-# -                            is hidden beneath the trees          -
+#   it is not water they seek, it is truth, the path hidden in the trees
+#   the rods tremble as they near the truth buried beneath the tree
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
@@ -50,6 +48,18 @@ $aliasPath = Join-Path (Join-Path $PSScriptRoot 'Aliases') 'Aliases.ps1'
 if (Test-Path $aliasPath) {
     . $aliasPath
 }
+
+# version is the latest changelog slot, read at load so nothing hardcodes it
+$script:DowserVersion = 'unknown'
+$changelogPath = Join-Path (Join-Path $PSScriptRoot 'docs') 'CHANGELOG.md'
+if (Test-Path -LiteralPath $changelogPath) {
+    $head = Get-Content -LiteralPath $changelogPath |
+        Where-Object { $_ -match '^##\s*\[[^\]]+\]' } | Select-Object -First 1
+    if ($head -match '^##\s*\[(?<ver>[^\]]+)\]') { $script:DowserVersion = $Matches['ver'] }
+}
+
+# open every session with the identity and context header
+Initialize-Log -ScriptName 'Dowser' -Version $script:DowserVersion
 
 # Compare-DowserReport is a public function dot-sourced inside Get-DowserReport.ps1,
 # so it is not a Public/ basename and must be named explicitly to export it.
