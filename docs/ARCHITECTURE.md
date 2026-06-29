@@ -24,27 +24,27 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 
 ### Private helpers (not exported)
 
-| File | Purpose |
-|------|---------|
-| ConvertTo-DowserBytes.ps1 | Converts human-readable size strings (e.g., "1.5GB") to byte counts |
-| Format-DowserSize.ps1 | Formats byte counts into human-readable strings (e.g., "1.5 GB") |
-| Get-DowserSortKey.ps1 | Generates sort keys for natural numeric ordering |
+| File                          | Purpose                                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| ConvertTo-DowserBytes.ps1     | Converts human-readable size strings (e.g., "1.5GB") to byte counts                                       |
+| Format-DowserSize.ps1         | Formats byte counts into human-readable strings (e.g., "1.5 GB")                                          |
+| Get-DowserSortKey.ps1         | Generates sort keys for natural numeric ordering                                                          |
 | Invoke-DowserRunspacePool.ps1 | Generic RunspacePool executor used by Find-DowserFile, Find-DowserString, Get-DowserMap, Get-DowserReport |
-| Test-DowserHelpers.ps1 | Validation helpers shared across test functions |
-| Write-Log.ps1 | CMTrace-compatible logging with file output and rotation |
+| Test-DowserHelpers.ps1        | Validation helpers shared across test functions                                                           |
+| Write-Log.ps1                 | CMTrace-compatible logging with file output and rotation                                                  |
 
 ### Public functions (exported)
 
 Functions fall into five verb buckets:
 
-- **Find-Dowser***: Hunt for things (duplicates, strings, orphans, dependencies, scripts, files, recent logs). These are search operations that locate items matching criteria.
-- **Get-Dowser***: Inspect and report (directory maps, file properties, ownership, topology, reports, module info, folder templates). These read and describe what exists.
-- **Measure-Dowser***: Count and size (directory measurement).
-- **ConvertTo-Dowser***: Transform (Base64 encoding, EXE compilation, ICO creation).
-- **Invoke-Dowser***: Actions (fast text search, numeric sorting).
-- **Test-Dowser***: Validation (EXE extractability classification, file integrity/corruption detection).
-- **Expand-Dowser***: Extraction (EXE archive extraction via 7-Zip).
-- **New-Dowser***: Creation (hidden folder attribute setting).
+- **Find-Dowser\***: Hunt for things (duplicates, strings, orphans, dependencies, scripts, files, recent logs). These are search operations that locate items matching criteria.
+- **Get-Dowser\***: Inspect and report (directory maps, file properties, ownership, topology, reports, module info, folder templates). These read and describe what exists.
+- **Measure-Dowser\***: Count and size (directory measurement).
+- **ConvertTo-Dowser\***: Transform (Base64 encoding, EXE compilation, ICO creation).
+- **Invoke-Dowser\***: Actions (fast text search, numeric sorting).
+- **Test-Dowser\***: Validation (EXE extractability classification, file integrity/corruption detection).
+- **Expand-Dowser\***: Extraction (EXE archive extraction via 7-Zip).
+- **New-Dowser\***: Creation (hidden folder attribute setting).
 
 ### Alias layer
 
