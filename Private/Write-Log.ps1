@@ -1,22 +1,84 @@
-function Get-SafeLogIdentity {
-    # $IsWindows null on 5.1 means windows
-    if ($IsWindows -ne $false) {
-        try {
-            return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        }
-        catch {
-            return $env:USERNAME
-        }
-    }
-    # non-windows falls back to env
-    if ($env:USER) {
-        return $env:USER 
-    }
-    if ($env:LOGNAME) {
-        return $env:LOGNAME 
-    }
-    return 'unknown'
+# ===========================================================================
+#  Write-Log.ps1 - canonical dot-source logging helper
+#
+#  This is the single-file dot-source form of the DivergentCortex.Witness module.
+#  Same behavior, packaged as one file so it can be dot-sourced into scripts and
+#  embedded inside other modules. Dot-source it, set a log path, then call Write-Log.
+#
+#  $script:WitnessIsWindows is set once with a 5.1-safe probe. PS 5.1 has no
+#  $IsWindows automatic variable, its absence means Windows. Every function below
+#  reads $script:WitnessIsWindows, raw $IsWindows is never used.
+#
+#  Set-StrictMode is intentionally not set at file scope. The module sets it in
+#  isolated module scope. A dot-sourced file runs in the caller scope, so setting
+#  it here would force strict mode onto the consuming script.
+# ===========================================================================
+
+# absence of $IsWindows means PS 5.1 on Windows
+$script:WitnessIsWindows = if (Test-Path Variable:IsWindows) {
+    $IsWindows
 }
+else {
+    $true
+}
+
+# session state, set by Initialize-Log and the cleanup sentinel
+$script:WitnessLogFilePath = $null
+$script:WitnessCleanupRan = $false
+
+# config defaults, consumers override with $Global: equivalents
+$script:WitnessAutoCleanup = $true
+$script:WitnessMaxSizeMB = 10
+$script:WitnessMaxAgeDays = 7
+$script:WitnessVerboseConsole = $false
+$script:WitnessVerboseLogfile = $false
+$script:WitnessDebugConsole = $false
+$script:WitnessDebugLogfile = $false
+
+
+function Resolve-WitnessLogPath {
+    <#
+    .SYNOPSIS
+        Resolves the active log file path using a deterministic layered lookup.
+
+    .DESCRIPTION
+        Walks three layers in order and returns the first non-whitespace value:
+          1. CallerResolved (explicit param or caller-scope value the caller checked).
+          2. $script:WitnessLogFilePath (set by Initialize-Log).
+          3. $Global:LogFilePath (dot-source back-compat).
+        Returns $null when no layer yields a value.
+
+    .PARAMETER CallerResolved
+        The path the caller already resolved from its parameter and caller-scope check.
+
+    .OUTPUTS
+        System.String. The resolved path, or $null.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$CallerResolved
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($CallerResolved)) {
+        return $CallerResolved
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($script:WitnessLogFilePath)) {
+        return $script:WitnessLogFilePath
+    }
+
+    if (Test-Path Variable:Global:LogFilePath) {
+        $glbPath = $Global:LogFilePath
+        if (-not [string]::IsNullOrWhiteSpace($glbPath)) {
+            return $glbPath
+        }
+    }
+
+    return $null
+}
+
 
 function Write-Log {
     <#
@@ -77,8 +139,12 @@ function Write-Log {
         Modified heavily by:           Curtis Leggett & S.Henry
         Organization:                  Divergent Cortex
         Filename:                      Write-Log.ps1
-        Version:                       2026.03.24.010
+        Version:                       2026.06.29.011
         ===========================================================================
+
+        Backported from the DivergentCortex.Witness module: cross-platform context
+        (Windows/Linux/macOS), native -Debug/-Verbose support, local-time timestamps,
+        UTF-8 no-BOM writes, rotation-on-rename-success, layered log path resolution.
 
         SETUP - Add these variables BEFORE dot-sourcing Write-Log.ps1:
 
@@ -94,11 +160,13 @@ function Write-Log {
             $LogDir = Join-Path $PSScriptRoot "logs"
             $LogFilePath = Join-Path $LogDir $logName
 
-        ## OPTIONAL - Granular Verbose/Debug Control (all default to $true):
+        ## OPTIONAL - Granular Verbose/Debug Control (all default to $false):
             $Global:VerboseConsole = $true   # Verbose messages to console
             $Global:VerboseLogfile = $true   # Verbose messages to logfile
             $Global:DebugConsole   = $true   # Debug messages to console
             $Global:DebugLogfile   = $true   # Debug messages to logfile
+
+        ## NOTE: -Debug or -Verbose on the calling function/script also turns these on.
 
         ## OPTIONAL - Auto Log Management (all have sensible defaults):
             $Global:WriteLogAutoCleanup   = $true   # Auto-cleanup on first call (default: $true)
@@ -116,12 +184,13 @@ function Write-Log {
         The $LogFilePath variable is read automatically - no parameter needed.
     #>
     [CmdletBinding()]
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [string]$Message,
 
         [Parameter(Mandatory = $False)]
-        [String]$Logfile = $LogFilePath,
+        [String]$Logfile,
 
         [Parameter(Mandatory = $false)]
         [ValidateSet('Info', 'Information', 'Warning', 'Error', 'Verbose', 'Debug', 'Success')]
@@ -132,390 +201,422 @@ function Write-Log {
         [String]$Component,
 
         [Parameter(Mandatory = $False)]
-        [switch]$WriteBackToHost = $True,
+        [bool]$WriteBackToHost = $True,
 
         [Parameter(Mandatory = $False)]
+        [ValidateRange(0, 10)]
         [int]$MaxRetries = 3,
 
         [Parameter(Mandatory = $False)]
+        [ValidateRange(0.0, 30.0)]
         [double]$RetryDelay = 0.5,
 
         [Parameter(Mandatory = $False)]
         [System.ConsoleColor]$Color
     )
 
-    # ==================== AUTO LOG MANAGEMENT ====================
-    # globals override these, documented in the help block above
+    process {
+        # resolve log path, layered lookup
+        $callerCandidate = $null
+        if ($PSBoundParameters.ContainsKey('Logfile') -and -not [string]::IsNullOrWhiteSpace($Logfile)) {
+            $callerCandidate = $Logfile
+        }
+        else {
+            $callerScopePath = $PSCmdlet.SessionState.PSVariable.GetValue('LogFilePath')
+            if (-not [string]::IsNullOrWhiteSpace($callerScopePath)) {
+                $callerCandidate = $callerScopePath
+            }
+        }
+        $Logfile = Resolve-WitnessLogPath -CallerResolved $callerCandidate
 
-    $autoCleanup = if (Test-Path Variable:Global:WriteLogAutoCleanup) {
-        $Global:WriteLogAutoCleanup 
-    }
-    else {
-        $true 
-    }
-    $maxSizeMB = if (Test-Path Variable:Global:WriteLogMaxSizeMB) {
-        $Global:WriteLogMaxSizeMB 
-    }
-    else {
-        10 
-    }
-    $maxAgeDays = if (Test-Path Variable:Global:WriteLogMaxAgeDays) {
-        $Global:WriteLogMaxAgeDays 
-    }
-    else {
-        7 
-    }
+        if ([string]::IsNullOrWhiteSpace($Logfile)) {
+            throw "FATAL: No log file path set. Call Initialize-Log -LogFilePath first, or set `$LogFilePath in your script scope before calling Write-Log."
+        }
 
-    # no temp fallback ever, caller sets this before dot-sourcing
-    if ([string]::IsNullOrWhiteSpace($Logfile)) {
-        throw "FATAL: `$LogFilePath is not set. You must define `$LogFilePath BEFORE dot-sourcing Write-Log.ps1. Example:`n`$LogFilePath = Join-Path `$PSScriptRoot 'logs\MyScript_`$(Get-Date -Format 'yyyyMMdd').log'"
-    }
+        # settings from script defaults, overridden by $Global: equivalents
+        $autoCleanup = $script:WitnessAutoCleanup
+        if (Test-Path Variable:Global:WriteLogAutoCleanup) {
+            $autoCleanup = $Global:WriteLogAutoCleanup 
+        }
 
-    # unresolved because the log file may not exist yet
-    $Logfile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Logfile)
+        $maxSizeMB = $script:WitnessMaxSizeMB
+        if (Test-Path Variable:Global:WriteLogMaxSizeMB) {
+            $maxSizeMB = $Global:WriteLogMaxSizeMB 
+        }
 
-    # normalize the information alias
-    if ($Severity -eq "Information") {
-        $Severity = "Info"
-    }
+        $maxAgeDays = $script:WitnessMaxAgeDays
+        if (Test-Path Variable:Global:WriteLogMaxAgeDays) {
+            $maxAgeDays = $Global:WriteLogMaxAgeDays 
+        }
 
-    $verboseToConsole = if (Test-Path Variable:Global:VerboseConsole) {
-        $Global:VerboseConsole 
-    }
-    else {
-        $true 
-    }
-    $verboseToLogfile = if (Test-Path Variable:Global:VerboseLogfile) {
-        $Global:VerboseLogfile 
-    }
-    else {
-        $true 
-    }
-    $debugToConsole = if (Test-Path Variable:Global:DebugConsole) {
-        $Global:DebugConsole 
-    }
-    else {
-        $true 
-    }
-    $debugToLogfile = if (Test-Path Variable:Global:DebugLogfile) {
-        $Global:DebugLogfile 
-    }
-    else {
-        $true 
-    }
+        # GetVariableValue crosses the module boundary, direct read cant
+        $callerDebugPref = $PSCmdlet.GetVariableValue('DebugPreference')
+        $callerVerbosePref = $PSCmdlet.GetVariableValue('VerbosePreference')
+        $nativeDebugActive = ($null -ne $callerDebugPref) -and ($callerDebugPref -ne 'SilentlyContinue')
+        $nativeVerboseActive = ($null -ne $callerVerbosePref) -and ($callerVerbosePref -ne 'SilentlyContinue')
 
-    # skip the work if nobody is listening
-    if ($Severity -eq "Verbose" -and (-not $verboseToConsole) -and (-not $verboseToLogfile)) {
-        return 
-    }
-    if ($Severity -eq "Debug" -and (-not $debugToConsole) -and (-not $debugToLogfile)) {
-        return 
-    }
+        $verboseToConsole = $script:WitnessVerboseConsole
+        if (Test-Path Variable:Global:VerboseConsole) {
+            $verboseToConsole = $Global:VerboseConsole 
+        }
 
-    $originalLocation = Get-Location
-    $isSCCMDrive = $false
-    if ($null -ne $originalLocation.Provider -and $originalLocation.Provider.Name -eq 'CMSite') {
-        $isSCCMDrive = $true
-        # cmsite drive breaks file io
-        Set-Location C:
-    }
+        $verboseToLogfile = $script:WitnessVerboseLogfile
+        if (Test-Path Variable:Global:VerboseLogfile) {
+            $verboseToLogfile = $Global:VerboseLogfile 
+        }
+
+        $debugToConsole = $script:WitnessDebugConsole
+        if (Test-Path Variable:Global:DebugConsole) {
+            $debugToConsole = $Global:DebugConsole 
+        }
+
+        $debugToLogfile = $script:WitnessDebugLogfile
+        if (Test-Path Variable:Global:DebugLogfile) {
+            $debugToLogfile = $Global:DebugLogfile 
+        }
+
+        # native preference overrides per-surface flags
+        if ($nativeVerboseActive) {
+            $verboseToConsole = $true; $verboseToLogfile = $true 
+        }
+        if ($nativeDebugActive) {
+            $debugToConsole = $true; $debugToLogfile = $true 
+        }
+
+        # map Information to Info
+        if ($Severity -eq "Information") {
+            $Severity = "Info"
+        }
+
+        if ($Severity -eq "Verbose" -and (-not $verboseToConsole) -and (-not $verboseToLogfile)) {
+            return 
+        }
+        if ($Severity -eq "Debug" -and (-not $debugToConsole) -and (-not $debugToLogfile)) {
+            return 
+        }
+
+        # CMSite provider breaks filesystem ops
+        $originalLocation = Get-Location
+        $isSCCMDrive = $false
+        if ($script:WitnessIsWindows) {
+            if ($null -ne $originalLocation.Provider -and $originalLocation.Provider.Name -eq 'CMSite') {
+                $isSCCMDrive = $true
+                Set-Location C:
+            }
+        }
     
-    try {
-        $callStack = Get-PSCallStack
+        try {
+            # Get caller information more reliably
+            # First, get the call stack
+            $callStack = Get-PSCallStack
         
-        $Source = "Unknown"
-        $callerFunctionName = "Unknown"
-        $lineNumber = "?"
+            # Default values if we can't determine them
+            $Source = "Unknown"
+            $callerFunctionName = "Unknown"
+            $lineNumber = "?"
         
-        if ($null -ne $callStack -and $callStack.Count -gt 1) {
-            $callerInfo = $callStack[1]
+            # If we have a call stack with at least 2 entries (current function and caller)
+            if ($null -ne $callStack -and $callStack.Count -gt 1) {
+                $callerInfo = $callStack[1]
             
-            if ($callerInfo.Location) {
-                $Source = $callerInfo.Location
-            }
+                # Get the source file location
+                if ($callerInfo.Location) {
+                    $Source = $callerInfo.Location
+                }
             
-            if ($callerInfo.ScriptLineNumber) {
-                $lineNumber = $callerInfo.ScriptLineNumber
+                # Get line number for console output
+                if ($callerInfo.ScriptLineNumber) {
+                    $lineNumber = $callerInfo.ScriptLineNumber
+                }
+                if ($callerInfo.Command) {
+                    $callerFunctionName = $callerInfo.Command
+                    if ($callerFunctionName -like "*.ps1") {
+                        $callerFunctionName = [System.IO.Path]::GetFileNameWithoutExtension($callerFunctionName)
+                    }
+                }
             }
-            if ($callerInfo.Command) {
-                $callerFunctionName = $callerInfo.Command
-                
-                # script body shows as a path not a function
-                if ($callerFunctionName -like "*.ps1") {
-                    $callerFunctionName = [System.IO.Path]::GetFileNameWithoutExtension($callerFunctionName)
-                    Write-Verbose "Call from script body: $callerFunctionName"
+            # Component resolution priority:
+            # 1. Explicitly provided Component parameter
+            # 2. Caller function name from call stack (prioritized over Script:Component)
+            # 3. Script:Component if defined in the calling script
+            # 4. "Unknown" as last resort
+            if ([string]::IsNullOrEmpty($Component)) {
+                if ($callerFunctionName -ne "Unknown" -and $callerFunctionName -notlike "*.ps1") {
+                    $Component = $callerFunctionName
                 }
                 else {
-                    Write-Verbose "Call from function: $callerFunctionName"
+                    $callerComponent = $PSCmdlet.SessionState.PSVariable.GetValue('Component')
+                    if (-not [string]::IsNullOrEmpty($callerComponent)) {
+                        $Component = $callerComponent
+                    }
+                    else {
+                        $Component = $callerFunctionName
+                    }
                 }
             }
-        }
-        # Component resolution priority:
-        # 1. Explicitly provided Component parameter
-        # 2. Caller function name from call stack (prioritized over Script:Component)
-        # 3. Script:Component if defined in the calling script
-        # 4. "Unknown" as last resort
-        if ([string]::IsNullOrEmpty($Component)) {
-            if ($callerFunctionName -ne "Unknown" -and $callerFunctionName -notlike "*ps1") {
-                $Component = $callerFunctionName
-            }
-            elseif (Test-Path Variable:Script:Component) {
-                $Component = $Script:Component
-            }
-            else {
-                $Component = $callerFunctionName
-            }
-        }
         
-        if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {
-            # last ditch, dig it out of myinvocation
-            if ($callStack.Count -gt 1 -and $null -ne $callStack[1].InvocationInfo -and $null -ne $callStack[1].InvocationInfo.MyCommand) {
-                $Component = $callStack[1].InvocationInfo.MyCommand.Name
-            }
+            # Final check - make sure Component isn't empty
+            if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {
+                # One last attempt - try to get it from MyInvocation of the caller
+                if ($callStack.Count -gt 1 -and $null -ne $callStack[1].InvocationInfo -and $null -ne $callStack[1].InvocationInfo.MyCommand) {
+                    $Component = $callStack[1].InvocationInfo.MyCommand.Name
+                }
             
-            if ([string]::IsNullOrEmpty($Component)) {
-                $Component = "Unknown"
+                # If still empty, use a default
+                if ([string]::IsNullOrEmpty($Component)) {
+                    $Component = "Unknown"
+                }
             }
-        }
         
-        # cmtrace is picky about this exact date shape
-        $DateTime = Get-Date
-        $LogDate = $DateTime.ToString('MM-dd-yyyy')
-        # offset in raw minutes the way cmtrace wants it
-        $UtcOffset = [TimeZoneInfo]::Local.GetUtcOffset($DateTime).TotalMinutes
-        $LogTime = "$($DateTime.ToString('HH:mm:ss.fff'))$UtcOffset"
+            # local time, utc confuses operators
+            $DateTime = Get-Date
+            $LogDate = $DateTime.ToString('MM-dd-yyyy')
+            $LogTime = $DateTime.ToString('HH:mm:ss.fff')
 
-        # cmtrace severity codes
-        $severityType = "1"
-        if ($Severity -eq "Error") {
-            $severityType = "3" 
-        }
-        elseif ($Severity -eq "Warning") {
-            $severityType = "2" 
-        }
-        elseif ($Severity -eq "Info") {
-            $severityType = "1" 
-        }
-        elseif ($Severity -eq "Success") {
-            $severityType = "1" 
-        } # cmtrace has no success, fold into info
-        elseif ($Severity -eq "Verbose") {
-            $severityType = "4" 
-        }
-        elseif ($Severity -eq "Debug") {
-            $severityType = "5" 
-        }
-
-        # cmtrace breaks if there are spaces between attributes
-        $logline = "<![LOG[$Message]LOG]!>" + 
-        "<time=`"$LogTime`" " + 
-        "date=`"$LogDate`" " + 
-        "component=`"$Component`" " + 
-        "context=`"$(Get-SafeLogIdentity)`" " + 
-        "type=`"$severityType`" " + 
-        "thread=`"$PID`" " + 
-        "file=`"$Source`">"
-
-        $logDir = Split-Path $Logfile
-        if (!(Test-Path $logDir)) {
-            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-        }
-
-        $shouldWriteConsole = switch ($Severity) {
-            'Verbose' {
-                $verboseToConsole 
+            # cmtrace expects integer type codes
+            $severityType = "1"
+            if ($Severity -eq "Error") {
+                $severityType = "3" 
             }
-            'Debug' {
-                $debugToConsole 
+            elseif ($Severity -eq "Warning") {
+                $severityType = "2" 
             }
-            default {
-                $true 
+            elseif ($Severity -eq "Verbose") {
+                $severityType = "4" 
             }
-        }
-
-        if ($WriteBackToHost -and $shouldWriteConsole) {
-            # cmtrace component field maxes out short
-            $displayComponent = $Component
-            if ($displayComponent.Length -gt 12) {
-                $displayComponent = $displayComponent.Substring(0, 10) + ".."
+            elseif ($Severity -eq "Debug") {
+                $severityType = "5" 
             }
 
-            $severityConfig = @{
-                'Error'   = @{ Label = ' ERROR '; LabelColor = 'Red'; MessageColor = 'Red' }
-                'Warning' = @{ Label = ' WARNING '; LabelColor = 'Yellow'; MessageColor = 'Yellow' }
-                'Info'    = @{ Label = ' INFO '; LabelColor = 'Green'; MessageColor = 'White' }
-                'Success' = @{ Label = ' SUCCESS '; LabelColor = 'Green'; MessageColor = 'Green' }
-                'Verbose' = @{ Label = ' VERBOSE '; LabelColor = 'DarkGray'; MessageColor = 'DarkGray' }
-                'Debug'   = @{ Label = ' DEBUG '; LabelColor = 'Magenta'; MessageColor = 'Magenta' }
-            }
-
-            $config = $severityConfig[$Severity]
-
-            $finalMessageColor = if ($PSBoundParameters.ContainsKey('Color')) {
-                $Color
+            # re-resolve per write for impersonation changes
+            if ($script:WitnessIsWindows) {
+                $contextUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
             }
             else {
-                $config.MessageColor
+                $contextUser = "$([System.Environment]::UserDomainName)\$([System.Environment]::UserName)"
             }
 
-            Write-Host "[" -NoNewline -ForegroundColor Gray
-            Write-Host $config.Label -NoNewline -ForegroundColor $config.LabelColor
-            Write-Host "] [" -NoNewline -ForegroundColor Gray
-            Write-Host "$displayComponent" -NoNewline -ForegroundColor Blue
-            Write-Host "] [" -NoNewline -ForegroundColor Gray
-            Write-Host "$lineNumber" -NoNewline -ForegroundColor Cyan
-            Write-Host "]" -NoNewline -ForegroundColor Gray
-            Write-Host ": " -NoNewline -ForegroundColor Magenta
-            Write-Host "$Message" -ForegroundColor $finalMessageColor
-        }
+            $logline = "<![LOG[$Message]LOG]!>" +
+            "<time=`"$LogTime`" " +
+            "date=`"$LogDate`" " +
+            "component=`"$Component`" " +
+            "context=`"$contextUser`" " +
+            "type=`"$severityType`" " +
+            "thread=`"$PID`" " +
+            "file=`"$Source`">"
 
-        $shouldWriteLogfile = switch ($Severity) {
-            'Verbose' {
-                $verboseToLogfile 
+            $logDir = Split-Path $Logfile
+            if ($logDir -and !(Test-Path $logDir)) {
+                New-Item -Path $logDir -ItemType Directory -Force | Out-Null
             }
-            'Debug' {
-                $debugToLogfile 
-            }
-            default {
-                $true 
-            }
-        }
 
-        # ==================== SIZE-BASED LOG ROTATION ====================
-        if ($shouldWriteLogfile -and (Test-Path $Logfile)) {
-            $currentSize = (Get-Item $Logfile).Length / 1MB
-            if ($currentSize -ge $maxSizeMB) {
-                $logDir = Split-Path $Logfile
-                $logBase = [System.IO.Path]::GetFileNameWithoutExtension($Logfile)
-                $logExt = [System.IO.Path]::GetExtension($Logfile)
-
-                $rotationNum = 1
-                do {
-                    $archiveName = "{0}_r{1:D2}{2}" -f $logBase, $rotationNum, $logExt
-                    $archivePath = Join-Path $logDir $archiveName
-                    $rotationNum++
-                } while (Test-Path $archivePath)
-
-                try {
-                    Rename-Item -Path $Logfile -NewName $archiveName -Force
+            # Check if console output is enabled for this severity
+            $shouldWriteConsole = switch ($Severity) {
+                'Verbose' {
+                    $verboseToConsole 
                 }
-                catch {
-                    # rename lost the race, keep writing the current file
+                'Debug' {
+                    $debugToConsole 
+                }
+                default {
+                    $true 
+                }
+            }
+
+            # Write to console if enabled
+            if ($WriteBackToHost -and $shouldWriteConsole) {
+                # Truncate component name for display if too long
+                $displayComponent = $Component
+                if ($displayComponent.Length -gt 12) {
+                    $displayComponent = $displayComponent.Substring(0, 10) + ".."
                 }
 
-                # stamp the rotation as the first line of the fresh log
-                $rotationMsg = "<![LOG[LOG ROTATION: Previous log archived to $archiveName (exceeded ${maxSizeMB}MB)]LOG]!>" +
-                "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
-                "context=`"$(Get-SafeLogIdentity)`" " +
-                "type=`"1`" thread=`"$PID`" file=`"Write-Log.ps1`">"
+                # Define severity label and color mappings
+                $severityConfig = @{
+                    'Error'   = @{ Label = ' ERROR '; LabelColor = 'Red'; MessageColor = 'Red' }
+                    'Warning' = @{ Label = ' WARNING '; LabelColor = 'Yellow'; MessageColor = 'Yellow' }
+                    'Info'    = @{ Label = ' INFO '; LabelColor = 'Green'; MessageColor = 'White' }
+                    'Success' = @{ Label = ' SUCCESS '; LabelColor = 'Green'; MessageColor = 'Green' }
+                    'Verbose' = @{ Label = ' VERBOSE '; LabelColor = 'DarkGray'; MessageColor = 'DarkGray' }
+                    'Debug'   = @{ Label = ' DEBUG '; LabelColor = 'Magenta'; MessageColor = 'Magenta' }
+                }
 
+                # Get configuration for current severity
+                $config = $severityConfig[$Severity]
+
+                # Determine final message color (use -Color parameter if specified, otherwise default)
+                $finalMessageColor = if ($PSBoundParameters.ContainsKey('Color')) {
+                    $Color
+                }
+                else {
+                    $config.MessageColor
+                }
+
+                # Write formatted output: [ SEVERITY ] [Component..] [LineNum]: Message
+                Write-Host "[" -NoNewline -ForegroundColor Gray
+                Write-Host $config.Label -NoNewline -ForegroundColor $config.LabelColor
+                Write-Host "] [" -NoNewline -ForegroundColor Gray
+                Write-Host "$displayComponent" -NoNewline -ForegroundColor Blue
+                Write-Host "] [" -NoNewline -ForegroundColor Gray
+                Write-Host "$lineNumber" -NoNewline -ForegroundColor Cyan
+                Write-Host "]" -NoNewline -ForegroundColor Gray
+                Write-Host ": " -NoNewline -ForegroundColor Magenta
+                Write-Host "$Message" -ForegroundColor $finalMessageColor
+            }
+
+            # Check if logfile output is enabled for this severity
+            $shouldWriteLogfile = switch ($Severity) {
+                'Verbose' {
+                    $verboseToLogfile 
+                }
+                'Debug' {
+                    $debugToLogfile 
+                }
+                default {
+                    $true 
+                }
+            }
+
+            # rotate when size exceeds limit
+            if ($shouldWriteLogfile -and (Test-Path $Logfile)) {
+                $currentSize = (Get-Item $Logfile).Length / 1MB
+                if ($currentSize -ge $maxSizeMB) {
+                    $rotLogDir = Split-Path $Logfile
+                    $logBase = [System.IO.Path]::GetFileNameWithoutExtension($Logfile)
+                    $logExt = [System.IO.Path]::GetExtension($Logfile)
+                    $rotationNum = 1
+                    do {
+                        $archiveName = "{0}_r{1:D2}{2}" -f $logBase, $rotationNum, $logExt
+                        $archivePath = Join-Path $rotLogDir $archiveName
+                        $rotationNum++
+                    } while (Test-Path $archivePath)
+
+                    $renamed = $false
+                    try {
+                        Rename-Item -Path $Logfile -NewName $archiveName -Force -ErrorAction Stop
+                        $renamed = $true
+                    }
+                    catch {
+                        Write-Warning "Write-Log: Could not rotate log to '$archiveName': $_"
+                    }
+
+                    if ($renamed) {
+                        $rotationMsg = "<![LOG[LOG ROTATION: Previous log archived to $archiveName (exceeded ${maxSizeMB}MB)]LOG]!>" +
+                        "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
+                        "context=`"$contextUser`" " +
+                        "type=`"1`" thread=`"$PID`" file=`"Write-Log.ps1`">"
+
+                        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                        # cant use Write-Log here, file may not exist yet
+                        try {
+                            [System.IO.File]::WriteAllText($Logfile, "$rotationMsg$([System.Environment]::NewLine)", $utf8NoBom)
+                        }
+                        catch {
+                            Write-Warning "Write-Log: Failed to write rotation notice to '$Logfile': $_"
+                        }
+                    }
+                }
+            }
+
+            # sentinel before call prevents recursion
+            if ($autoCleanup -and (-not $script:WitnessCleanupRan) -and (Test-Path $Logfile)) {
+                $script:WitnessCleanupRan = $true
+                $logFolder = Split-Path $Logfile
+                if ($logFolder -and (Test-Path $logFolder)) {
+                    try {
+                        Clear-LogFile -LogFolder $logFolder -MaxAgeDays $maxAgeDays
+                    }
+                    catch {
+                        Write-Warning "Auto-cleanup failed: $_"
+                    }
+                }
+            }
+
+            # Write to logfile if enabled
+            if ($shouldWriteLogfile) {
+                $retryCount = 0
+                $writeSucceeded = $false
+
+                while (-not $writeSucceeded -and $retryCount -le $MaxRetries) {
+                    $fileStream = $null
+                    $streamWriter = $null
+
+                    try {
+                        $fileMode = [System.IO.FileMode]::Append
+                        $fileAccess = [System.IO.FileAccess]::Write
+                        $fileShare = [System.IO.FileShare]::ReadWrite
+                        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+                        $fileStream = New-Object System.IO.FileStream($Logfile, $fileMode, $fileAccess, $fileShare)
+                        $streamWriter = New-Object System.IO.StreamWriter($fileStream, $utf8NoBom)
+                        $streamWriter.NewLine = [System.Environment]::NewLine
+                        $streamWriter.WriteLine($logline)
+                        $writeSucceeded = $true
+
+                        if ($retryCount -gt 0) {
+                            $retryNote = "<![LOG[WRITE-LOG FILE CONTENTION: Previous entry required $retryCount retry attempt(s) due to file lock on $Logfile]LOG]!>" +
+                            "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
+                            "context=`"$contextUser`" " +
+                            "type=`"2`" thread=`"$PID`" file=`"Write-Log.ps1`">"
+                            $streamWriter.WriteLine($retryNote)
+                        }
+                    }
+                    catch [System.IO.IOException] {
+                        $retryCount++
+                        if ($retryCount -le $MaxRetries) {
+                            Start-Sleep -Milliseconds ([int]($RetryDelay * 1000))
+                        }
+                        else {
+                            Write-Warning "Failed to write to log after $MaxRetries retries (file locked): $Logfile"
+                        }
+                    }
+                    catch {
+                        Write-Warning "Failed to write to log file '$Logfile': $_"
+                        break
+                    }
+                    finally {
+                        try {
+                            if ($null -ne $streamWriter) {
+                                $streamWriter.Dispose() 
+                            } 
+                        }
+                        catch { 
+                        }
+                        try {
+                            if ($null -ne $fileStream) {
+                                $fileStream.Dispose()   
+                            } 
+                        }
+                        catch { 
+                        }
+                    }
+                }
+            }
+        }
+        finally {
+            # Return to original location if possible (SCCM drive may have disconnected)
+            if ($isSCCMDrive) {
                 try {
-                    [System.IO.File]::WriteAllText($Logfile, "$rotationMsg`r`n")
+                    Set-Location $originalLocation -ErrorAction SilentlyContinue 
                 }
                 catch { 
                 }
             }
         }
-
-        # ==================== AUTO-CLEANUP (ONCE PER SESSION) ====================
-        $cleanupAlreadyRan = if (Test-Path Variable:Script:WriteLogCleanupRan) {
-            $Script:WriteLogCleanupRan 
-        }
-        else {
-            $false 
-        }
-        if ($autoCleanup -and (-not $cleanupAlreadyRan) -and (Test-Path $Logfile)) {
-            $Script:WriteLogCleanupRan = $true  # set before cleanup or it recurses
-            $logFolder = Split-Path $Logfile
-            if (Test-Path $logFolder) {
-                try {
-                    Remove-DowserOldLogFiles -LogFolder $logFolder -MaxAgeDays $maxAgeDays
-                }
-                catch {
-                    # cleanup dying must not kill logging
-                    Write-Warning "Auto-cleanup failed: $_"
-                }
-            }
-        }
-
-        if ($shouldWriteLogfile) {
-            $retryCount = 0
-            $writeSucceeded = $false
-
-            while (-not $writeSucceeded -and $retryCount -le $MaxRetries) {
-                $fileStream = $null
-                $streamWriter = $null
-
-                try {
-                    $fileMode = [System.IO.FileMode]::Append
-                    $fileAccess = [System.IO.FileAccess]::Write
-                    $fileShare = [System.IO.FileShare]::ReadWrite
-
-                    $fileStream = New-Object System.IO.FileStream($Logfile, $fileMode, $fileAccess, $fileShare)
-                    $streamWriter = New-Object System.IO.StreamWriter($fileStream)
-                    $streamWriter.WriteLine($logline)
-                    $writeSucceeded = $true
-
-                    # note the contention so the lock is visible later
-                    if ($retryCount -gt 0) {
-                        $retryNote = "<![LOG[WRITE-LOG FILE CONTENTION: Previous entry required $retryCount retry attempt(s) due to file lock on $Logfile]LOG]!>" +
-                        "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
-                        "context=`"$(Get-SafeLogIdentity)`" " +
-                        "type=`"2`" thread=`"$PID`" file=`"Write-Log.ps1`">"
-                        $streamWriter.WriteLine($retryNote)
-                    }
-                }
-                catch [System.IO.IOException] {
-                    # locked, retry while attempts remain
-                    $retryCount++
-                    if ($retryCount -le $MaxRetries) {
-                        Start-Sleep -Milliseconds ([int]($RetryDelay * 1000))
-                    }
-                    else {
-                        Write-Warning "Failed to write to log after $MaxRetries retries (file locked): $Logfile"
-                    }
-                }
-                catch {
-                    # not a lock, retrying will not help
-                    Write-Warning "Failed to write to log file: $_"
-                    break
-                }
-                finally {
-                    if ($null -ne $streamWriter) {
-                        $streamWriter.Close() 
-                    }
-                    if ($null -ne $fileStream) {
-                        $fileStream.Close() 
-                    }
-                }
-            }
-        }
-    }
-    finally {
-        # cmsite drive may have dropped, try anyway
-        if ($isSCCMDrive) {
-            try {
-                Set-Location $originalLocation -ErrorAction SilentlyContinue 
-            }
-            catch { 
-            }
-        }
     }
 }
 
-function Remove-DowserOldLogFiles {
+function Clear-LogFile {
     [CmdletBinding()]
+    [OutputType([void])]
     param(
         [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
         [string]$LogFolder,
 
-        # delete all logs older than this many days - no count-based logic
-        [Parameter()]
-        [int]$MaxAgeDays = 7,
-
-        # optional: scope cleanup to a specific script name prefix
-        [Parameter()]
-        [string]$ScriptFilter = $null
+        [Parameter(Mandatory = $false)]
+        [ValidateRange(1, 365)]
+        [int]$MaxAgeDays = 7
     )
 
     Write-Log "Starting log cleanup in: $LogFolder (keep last $MaxAgeDays days)" -Severity Debug
@@ -524,14 +625,6 @@ function Remove-DowserOldLogFiles {
     if (-not $logFiles) {
         Write-Log "No log files found in $LogFolder" -Severity Verbose
         return
-    }
-
-    if ($ScriptFilter) {
-        $logFiles = $logFiles | Where-Object { $_.BaseName -like "$ScriptFilter*" }
-        if (-not $logFiles) {
-            Write-Log "No log files matched filter: $ScriptFilter" -Severity Verbose
-            return
-        }
     }
 
     $cutoff = (Get-Date).AddDays(-$MaxAgeDays)
@@ -558,93 +651,330 @@ function Remove-DowserOldLogFiles {
 
 function Write-LogFinal {
     <#
+    .SYNOPSIS
+        Write a final log entry and trigger the session-end log cleanup pass.
+
     .DESCRIPTION
-      Writes a final log message and triggers the log cleanup routine.
-      Use this function only as your final log entry in the script
-      (for example, in Remove-HpAdminLocal.ps1) so that cleanup only occurs once.
+        Use as the last log call in a script. Writes the supplied message, then runs
+        Clear-LogFile against the log directory to prune logs older than MaxAgeDays.
+        The cleanup sentinel prevents cleanup from running twice. If Write-Log already
+        triggered auto-cleanup earlier in the session, this skips it. Calling
+        Initialize-Log resets the sentinel.
     #>
     [CmdletBinding()]
+    [OutputType([void])]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, Position = 0)]
         [string]$Message,
-        
+
         [Parameter(Mandatory = $false)]
-        [ValidateSet('Info', 'Warning', 'Error', 'Verbose', 'Debug')]
+        [ValidateSet('Info', 'Information', 'Warning', 'Error', 'Verbose', 'Debug', 'Success')]
         [string]$Severity = 'Info'
     )
-    
+
     Write-Log -Message $Message -Severity $Severity
-    Write-Log -Message "Final log entry: Triggering log cleanup." -Severity 'Verbose'
-    
-    $logFolder = Split-Path $LogFile
-    
+
+    # dont run cleanup twice
+    if ($script:WitnessCleanupRan) {
+        return
+    }
+
+    $maxAgeDays = $script:WitnessMaxAgeDays
+    if (Test-Path Variable:Global:WriteLogMaxAgeDays) {
+        $maxAgeDays = $Global:WriteLogMaxAgeDays 
+    }
+
+    $callerScopePath = $PSCmdlet.SessionState.PSVariable.GetValue('LogFilePath')
+    $resolvedPath = Resolve-WitnessLogPath -CallerResolved $callerScopePath
+
+    if ([string]::IsNullOrWhiteSpace($resolvedPath)) {
+        $script:WitnessCleanupRan = $true
+        Write-Log -Message 'Write-LogFinal: Cannot determine log folder - skipping cleanup.' -Severity Warning
+        return
+    }
+
+    $logFolder = Split-Path $resolvedPath
+    if ([string]::IsNullOrWhiteSpace($logFolder) -or -not (Test-Path $logFolder)) {
+        $script:WitnessCleanupRan = $true
+        Write-Log -Message "Write-LogFinal: Log folder not found at '$logFolder' - skipping cleanup." -Severity Warning
+        return
+    }
+
+    # sentinel before call prevents recursion
+    $script:WitnessCleanupRan = $true
     try {
-        Remove-DowserOldLogFiles -LogFolder $logFolder
+        Clear-LogFile -LogFolder $logFolder -MaxAgeDays $maxAgeDays
     }
     catch {
-        Write-Log -Message "Log cleanup failed: $_" -Severity 'Error'
+        Write-Log -Message "Log cleanup failed: $_" -Severity Error
     }
 }
 
-function Get-ExecutionContextInfo {
+function Get-PlatformContext {
+    <#
+    .SYNOPSIS
+        Returns a cross-platform identity and execution context object.
+
+    .DESCRIPTION
+        Detects platform (Windows/Linux/macOS), process identity, elevation, interactive
+        user, session type, and hostname. Called once per session from Initialize-Log
+        for the start banner. Windows uses WindowsIdentity; Linux/macOS use .NET
+        Environment APIs with id(1) and loginctl fallbacks.
+
+    .OUTPUTS
+        PSCustomObject with Platform, IdentityName, LogonType, IsSystem, IsAdmin,
+        UserDomainName, UserName, InteractiveUser, SessionType, HostName, ProcessId.
+    #>
     [CmdletBinding()]
+    [OutputType([pscustomobject])]
     param()
 
-    # non-Windows degraded shape ($IsWindows null on 5.1 = Windows)
-    if ($IsWindows -eq $false) {
-        return [PSCustomObject]@{
-            UserName    = Get-SafeLogIdentity
-            IsAdmin     = ($env:USER -eq 'root')
-            IsSystem    = $false
-            SessionType = 'NonWindows'
+    # $IsMacOS missing on 5.1
+    $platformStr = 'Linux'
+    if ($script:WitnessIsWindows) {
+        $platformStr = 'Windows'
+    }
+    elseif ((Test-Path Variable:IsMacOS) -and $IsMacOS) {
+        $platformStr = 'macOS'
+    }
+
+    if ($script:WitnessIsWindows) {
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $identityName = $identity.Name
+        $logonType = if ($identity.AuthenticationType) {
+            $identity.AuthenticationType 
+        }
+        else {
+            'N/A' 
+        }
+    }
+    else {
+        $identity = $null
+        $identityName = "$([System.Environment]::UserDomainName)\$([System.Environment]::UserName)"
+        $logonType = 'N/A'
+    }
+
+    # id -u must never run on windows
+    if ($script:WitnessIsWindows) {
+        $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+        $isAdmin = $principal.IsInRole(
+            [System.Security.Principal.WindowsBuiltInRole]::Administrator
+        )
+    }
+    else {
+        # needs .NET 7+, missing on older builds
+        $isAdmin = $false
+        $privilegedProcessChecked = $false
+        try {
+            $isAdmin = [System.Environment]::IsPrivilegedProcess
+            $privilegedProcessChecked = $true
+        }
+        catch [System.Management.Automation.RuntimeException] {
+            $privilegedProcessChecked = $false
+        }
+        catch [System.MissingMemberException] {
+            $privilegedProcessChecked = $false
+        }
+        if (-not $privilegedProcessChecked) {
+            try {
+                $idOutput = id -u 2>$null
+                $isAdmin = ([int]$idOutput) -eq 0
+            }
+            catch {
+                $isAdmin = $false
+            }
         }
     }
 
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+    $isSystem = $false
+    if ($script:WitnessIsWindows) {
+        $isSystem = $identityName -eq 'NT AUTHORITY\SYSTEM'
+    }
 
-    $isSystem = $identity.Name -eq 'NT AUTHORITY\SYSTEM'
-    $isAdmin = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+    $hostName = [System.Environment]::MachineName
 
-    # interactive guess, find explorer owned by a user
     $interactiveUser = $null
-    try {
-        $explorer = Get-Process explorer -IncludeUserName -ErrorAction SilentlyContinue
-        if ($explorer) {
-            $interactiveUser = ($explorer | Select-Object -First 1).UserName
+    if ($script:WitnessIsWindows) {
+        try {
+            $explorer = Get-Process explorer -IncludeUserName -ErrorAction SilentlyContinue
+            if ($explorer) {
+                $interactiveUser = ($explorer | Select-Object -First 1).UserName
+            }
+        }
+        catch {
+        }
+        if (-not $interactiveUser) {
+            $interactiveUser = [System.Environment]::UserName
         }
     }
-    catch {
+    else {
+        # loginctl doesnt exist on macOS
+        if ($platformStr -ne 'macOS') {
+            try {
+                $raw = loginctl list-sessions --no-legend 2>$null
+                if ($LASTEXITCODE -eq 0 -and $raw) {
+                    foreach ($line in ($raw -split "`n")) {
+                        $fields = $line.Trim() -split '\s+'
+                        if ($fields.Count -ge 3) {
+                            $sessionId = $fields[0]
+                            $sessionUser = $fields[2]
+                            $sessionType = (loginctl show-session $sessionId -p Type --value 2>$null)
+                            if ($null -ne $sessionType) {
+                                $sessionType = $sessionType.Trim() 
+                            }
+                            if ($sessionType -in 'x11', 'wayland') {
+                                $interactiveUser = $sessionUser
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+            catch {
+            }
+        }
+
+        if (-not $interactiveUser) {
+            try {
+                $whoOutput = who 2>$null
+                if ($LASTEXITCODE -eq 0 -and $whoOutput) {
+                    $interactiveUser = ($whoOutput -split "`n" |
+                            Where-Object { $_ -match '\S' } |
+                            Select-Object -First 1) -split '\s+' |
+                            Select-Object -First 1
+                }
+            }
+            catch {
+            }
+        }
+
+        if (-not $interactiveUser) {
+            $interactiveUser = [System.Environment]::UserName
+        }
+    }
+
+    $sessionType = $logonType
+    if (-not $script:WitnessIsWindows) {
+        $sshConn = [System.Environment]::GetEnvironmentVariable('SSH_CONNECTION')
+        $xdgType = [System.Environment]::GetEnvironmentVariable('XDG_SESSION_TYPE')
+        $xdgClass = [System.Environment]::GetEnvironmentVariable('XDG_SESSION_CLASS')
+
+        if ($sshConn) {
+            $sessionType = "ssh ($sshConn)"
+        }
+        elseif ($xdgType) {
+            $sessionType = if ($xdgClass) {
+                "$xdgType ($xdgClass)" 
+            }
+            else {
+                $xdgType 
+            }
+        }
+        else {
+            $xdgSessionId = [System.Environment]::GetEnvironmentVariable('XDG_SESSION_ID')
+            if ($xdgSessionId -and $platformStr -ne 'macOS') {
+                try {
+                    $lType = (loginctl show-session $xdgSessionId -p Type --value 2>$null)
+                    $lClass = (loginctl show-session $xdgSessionId -p Class --value 2>$null)
+                    if ($LASTEXITCODE -eq 0 -and $lType) {
+                        $parts = @()
+                        if ($lType) {
+                            $parts += "type=$($lType.Trim())" 
+                        }
+                        if ($lClass) {
+                            $parts += "class=$($lClass.Trim())" 
+                        }
+                        $sessionType = $parts -join '; '
+                    }
+                }
+                catch {
+                }
+            }
+            if ($sessionType -eq 'N/A') {
+                $hasTty = -not [System.Console]::IsInputRedirected
+                $sessionType = if ($hasTty) {
+                    'local-interactive' 
+                }
+                else {
+                    'non-interactive-or-unknown' 
+                }
+            }
+        }
     }
 
     [pscustomobject]@{
-        IdentityName    = $identity.Name
-        LogonType       = $identity.AuthenticationType
+        Platform        = $platformStr
+        IdentityName    = $identityName
+        LogonType       = $logonType
         IsSystem        = $isSystem
         IsAdmin         = $isAdmin
-        UserDomainUser  = if ($env:USERDOMAIN -and $env:USERNAME) {
-            "$($env:USERDOMAIN)\$($env:USERNAME)" 
-        }
-        else {
-            $null 
-        }
+        UserDomainName  = [System.Environment]::UserDomainName
+        UserName        = [System.Environment]::UserName
         InteractiveUser = $interactiveUser
+        SessionType     = $sessionType
+        HostName        = $hostName
         ProcessId       = $PID
-        HostName        = $env:COMPUTERNAME
     }
 }
 
 
 function Initialize-Log {
+    <#
+    .SYNOPSIS
+        Initialize the log path and write a structured session-start banner.
+
+    .DESCRIPTION
+        Call once at the start of a script or session. Stores the resolved log file
+        path in script scope so all subsequent Write-Log calls find it without an
+        explicit -Logfile argument. The banner is written directly to the file
+        bypassing the Verbose/Debug gate, and echoed to the console. Calling
+        Initialize-Log a second time resets the auto-cleanup sentinel.
+
+    .PARAMETER LogFilePath
+        Full path to the log file. The parent directory is created if missing.
+
+    .PARAMETER ScriptName
+        Name of the calling script for the banner. Auto-detected when not supplied.
+
+    .PARAMETER Version
+        Version string written to the banner VERSION line.
+
+    .OUTPUTS
+        None. Sets $script:WitnessLogFilePath and writes the banner.
+    #>
     [CmdletBinding()]
+    [OutputType([void])]
     param (
         [Parameter(Mandatory = $false)]
-        [string]$LogFilePath = $LogFilePath,
+        [string]$LogFilePath,
 
+        [Parameter(Mandatory = $false)]
         [string]$ScriptName,
 
+        [Parameter(Mandatory = $false)]
         [string]$Version
     )
+
+    $callerCandidate = $null
+    if ($PSBoundParameters.ContainsKey('LogFilePath') -and -not [string]::IsNullOrWhiteSpace($LogFilePath)) {
+        $callerCandidate = $LogFilePath
+    }
+    else {
+        $callerScopePath = $PSCmdlet.SessionState.PSVariable.GetValue('LogFilePath')
+        if (-not [string]::IsNullOrWhiteSpace($callerScopePath)) {
+            $callerCandidate = $callerScopePath
+        }
+    }
+    $LogFilePath = Resolve-WitnessLogPath -CallerResolved $callerCandidate
+
+    if ([string]::IsNullOrWhiteSpace($LogFilePath)) {
+        throw "Initialize-Log: No log file path provided. Pass -LogFilePath, set `$LogFilePath in your script scope, or set `$Global:LogFilePath before calling Initialize-Log."
+    }
+
+    $script:WitnessLogFilePath = $LogFilePath
+
+    # new session, reset cleanup sentinel
+    $script:WitnessCleanupRan = $false
 
     if ([string]::IsNullOrWhiteSpace($ScriptName)) {
         try {
@@ -653,7 +983,7 @@ function Initialize-Log {
                 $ScriptName = $callStack[1].ScriptName | Split-Path -Leaf
             }
             if ([string]::IsNullOrWhiteSpace($ScriptName)) {
-                $ScriptName = "Unknown Script"
+                $ScriptName = "Unknown Script" 
             }
         }
         catch {
@@ -661,23 +991,107 @@ function Initialize-Log {
         }
     }
 
-    $ctx = Get-ExecutionContextInfo
+    $ctx = Get-PlatformContext
 
-    Write-Log -Message "===============================================================================" -Severity Verbose
-    Write-Log -Message "SCRIPT START: $ScriptName" -Severity Debug
-    Write-Log -Message "TIME:         $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -Severity Debug
-    Write-Log -Message "IDENTITY:     $($ctx.IdentityName)" -Severity Debug
-    Write-Log -Message "CONTEXT:      $(if ($ctx.IsSystem) { 'SYSTEM' } else { 'USER' }), Admin=$($ctx.IsAdmin)" -Severity Debug
-    Write-Log -Message "ENV USER:     $($ctx.UserDomainUser)" -Severity Debug
-    if ($ctx.InteractiveUser) {
-        Write-Log -Message "INTERACTIVE:  $($ctx.InteractiveUser)" -Severity Debug
+    # CMSite PSDrive breaks filesystem ops, same guard Write-Log uses
+    $originalLocation = Get-Location
+    $isSCCMDrive = $false
+    if ($script:WitnessIsWindows) {
+        if ($null -ne $originalLocation.Provider -and $originalLocation.Provider.Name -eq 'CMSite') {
+            $isSCCMDrive = $true
+            Set-Location C:
+        }
     }
-    Write-Log -Message "HOST:         $($ctx.HostName)" -Severity Debug
-    Write-Log -Message "PID:          $($ctx.ProcessId)" -Severity Debug
-    Write-Log -Message "LOG:          $LogFilePath" -Severity Debug
-    Write-Log -Message "VERSION:      $Version" -Severity Debug
-    Write-Log -Message "===============================================================================" -Severity Verbose
-}
 
-##############################################################
-##############################################################
+    $logDir = Split-Path $LogFilePath
+    if ($logDir -and !(Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    }
+
+    # bypass Write-Log so banner always appears regardless of gate settings
+    $now = Get-Date
+    $LogDate = $now.ToString('MM-dd-yyyy')
+    $LogTime = $now.ToString('HH:mm:ss.fff')
+
+    if ($script:WitnessIsWindows) {
+        $contextUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    }
+    else {
+        $contextUser = "$([System.Environment]::UserDomainName)\$([System.Environment]::UserName)"
+    }
+
+    $bannerLines = @(
+        "===============================================================================",
+        "SCRIPT START: $ScriptName",
+        "TIME:         $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+        "IDENTITY:     $($ctx.IdentityName)",
+        "CONTEXT:      $(if ($ctx.IsSystem) { 'SYSTEM' } else { 'USER' }), Admin=$($ctx.IsAdmin)",
+        "PLATFORM:     $($ctx.Platform)",
+        "ENV USER:     $($ctx.UserDomainName)\$($ctx.UserName)",
+        "INTERACTIVE:  $($ctx.InteractiveUser)",
+        "SESSION:      $($ctx.SessionType)",
+        "HOST:         $($ctx.HostName)",
+        "PID:          $($ctx.ProcessId)",
+        "LOG:          $LogFilePath",
+        "VERSION:      $Version",
+        "==============================================================================="
+    )
+
+    $fileStream = $null
+    $streamWriter = $null
+    try {
+        $fileMode = [System.IO.FileMode]::Append
+        $fileAccess = [System.IO.FileAccess]::Write
+        $fileShare = [System.IO.FileShare]::ReadWrite
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+        $fileStream = New-Object System.IO.FileStream($LogFilePath, $fileMode, $fileAccess, $fileShare)
+        $streamWriter = New-Object System.IO.StreamWriter($fileStream, $utf8NoBom)
+        $streamWriter.NewLine = [System.Environment]::NewLine
+
+        foreach ($line in $bannerLines) {
+            $entry = "<![LOG[$line]LOG]!>" +
+            "<time=`"$LogTime`" " +
+            "date=`"$LogDate`" " +
+            "component=`"Initialize-Log`" " +
+            "context=`"$contextUser`" " +
+            "type=`"1`" " +
+            "thread=`"$PID`" " +
+            "file=`"Write-Log.ps1`">"
+            $streamWriter.WriteLine($entry)
+        }
+    }
+    catch {
+        Write-Warning "Initialize-Log: Failed to write banner to '$LogFilePath': $_"
+    }
+    finally {
+        try {
+            if ($null -ne $streamWriter) {
+                $streamWriter.Dispose() 
+            } 
+        }
+        catch { 
+        }
+        try {
+            if ($null -ne $fileStream) {
+                $fileStream.Dispose()   
+            } 
+        }
+        catch { 
+        }
+    }
+
+    # banner to console unconditionally, session context must be visible on screen
+    foreach ($line in $bannerLines) {
+        Write-Host $line -ForegroundColor Cyan
+    }
+
+    if ($isSCCMDrive) {
+        try {
+            Set-Location $originalLocation -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Warning "Initialize-Log: Could not restore CMSite location: $_"
+        }
+    }
+}
