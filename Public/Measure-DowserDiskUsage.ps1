@@ -105,15 +105,17 @@ function Measure-DowserDiskUsage {
             else {
                 [System.StringComparer]::OrdinalIgnoreCase
             }
-            $dirSizes   = [System.Collections.Generic.Dictionary[string, long]]::new($dirComparer)
-            $allFiles   = [System.Collections.Generic.List[PSCustomObject]]::new()
+            $dirSizes = [System.Collections.Generic.Dictionary[string, long]]::new($dirComparer)
+            $allFiles = [System.Collections.Generic.List[PSCustomObject]]::new()
             $totalBytes = [long]0
             $totalCount = [int]0
 
             $excludeSet = [System.Collections.Generic.HashSet[string]]::new(
                 [System.StringComparer]::OrdinalIgnoreCase)
             if ($ExcludePath) {
-                foreach ($ex in $ExcludePath) { [void]$excludeSet.Add($ex) }
+                foreach ($ex in $ExcludePath) {
+                    [void]$excludeSet.Add($ex) 
+                }
             }
 
             $queue = [System.Collections.Generic.Queue[System.IO.DirectoryInfo]]::new()
@@ -170,10 +172,10 @@ function Measure-DowserDiskUsage {
                         }
 
                         $allFiles.Add([PSCustomObject]@{
-                            FullName  = $fi.FullName
-                            SizeBytes = $sz
-                            Extension = $ext
-                        })
+                                FullName  = $fi.FullName
+                                SizeBytes = $sz
+                                Extension = $ext
+                            })
 
                         # roll size up every ancestor through resolvedRoot
                         $ancestor = $currentDir.FullName
@@ -182,9 +184,13 @@ function Measure-DowserDiskUsage {
                                 $dirSizes[$ancestor] = [long]0
                             }
                             $dirSizes[$ancestor] += $sz
-                            if ($dirComparer.Equals($ancestor, $resolvedRoot)) { break }
+                            if ($dirComparer.Equals($ancestor, $resolvedRoot)) {
+                                break 
+                            }
                             $parentPath = [System.IO.Path]::GetDirectoryName($ancestor)
-                            if (-not $parentPath -or $parentPath.Length -lt $resolvedRoot.Length) { break }
+                            if (-not $parentPath -or $parentPath.Length -lt $resolvedRoot.Length) {
+                                break 
+                            }
                             $ancestor = $parentPath
                         }
 
@@ -221,12 +227,16 @@ function Measure-DowserDiskUsage {
             $dirObjects = foreach ($entry in $bigDirs) {
                 $relPath = $entry.Key.Substring($resolvedRoot.Length).TrimStart(
                     [System.IO.Path]::DirectorySeparatorChar, '/')
-                if (-not $relPath) { $relPath = '.' }
+                if (-not $relPath) {
+                    $relPath = '.' 
+                }
 
                 $pct = if ($totalBytes -gt 0) {
                     [Math]::Round($entry.Value / $totalBytes * 100, 1)
                 }
-                else { 0 }
+                else {
+                    0 
+                }
                 $barLen = [Math]::Round($pct / 2)
                 $bar = ('#' * [int]$barLen).PadRight(50)
 
@@ -258,7 +268,9 @@ function Measure-DowserDiskUsage {
                 $pct = if ($totalBytes -gt 0) {
                     [Math]::Round($f.SizeBytes / $totalBytes * 100, 1)
                 }
-                else { 0 }
+                else {
+                    0 
+                }
                 $barLen = [Math]::Round($pct / 2)
                 $bar = ('#' * [int]$barLen).PadRight(50)
 
@@ -273,7 +285,7 @@ function Measure-DowserDiskUsage {
                 }
             }
 
-            $extMap   = [System.Collections.Generic.Dictionary[string, long]]::new(
+            $extMap = [System.Collections.Generic.Dictionary[string, long]]::new(
                 [System.StringComparer]::OrdinalIgnoreCase)
             $extCount = [System.Collections.Generic.Dictionary[string, int]]::new(
                 [System.StringComparer]::OrdinalIgnoreCase)
@@ -281,11 +293,11 @@ function Measure-DowserDiskUsage {
             foreach ($f in $allFiles) {
                 $e = $f.Extension
                 if ($extMap.ContainsKey($e)) {
-                    $extMap[$e]   += $f.SizeBytes
+                    $extMap[$e] += $f.SizeBytes
                     $extCount[$e]++
                 }
                 else {
-                    $extMap[$e]   = $f.SizeBytes
+                    $extMap[$e] = $f.SizeBytes
                     $extCount[$e] = 1
                 }
             }
@@ -296,7 +308,9 @@ function Measure-DowserDiskUsage {
                     $pct = if ($totalBytes -gt 0) {
                         [Math]::Round($_.Value / $totalBytes * 100, 1)
                     }
-                    else { 0 }
+                    else {
+                        0 
+                    }
                     $barLen = [Math]::Round($pct / 2)
                     $bar = ('#' * [int]$barLen).PadRight(50)
                     [PSCustomObject][Ordered]@{
@@ -347,13 +361,19 @@ function Measure-DowserDiskUsage {
             Write-Verbose $sep
             foreach ($e in $extObjects) {
                 Write-Verbose ("{0,-12} {1,10}  {2,5}%  {3,6} files  [{4}]" -f `
-                    $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar)
+                        $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar)
             }
 
             $summaryObject
-            foreach ($o in $dirObjects)  { $o }
-            foreach ($o in $fileObjects) { $o }
-            foreach ($o in $extObjects)  { $o }
+            foreach ($o in $dirObjects) {
+                $o 
+            }
+            foreach ($o in $fileObjects) {
+                $o 
+            }
+            foreach ($o in $extObjects) {
+                $o 
+            }
 
             if ($ExportHtml) {
                 try {
@@ -377,7 +397,8 @@ function Measure-DowserDiskUsage {
         }
     }
 
-    end {}
+    end {
+    }
 }
 
 # lives here, only Measure-DowserDiskUsage calls it
@@ -429,12 +450,19 @@ function _Build-DduHtml {
 "@
 
     # immediate children only so nested dirs are not double-counted
-    $tmColors = @('#264f78','#1e5f5f','#3a3a6b','#1e4d4d','#2d4a2d','#4d2d2d','#4d3a1e','#2d2d4d')
-    $tmDenominator = if ($TotalBytes -gt 0) { [double]$TotalBytes } else { 1.0 }
+    $tmColors = @('#264f78', '#1e5f5f', '#3a3a6b', '#1e4d4d', '#2d4a2d', '#4d2d2d', '#4d3a1e', '#2d2d4d')
+    $tmDenominator = if ($TotalBytes -gt 0) {
+        [double]$TotalBytes 
+    }
+    else {
+        1.0 
+    }
 
     $immChildren = [System.Collections.Generic.List[PSCustomObject]]::new()
     foreach ($kv in $DirSizes.GetEnumerator()) {
-        if ($DirComparer.Equals($kv.Key, $RootPath)) { continue }
+        if ($DirComparer.Equals($kv.Key, $RootPath)) {
+            continue 
+        }
         $parentOfKey = [System.IO.Path]::GetDirectoryName($kv.Key)
         if ($DirComparer.Equals($parentOfKey, $RootPath)) {
             $childName = [System.IO.Path]::GetFileName($kv.Key)
@@ -445,18 +473,20 @@ function _Build-DduHtml {
 
     # remainder is bytes outside any immediate subdir
     $allImmTotal = [long]0
-    foreach ($ic in $immChildren) { $allImmTotal += $ic.SizeBytes }
+    foreach ($ic in $immChildren) {
+        $allImmTotal += $ic.SizeBytes 
+    }
     $rootFileBytes = $TotalBytes - $allImmTotal
 
     $tmBlocksHtml = ''
-    $leftPct  = 0.0
+    $leftPct = 0.0
     $colorIdx = 0
     foreach ($ti in $tmItems) {
         $widthPct = [Math]::Round($ti.SizeBytes / $tmDenominator * 100, 2)
-        $label    = [System.Security.SecurityElement]::Escape($ti.Name)
-        $sizeStr  = [System.Security.SecurityElement]::Escape((Format-DowserSize -DataValue $ti.SizeBytes))
-        $pct      = [Math]::Round($ti.SizeBytes / $tmDenominator * 100, 1)
-        $color    = $tmColors[$colorIdx % $tmColors.Count]
+        $label = [System.Security.SecurityElement]::Escape($ti.Name)
+        $sizeStr = [System.Security.SecurityElement]::Escape((Format-DowserSize -DataValue $ti.SizeBytes))
+        $pct = [Math]::Round($ti.SizeBytes / $tmDenominator * 100, 1)
+        $color = $tmColors[$colorIdx % $tmColors.Count]
         $colorIdx++
 
         # data attrs hold escaped strings, js reads them via textContent
@@ -472,8 +502,8 @@ function _Build-DduHtml {
     }
     if ($rootFileBytes -gt 0) {
         $widthPct = [Math]::Round($rootFileBytes / $tmDenominator * 100, 2)
-        $sizeStr  = [System.Security.SecurityElement]::Escape((Format-DowserSize -DataValue $rootFileBytes))
-        $pct      = [Math]::Round($rootFileBytes / $tmDenominator * 100, 1)
+        $sizeStr = [System.Security.SecurityElement]::Escape((Format-DowserSize -DataValue $rootFileBytes))
+        $pct = [Math]::Round($rootFileBytes / $tmDenominator * 100, 1)
         $tmBlocksHtml += @"
 <div class='ddu-block ddu-remainder' style='left:${leftPct}%;top:0;width:${widthPct}%;height:100%;background:#3a3a3a;'
      data-path='(root files)' data-size='$sizeStr' data-pct='$pct'
@@ -519,15 +549,15 @@ $tmBlocksHtml
 </script>
 "@
 
-    $dirTableHtml  = _DduTableHtml -Rows $DirObjects  `
-        -Cols @('RelPath','Size','PctOfTotal','Bar') `
-        -Headers @('Directory','Size','% of Total','Bar')
+    $dirTableHtml = _DduTableHtml -Rows $DirObjects  `
+        -Cols @('RelPath', 'Size', 'PctOfTotal', 'Bar') `
+        -Headers @('Directory', 'Size', '% of Total', 'Bar')
     $fileTableHtml = _DduTableHtml -Rows $FileObjects `
-        -Cols @('RelPath','Size','PctOfTotal','Bar') `
-        -Headers @('File','Size','% of Total','Bar')
-    $extTableHtml  = _DduTableHtml -Rows $ExtObjects  `
-        -Cols @('Extension','Size','FileCount','PctOfTotal','Bar') `
-        -Headers @('Extension','Size','Files','% of Total','Bar')
+        -Cols @('RelPath', 'Size', 'PctOfTotal', 'Bar') `
+        -Headers @('File', 'Size', '% of Total', 'Bar')
+    $extTableHtml = _DduTableHtml -Rows $ExtObjects  `
+        -Cols @('Extension', 'Size', 'FileCount', 'PctOfTotal', 'Bar') `
+        -Headers @('Extension', 'Size', 'Files', '% of Total', 'Bar')
 
     return @"
 <!DOCTYPE html>

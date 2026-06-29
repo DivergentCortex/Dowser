@@ -125,13 +125,15 @@ function Invoke-DowserFastSearch {
         }
 
         $totalFiles = $files.Count
-        $completed  = 0
+        $completed = 0
 
         while ($jobs.Handle.IsCompleted -contains $false) {
             $completedJobs = $jobs | Where-Object { $_.Handle.IsCompleted }
             foreach ($job in $completedJobs) {
                 $result = $job.Instance.EndInvoke($job.Handle)
-                if ($null -ne $result) { $results.Add($result) | Out-Null }
+                if ($null -ne $result) {
+                    $results.Add($result) | Out-Null 
+                }
                 $job.Instance.Dispose()
                 $completed++
                 Write-Progress -Activity "Searching files" -Status "Completed $completed of $totalFiles" -PercentComplete (($completed / $totalFiles) * 100)
@@ -143,7 +145,9 @@ function Invoke-DowserFastSearch {
         # drain anything that finished in the last cycle
         foreach ($job in $jobs) {
             $result = $job.Instance.EndInvoke($job.Handle)
-            if ($null -ne $result) { $results.Add($result) | Out-Null }
+            if ($null -ne $result) {
+                $results.Add($result) | Out-Null 
+            }
             $job.Instance.Dispose()
             $completed++
             Write-Progress -Activity "Searching files" -Status "Completed $completed of $totalFiles" -PercentComplete (($completed / $totalFiles) * 100)

@@ -28,7 +28,7 @@
 #>
 
 # visual tree builder. self-recursive. dont reorder the filter logic unless you enjoy broken connectors.
-# size and .ps1 count annotations bolt onto the folder line, computed lazily per folder
+# size and .ps1 count annotations bolt onto the folder line — computed lazily per folder.
 
 function Get-DowserMap {
     [CmdletBinding()]
@@ -74,7 +74,7 @@ function Get-DowserMap {
         [string]$MarkdownFile,
         [switch]$EmitSummary,
 
-        # internal for recursion, dont mess with these
+        # Internal (for recursion) — dont mess with these
         [string]$Indent = "",
         [int]$CurrentDepth = 0,
         [Parameter(DontShow = $true)]
@@ -115,6 +115,7 @@ function Get-DowserMap {
         }
     }
 
+    # --- Folder annotation helper: builds the "[1.2 GB] [14 .ps1]" suffix ---
     function Get-FolderAnnotation {
         param([string]$folderPath)
         $annotation = ''
@@ -158,6 +159,7 @@ function Get-DowserMap {
         return $annotation
     }
 
+    # Precompute normalized extension filters
     $normInclude = @()
     if ($IncludeExtensions) {
         $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
@@ -183,7 +185,7 @@ function Get-DowserMap {
         $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
     }
 
-    # folder exclude defaults, bypass with -NoDefaultExcludes
+    # folder exclude defaults — opinionated but documented. use -NoDefaultExcludes to bypass.
     $defaultExcludes = @(
         '__pycache__', 'node_modules', '.git', '.svn', '.hg', '.vs', '.vscode', 'obj', '.idea',
         'dist', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv', 'env', '.env',
@@ -211,6 +213,7 @@ function Get-DowserMap {
         $excludeWild = @($allExcludes | Where-Object { $_ -match '[\*\?\[\]]' })
     }
 
+    # file-level excludes
     $defaultExcludeFiles = @( 'settings.local.json', '.env', 'sccm.code-workspace', '*.code-workspace' )
     $allExcludeFiles = @()
     if (-not $NoDefaultExcludes) {
@@ -247,7 +250,10 @@ function Get-DowserMap {
         }
     }
 
-    # native separator so path compares stay valid on linux and windows
+    # path normalization helpers
+    # Internal path comparison/filtering uses the platform separator so that
+    # Get-ChildItem -LiteralPath calls and string compares stay valid on Linux
+    # (forward slash) as well as Windows (backslash). $sep is computed once.
     $sep = [string][IO.Path]::DirectorySeparatorChar
     function ConvertTo-NativeSeparator {
         param([string]$s) if ($null -eq $s) {
@@ -259,7 +265,8 @@ function Get-DowserMap {
             return ($s -replace '/', '\') 
         } 
     }
-    # regex needs backslash input so normalize locally
+    # ConvertTo-WslPath translates a Windows drive/UNC path into a /mnt style path.
+    # It needs backslash-normalized input for its regex, so it normalizes locally.
     function ConvertTo-WslPath {
         param([string]$inputPath)
         if ([string]::IsNullOrWhiteSpace($inputPath)) {
@@ -304,6 +311,7 @@ function Get-DowserMap {
         $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) 
     }
 
+    # IncludeFolders breakdown: exact names, wildcards, exact paths, wildcard paths
     $includeExactNames = @(); $includeWildcardNames = @()
     $includeExactPaths = @(); $includeWildcardPaths = @()
     if ($IncludeFolders) {
@@ -356,6 +364,7 @@ function Get-DowserMap {
         }
     }
 
+    # --- Parallel Pre-scan Phase ---
     if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($effectiveIncludePatterns -or $IncludeExtensions -or $IncludeFolders)) {
         Write-Verbose "Starting parallel pre-scan of '$Path' to populate caches..."
 
@@ -493,6 +502,7 @@ function Get-DowserMap {
         Write-Verbose "Pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
     }
 
+    # --- Filter helper functions ---
     function ConvertTo-RelativePath {
         param([string]$full)
         if ([string]::IsNullOrEmpty($rootFull)) {
@@ -609,7 +619,8 @@ function Get-DowserMap {
         if (Test-ExcludeByPath $item) {
             return $true 
         }
-        # includehidden was asked for so dont let excludes drop hidden items
+        # When -IncludeHidden is active, hidden items bypass the name-based exclude list.
+        # The user explicitly asked to see hidden items; defaultExcludes should not silently discard them.
         if ($IncludeHidden -and (Test-IsHidden $item)) {
             return $false 
         }
@@ -764,6 +775,7 @@ function Get-DowserMap {
         return $false
     }
 
+    # auto-enable HTML when output file ends in .html
     if (-not $PSBoundParameters.ContainsKey('AsHtml') -and $OutputFile -and ($OutputFile -match '\.html?$')) {
         $AsHtml = $true 
     }
@@ -800,6 +812,7 @@ function Get-DowserMap {
     catch {
     }
 
+    # box-drawing characters
     if ($Ascii) {
         $treeChars = @{ Branch = '+-'; Last = '\\-'; Pipe = '| '; Space = '  ' }
         $fileChar = '-'; $folderChar = '+'; $errorChar = 'X'
@@ -1008,6 +1021,7 @@ function Get-DowserMap {
         return $finalLines
     }
 
+    # --- Non-ShowFullPathTree rendering ---
     if (-not $ShowFullPathTree) {
         $rawItems = @()
         $itemsLoaded = $true
@@ -1028,7 +1042,7 @@ function Get-DowserMap {
             return Complete-DirectoryMapOutput -Lines $errorLines -TreeLines $errorLines
         }
 
-        # filter before isLast or connectors break
+        # pre-filter items before calculating isLast (fixes tree connector bug)
         $filteredFolders = @(); $filteredLinks = @(); $filteredFiles = @()
         foreach ($item in $rawItems) {
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
@@ -1097,6 +1111,7 @@ function Get-DowserMap {
                 $TraversalState.LinkCount++
             }
             elseif ($item.PSIsContainer) {
+                # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
                 $annotation = Get-FolderAnnotation -folderPath $item.FullName
                 $line = "$Indent$connector $folderChar $($item.Name)$folderSuffix$annotation"
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
@@ -1114,6 +1129,7 @@ function Get-DowserMap {
         return Complete-DirectoryMapOutput -Lines $output -TreeLines $output
     }
 
+    # --- ShowFullPathTree logic ("trunk" with artistic connectors) ---
     $segments = @()
     if ($LinuxPaths) {
         $displayPath = ConvertTo-WslPath $Path
@@ -1185,6 +1201,7 @@ function Get-DowserMap {
         return Complete-DirectoryMapOutput -Lines $errorLines -TreeLines $errorLines
     }
 
+    # filter folders
     $folders = @(); $links = @()
     foreach ($child in $children) {
         if (-not $child.PSIsContainer) {
@@ -1210,6 +1227,7 @@ function Get-DowserMap {
         $folders += $child
     }
 
+    # filter files
     $files = @()
     if (-not $FoldersOnly -or $fileFilterActive) {
         foreach ($child in $children) {
@@ -1257,22 +1275,16 @@ function Get-DowserMap {
             $TraversalState.LinkCount++
         }
         elseif ($item.PSIsContainer) {
-            $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
-            $TraversalState.LinkCount++
-        }
-        elseif ($item.PSIsContainer) {
             # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
             $annotation = Get-FolderAnnotation -folderPath $item.FullName
             $line = "$childrenBaseIndent$connector $folderChar $($item.Name)$folderSuffix$annotation"
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
-             
                 $TraversalState.FolderCount++
                 $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
             }
             else {
-         
                 $TraversalState.FolderCount++
                 $output += $line
             }

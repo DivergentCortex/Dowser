@@ -70,13 +70,16 @@ function Measure-DowserDirectory {
                 $subFolderItems = Get-ChildItem $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue |
                     Where-Object { -not $_.PSIsContainer }
 
-                $totalSize   = ($subFolderItems | Measure-Object -Property Length -Sum).Sum
+                $totalSize = ($subFolderItems | Measure-Object -Property Length -Sum).Sum
                 $largestItem = $subFolderItems | Sort-Object Length | Select-Object -Last 1
                 $largestSize = if ($largestItem) {
                     ($largestItem.Length | ForEach-Object { Format-DowserSize -DataValue $_ })
-                } else { '0B' }
-                $newestFile  = $subFolderItems | Sort-Object LastWriteTime | Select-Object -Last 1
-                $oldestFile  = $subFolderItems | Sort-Object LastWriteTime | Select-Object -First 1
+                }
+                else {
+                    '0B' 
+                }
+                $newestFile = $subFolderItems | Sort-Object LastWriteTime | Select-Object -Last 1
+                $oldestFile = $subFolderItems | Sort-Object LastWriteTime | Select-Object -First 1
 
                 [PSCustomObject][Ordered]@{
                     Directory       = $dir.FullName

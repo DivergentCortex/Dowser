@@ -50,7 +50,7 @@ function Get-DowserTemplate {
         $resolvedPath = (Resolve-Path $Path).ProviderPath
 
         try {
-            $shell  = New-Object -ComObject Shell.Application
+            $shell = New-Object -ComObject Shell.Application
             $folder = $shell.Namespace($resolvedPath)
 
             if (-not $folder) {
@@ -68,17 +68,17 @@ function Get-DowserTemplate {
                 $name = $folder.GetDetailsOf($folder.Items(), $i)
                 if ($name) {
                     $columns.Add([PSCustomObject]@{
-                        Index = $i
-                        Name  = $name
-                    })
+                            Index = $i
+                            Name  = $name
+                        })
                 }
             }
             Write-Progress -Activity "Get-DowserTemplate" -Completed
 
             [PSCustomObject]@{
-                Path      = $resolvedPath
-                ViewMode  = $viewMode
-                Columns   = $columns.ToArray()
+                Path     = $resolvedPath
+                ViewMode = $viewMode
+                Columns  = $columns.ToArray()
             }
         }
         catch {

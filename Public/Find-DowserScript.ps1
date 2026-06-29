@@ -73,18 +73,27 @@ function Find-DowserScript {
                     ErrorAction = 'SilentlyContinue'
                 }
 
-                $files    = Get-ChildItem @getAllParams
-                $total    = @($files).Count
+                $files = Get-ChildItem @getAllParams
+                $total = @($files).Count
                 $processed = 0
 
                 foreach ($file in $files) {
                     $processed++
                     $ext = [System.IO.Path]::GetExtension($file.Name)
 
-                    if ($Extensions -notcontains $ext) { continue }
-                    if ($cutoff -and $file.LastWriteTime -lt $cutoff) { continue }
+                    if ($Extensions -notcontains $ext) {
+                        continue 
+                    }
+                    if ($cutoff -and $file.LastWriteTime -lt $cutoff) {
+                        continue 
+                    }
 
-                    $percentComplete = if ($total -gt 0) { ($processed / $total) * 100 } else { 0 }
+                    $percentComplete = if ($total -gt 0) {
+                        ($processed / $total) * 100 
+                    }
+                    else {
+                        0 
+                    }
                     Write-Progress -Activity "Find-DowserScript" -Status "Scanning $($file.FullName)" -PercentComplete $percentComplete
 
                     [PSCustomObject]@{

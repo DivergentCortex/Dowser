@@ -134,7 +134,7 @@ Register-ArgumentCompleter -CommandName Invoke-DowserNumericSort -ParameterName 
             Select-Object -First 1
         if ($variableAst) {
             $variableName = $variableAst.VariablePath.UserPath
-            $inputObject  = Get-Variable -Name $variableName -ValueOnly -ErrorAction SilentlyContinue
+            $inputObject = Get-Variable -Name $variableName -ValueOnly -ErrorAction SilentlyContinue
         }
     }
 

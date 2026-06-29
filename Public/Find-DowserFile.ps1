@@ -97,7 +97,8 @@ function Find-DowserFile {
                 $topLevelItems = Get-ChildItem -Path $p -Directory -ErrorAction SilentlyContinue
                 if ($Recurse) {
                     $scanTargets = @($p) + @($topLevelItems.FullName)
-                } else {
+                }
+                else {
                     $scanTargets = @($p)
                 }
 
@@ -106,20 +107,32 @@ function Find-DowserFile {
                     $res = @()
                     foreach ($targetPath in $chunk) {
                         $params = @{
-                            Path = $targetPath
-                            File = $true
+                            Path        = $targetPath
+                            File        = $true
                             ErrorAction = 'SilentlyContinue'
-                            Force = $true
+                            Force       = $true
                         }
-                        if ($recurse) { $params['Recurse'] = $true }
-                        if ($pattern -ne "*") { $params['Filter'] = $pattern }
+                        if ($recurse) {
+                            $params['Recurse'] = $true 
+                        }
+                        if ($pattern -ne "*") {
+                            $params['Filter'] = $pattern 
+                        }
 
                         Get-ChildItem @params | ForEach-Object {
                             $ok = $true
-                            if ($min -and $_.Length -lt $min) { $ok = $false }
-                            if ($max -and $_.Length -gt $max) { $ok = $false }
-                            if ($after -and $_.LastWriteTime -lt $after) { $ok = $false }
-                            if ($before -and $_.LastWriteTime -gt $before) { $ok = $false }
+                            if ($min -and $_.Length -lt $min) {
+                                $ok = $false 
+                            }
+                            if ($max -and $_.Length -gt $max) {
+                                $ok = $false 
+                            }
+                            if ($after -and $_.LastWriteTime -lt $after) {
+                                $ok = $false 
+                            }
+                            if ($before -and $_.LastWriteTime -gt $before) {
+                                $ok = $false 
+                            }
 
                             if ($ok) {
                                 $res += $_.FullName
@@ -131,27 +144,42 @@ function Find-DowserFile {
 
                 $results = Invoke-DowserRunspacePool -InputObject $scanTargets -ScriptBlock $scriptBlock -ArgumentList @($Pattern, $Recurse, $minBytes, $maxBytes, $ModifiedAfter, $ModifiedBefore) -ThreadCount $ThreadCount -ProgressActivity "Scanning Files" -ProgressStatus "Scanning targets..."
                 
-                foreach ($r in $results) { $filesFound.Add($r) }
-            } else {
-                $params = @{
-                    Path = $p
-                    Recurse = $Recurse
-                    File = $true
-                    ErrorAction = 'SilentlyContinue'
-                    Force = $true
+                foreach ($r in $results) {
+                    $filesFound.Add($r) 
                 }
-                if ($Pattern -ne "*") { $params['Filter'] = $Pattern }
+            }
+            else {
+                $params = @{
+                    Path        = $p
+                    Recurse     = $Recurse
+                    File        = $true
+                    ErrorAction = 'SilentlyContinue'
+                    Force       = $true
+                }
+                if ($Pattern -ne "*") {
+                    $params['Filter'] = $Pattern 
+                }
                 
                 Get-ChildItem @params | ForEach-Object {
                     $ok = $true
-                    if ($minBytes -and $_.Length -lt $minBytes) { $ok = $false }
-                    if ($maxBytes -and $_.Length -gt $maxBytes) { $ok = $false }
-                    if ($ModifiedAfter -and $_.LastWriteTime -lt $ModifiedAfter) { $ok = $false }
-                    if ($ModifiedBefore -and $_.LastWriteTime -gt $ModifiedBefore) { $ok = $false }
+                    if ($minBytes -and $_.Length -lt $minBytes) {
+                        $ok = $false 
+                    }
+                    if ($maxBytes -and $_.Length -gt $maxBytes) {
+                        $ok = $false 
+                    }
+                    if ($ModifiedAfter -and $_.LastWriteTime -lt $ModifiedAfter) {
+                        $ok = $false 
+                    }
+                    if ($ModifiedBefore -and $_.LastWriteTime -gt $ModifiedBefore) {
+                        $ok = $false 
+                    }
 
                     if ($ok) {
                         $filesFound.Add($_.FullName)
-                        if ($StopOnFirstMatch) { return }
+                        if ($StopOnFirstMatch) {
+                            return 
+                        }
                     }
                 }
             }
@@ -172,7 +200,8 @@ function Find-DowserFile {
                         LastWriteTime = $firstFile.LastWriteTime
                         CreationTime  = $firstFile.CreationTime
                     }
-                } else {
+                }
+                else {
                     $allPaths | ForEach-Object {
                         $f = Get-Item -LiteralPath $_ -ErrorAction SilentlyContinue
                         [PSCustomObject]@{

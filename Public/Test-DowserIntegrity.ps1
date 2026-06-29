@@ -135,7 +135,12 @@ function Test-DowserIntegrity {
 
         [string]$Filter = '*',
 
-        [string]$SevenZipPath = $(if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }),
+        [string]$SevenZipPath = $(if ($IsWindows -eq $false) {
+                '7z' 
+            }
+            else {
+                Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' 
+            }),
 
         [switch]$SkipSevenZip,
 
@@ -180,7 +185,12 @@ function Test-DowserIntegrity {
             Write-Verbose '7-Zip not available. Native-only validation for archives.'
         }
 
-        $expandExe = if ($IsWindows -eq $false) { $null } else { Join-Path $env:SystemRoot 'System32\expand.exe' }
+        $expandExe = if ($IsWindows -eq $false) {
+            $null 
+        }
+        else {
+            Join-Path $env:SystemRoot 'System32\expand.exe' 
+        }
         $hasExpand = $expandExe -and (Test-Path $expandExe)
 
         try {
@@ -667,12 +677,24 @@ function Test-DowserIntegrity {
                 $ext = $file.Extension.ToLowerInvariant()
 
                 $category = 'Generic'
-                if     ($peExts      -contains $ext) { $category = 'PE' }
-                elseif ($archiveExts -contains $ext) { $category = 'Archive' }
-                elseif ($xmlExts     -contains $ext) { $category = 'Xml' }
-                elseif ($jsonExts    -contains $ext) { $category = 'Json' }
-                elseif ($psExts      -contains $ext) { $category = 'PowerShell' }
-                elseif ($textExts    -contains $ext) { $category = 'Text' }
+                if ($peExts -contains $ext) {
+                    $category = 'PE' 
+                }
+                elseif ($archiveExts -contains $ext) {
+                    $category = 'Archive' 
+                }
+                elseif ($xmlExts -contains $ext) {
+                    $category = 'Xml' 
+                }
+                elseif ($jsonExts -contains $ext) {
+                    $category = 'Json' 
+                }
+                elseif ($psExts -contains $ext) {
+                    $category = 'PowerShell' 
+                }
+                elseif ($textExts -contains $ext) {
+                    $category = 'Text' 
+                }
 
                 $result = New-IntegrityResult -File $file -Category $category -RelPath $relPath
 

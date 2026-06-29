@@ -37,8 +37,8 @@ function Get-DowserOwnership {
         param([string] $File)
         if (Test-Path $File) {
             return Get-Item $File | Select-Object Name, FullName,
-                @{N = 'Size'; E = { Format-DowserSize -DataValue $_.Length } },
-                IsReadOnly, LastWriteTime
+            @{N = 'Size'; E = { Format-DowserSize -DataValue $_.Length } },
+            IsReadOnly, LastWriteTime
         }
         return
     }
@@ -65,22 +65,28 @@ function Get-DowserOwnership {
             [switch] $Signature,
             [switch] $AsHashTable
         )
-        Process {
+        process {
             foreach ($F in $File) {
                 $MetaDataObject = [ordered] @{}
                 if ($F -is [string]) {
                     if ($F -and (Test-Path -LiteralPath $F)) {
                         $FileInformation = Get-ItemProperty -Path $F
-                        if ($FileInformation -is [System.IO.DirectoryInfo]) { continue }
-                    } else {
+                        if ($FileInformation -is [System.IO.DirectoryInfo]) {
+                            continue 
+                        }
+                    }
+                    else {
                         Write-Warning "Get-FileMetaData - Doesn't exists. Skipping $F."
                         continue
                     }
-                } elseif ($F -is [System.IO.DirectoryInfo]) {
+                }
+                elseif ($F -is [System.IO.DirectoryInfo]) {
                     continue
-                } elseif ($F -is [System.IO.FileInfo]) {
+                }
+                elseif ($F -is [System.IO.FileInfo]) {
                     $FileInformation = $F
-                } else {
+                }
+                else {
                     Write-Warning "Get-FileMetaData - Only files are supported. Skipping $F."
                     continue
                 }
@@ -88,21 +94,22 @@ function Get-DowserOwnership {
                 # com metadata is windows only, fall back to unix fileinfo elsewhere
                 # $IsWindows is null on 5.1 so -ne $false means windows
                 $ShellApplication = $null
-                $ShellFolder      = $null
-                $ShellFile        = $null
+                $ShellFolder = $null
+                $ShellFile = $null
                 if ($IsWindows -ne $false) {
                     try {
                         $ShellApplication = New-Object -ComObject Shell.Application -ErrorAction Stop
                         $ShellFolder = $ShellApplication.Namespace($FileInformation.Directory.FullName)
-                        $ShellFile   = $ShellFolder.ParseName($FileInformation.Name)
-                    } catch {
+                        $ShellFile = $ShellFolder.ParseName($FileInformation.Name)
+                    }
+                    catch {
                         Write-Verbose "Shell.Application COM not available on this platform; skipping extended metadata."
                     }
                 }
                 if ($IsWindows -eq $false) {
                     # user/group/unixmode come from get-item on pwsh core unix
-                    $MetaDataObject['Owner']    = $FileInformation.User
-                    $MetaDataObject['Group']    = $FileInformation.Group
+                    $MetaDataObject['Owner'] = $FileInformation.User
+                    $MetaDataObject['Group'] = $FileInformation.Group
                     $MetaDataObject['UnixMode'] = $FileInformation.UnixMode
                     $MetaDataObject['PlatformNote'] = 'Unix ownership via .NET FileInfo; Shell.Application extended metadata is Windows-only and was skipped.'
                 }
@@ -111,20 +118,31 @@ function Get-DowserOwnership {
                     $MetaDataObject['IsReadOnly'] = $FileInformation.IsReadOnly
                     $MetaDataObject['IsHidden'] = $FileInformation.Attributes -like '*Hidden*'
                     $MetaDataObject['IsSystem'] = $FileInformation.Attributes -like '*System*'
-                    if ($AsHashTable) { $MetaDataObject } else { [PSCustomObject]$MetaDataObject }
+                    if ($AsHashTable) {
+                        $MetaDataObject 
+                    }
+                    else {
+                        [PSCustomObject]$MetaDataObject 
+                    }
                     continue
                 }
                 $MetaDataProperties = [ordered] @{}
                 0..400 | ForEach-Object -Process {
                     $DataValue = $ShellFolder.GetDetailsOf($null, $_)
                     $PropertyValue = (Get-Culture).TextInfo.ToTitleCase($DataValue.Trim()).Replace(' ', '')
-                    if ($PropertyValue -ne '') { $MetaDataProperties["$_"] = $PropertyValue }
+                    if ($PropertyValue -ne '') {
+                        $MetaDataProperties["$_"] = $PropertyValue 
+                    }
                 }
                 foreach ($Key in $MetaDataProperties.Keys) {
                     $Property = $MetaDataProperties[$Key]
                     $Value = $ShellFolder.GetDetailsOf($ShellFile, [int] $Key)
-                    if ($Property -in 'Attributes', 'Folder', 'Type', 'SpaceFree', 'TotalSize', 'SpaceUsed') { continue }
-                    If (($null -ne $Value) -and ($Value -ne '')) { $MetaDataObject["$Property"] = $Value }
+                    if ($Property -in 'Attributes', 'Folder', 'Type', 'SpaceFree', 'TotalSize', 'SpaceUsed') {
+                        continue 
+                    }
+                    if (($null -ne $Value) -and ($Value -ne '')) {
+                        $MetaDataObject["$Property"] = $Value 
+                    }
                 }
                 if ($FileInformation.VersionInfo) {
                     $SplitInfo = ([string] $FileInformation.VersionInfo).Split([char]13)
@@ -133,7 +151,8 @@ function Get-DowserOwnership {
                         if ($Property[0] -and $Property[1] -ne '') {
                             if ($Property[1] -in 'False', 'True') {
                                 $MetaDataObject["$($Property[0])"] = [bool] $Property[1]
-                            } else {
+                            }
+                            else {
                                 $MetaDataObject["$($Property[0])"] = $Property[1]
                             }
                         }
@@ -157,7 +176,12 @@ function Get-DowserOwnership {
                 if ($HashAlgorithm -ne 'None') {
                     $MetaDataObject[$HashAlgorithm] = (Get-FileHash -LiteralPath $FileInformation.FullName -Algorithm $HashAlgorithm).Hash
                 }
-                if ($AsHashTable) { $MetaDataObject } else { [PSCustomObject] $MetaDataObject }
+                if ($AsHashTable) {
+                    $MetaDataObject 
+                }
+                else {
+                    [PSCustomObject] $MetaDataObject 
+                }
             }
         }
     }

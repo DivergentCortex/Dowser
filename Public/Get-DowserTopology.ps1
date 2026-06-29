@@ -40,7 +40,7 @@ function Get-DowserTopology {
     [CmdletBinding(DefaultParameterSetName = "Path")]
     [Alias("pstree", "shtree")]
 
-    Param(
+    param(
         [Parameter(
             Position = 0,
             ParameterSetName = "Path",
@@ -76,16 +76,18 @@ function Get-DowserTopology {
         [string[]]$ShowProperty
     )
 
-    DynamicParam {
+    dynamicparam {
         if ($PSBoundParameters.ContainsKey("Path")) {
             $here = $PSBoundParameters["Path"]
-        } elseif ($PSBoundParameters.ContainsKey("LiteralPath")) {
+        }
+        elseif ($PSBoundParameters.ContainsKey("LiteralPath")) {
             $here = $PSBoundParameters["LiteralPath"]
-        } else {
+        }
+        else {
             $here = (Get-Location).path
         }
         if (
-            ((Get-Item -Path $here -ErrorAction SilentlyContinue).PSprovider.Name -eq 'FileSystem') -OR
+            ((Get-Item -Path $here -ErrorAction SilentlyContinue).PSprovider.Name -eq 'FileSystem') -or
             ((Get-Item -LiteralPath $here -ErrorAction SilentlyContinue).PSprovider.Name -eq 'FileSystem')
         ) {
             $attributes = New-Object System.Management.Automation.ParameterAttribute
@@ -101,9 +103,9 @@ function Get-DowserTopology {
         }
     }
 
-    Begin {
+    begin {
         Write-Verbose "Starting $($MyInvocation.MyCommand)"
-        if (-Not $Path -and $PSCmdlet.ParameterSetName -eq "Path") {
+        if (-not $Path -and $PSCmdlet.ParameterSetName -eq "Path") {
             $Path = Get-Location
         }
 
@@ -111,24 +113,35 @@ function Get-DowserTopology {
             # PSAnsiFileMap is ps7+ only, null on 5.1 and indexing null-refs
             if ($PSVersionTable.PSVersion.Major -ge 7) {
                 $Colorize = $True
-                $script:top   = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi
+                $script:top = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi
                 $script:child = ($global:PSAnsiFileMap).where({ $_.description -eq 'ChildContainer' }).Ansi
-            } else {
+            }
+            else {
                 Write-Warning "Get-DowserTopology -InColor requires PowerShell 7+ (PSAnsiFileMap). Rendering without color."
             }
         }
 
         function GetIndentString {
             [CmdletBinding()]
-            Param([bool[]]$IsLast)
+            param([bool[]]$IsLast)
             Write-Verbose "Starting $($MyInvocation.MyCommand)"
             $str = ''
             for ($i = 0; $i -lt $IsLast.Count - 1; $i++) {
-                $sepChar = if ($IsLast[$i]) { ' ' } else { '|' }
+                $sepChar = if ($IsLast[$i]) {
+                    ' ' 
+                }
+                else {
+                    '|' 
+                }
                 $str += "$sepChar"
                 $str += " " * ($IndentSize - 1)
             }
-            $teeChar = if ($IsLast[-1]) { '\' } else { '+' }
+            $teeChar = if ($IsLast[-1]) {
+                '\' 
+            }
+            else {
+                '+' 
+            }
             $str += "$teeChar"
             $str += "-" * ($IndentSize - 1)
             $str
@@ -137,7 +150,7 @@ function Get-DowserTopology {
 
         function ShowProperty() {
             [cmdletbinding()]
-            Param(
+            param(
                 [string]$Name,
                 [string]$Value,
                 [bool[]]$IsLast
@@ -149,7 +162,8 @@ function Get-DowserTopology {
             if ($Value.Length -gt $availableWidth) {
                 $ellipsis = '...'
                 $val = $Value.Substring(0, $availableWidth - $ellipsis.Length) + $ellipsis
-            } else {
+            }
+            else {
                 $val = $Value
             }
             $propStr += $val
@@ -159,7 +173,7 @@ function Get-DowserTopology {
 
         function ShowItem {
             [CmdletBinding()]
-            Param(
+            param(
                 [string]$Path,
                 [string]$Name,
                 [bool[]]$IsLast,
@@ -173,13 +187,15 @@ function Get-DowserTopology {
             if ($IsLast.Count -eq 0) {
                 if ($Color) {
                     Write-Output "$($script:top)$("$(Resolve-Path $Path)")$([char]0x1b)[0m"
-                } else {
+                }
+                else {
                     "$(Resolve-Path $Path)"
                 }
-            } else {
+            }
+            else {
                 $indentStr = GetIndentString $IsLast
                 if ($Color) {
-                    Switch ($ItemType) {
+                    switch ($ItemType) {
                         "topcontainer" {
                             Write-Output "$indentStr$($script:top)$($Name)$([char]0x1b)[0m"
                         }
@@ -188,22 +204,23 @@ function Get-DowserTopology {
                         }
                         "file" {
                             foreach ($item in ($global:PSAnsiFileMap | Where-Object Pattern)) {
-                                if ($name -match $item.pattern -AND (-not $done)) {
+                                if ($name -match $item.pattern -and (-not $done)) {
                                     Write-Verbose "Detected a $($item.description) file"
                                     Write-Output "$indentStr$($item.ansi)$($Name)$([char]0x1b)[0m"
                                     $done = $True
                                 }
                             }
-                            if (-Not $done) {
+                            if (-not $done) {
                                 Write-Verbose "No ansi match for $Name"
                                 Write-Output "$indentStr$Name$([char]0x1b)[0m"
                             }
                         }
-                        Default {
+                        default {
                             Write-Output "$indentStr$Name"
                         }
                     }
-                } else {
+                }
+                else {
                     "$indentStr$Name"
                 }
             }
@@ -214,15 +231,16 @@ function Get-DowserTopology {
                 $props = @(Get-ItemProperty $Path -ea 0)
                 if ($props[0] -is [PSCustomObject]) {
                     if ($ShowProperty -eq "*") {
-                        $props = @($props[0].PSObject.properties | Where-Object { $excludedProviderNoteProps -NotContains $_.Name })
-                    } else {
+                        $props = @($props[0].PSObject.properties | Where-Object { $excludedProviderNoteProps -notcontains $_.Name })
+                    }
+                    else {
                         $props = @($props[0].PSObject.properties |
-                            Where-Object { $excludedProviderNoteProps -NotContains $_.Name -AND $showproperty -contains $_.name })
+                                Where-Object { $excludedProviderNoteProps -notcontains $_.Name -and $showproperty -contains $_.name })
                     }
                 }
                 for ($i = 0; $i -lt $props.Count; $i++) {
                     $prop = $props[$i]
-                    $IsLast[-1] = ($i -eq $props.count - 1) -and (-Not $HasChildItems)
+                    $IsLast[-1] = ($i -eq $props.count - 1) -and (-not $HasChildItems)
                     $showParams = @{
                         Name   = $prop.Name
                         Value  = $prop.Value
@@ -236,7 +254,7 @@ function Get-DowserTopology {
 
         function ShowContainer {
             [CmdletBinding()]
-            Param (
+            param (
                 [string]$Path,
                 [string]$Name = $(Split-Path $Path -Leaf),
                 [bool[]]$IsLast = @(),
@@ -245,7 +263,9 @@ function Get-DowserTopology {
             )
             Write-Verbose "Starting $($MyInvocation.MyCommand) on $Path"
             $PSBoundParameters | Out-String | Write-Verbose
-            if ($IsLast.Count -gt $Depth) { return }
+            if ($IsLast.Count -gt $Depth) {
+                return 
+            }
 
             $childItems = @()
             if ($IsLast.Count -lt $Depth) {
@@ -253,11 +273,11 @@ function Get-DowserTopology {
                     $rPath = Resolve-Path -LiteralPath $Path -ErrorAction Stop
                 }
                 catch {
-                    Throw "Failed to resolve $path. This PSProvider and path may be incompatible with this command."
+                    throw "Failed to resolve $path. This PSProvider and path may be incompatible with this command."
                     return
                 }
                 $childItems = @(Get-ChildItem $rPath -ErrorAction $ErrorActionPreference |
-                    Where-Object { $ShowItem -or $_.PSIsContainer })
+                        Where-Object { $ShowItem -or $_.PSIsContainer })
             }
             $hasChildItems = $childItems.Count -gt 0
 
@@ -267,7 +287,12 @@ function Get-DowserTopology {
                 IsLast        = $IsLast
                 hasChildItems = $hasChildItems
                 Color         = $Color
-                ItemType      = If ($isTop) { "topcontainer" } else { "childcontainer" }
+                ItemType      = if ($isTop) {
+                    "topcontainer" 
+                }
+                else {
+                    "childcontainer" 
+                }
             }
             ShowItem @sParams
 
@@ -283,7 +308,8 @@ function Get-DowserTopology {
                         Color  = $color
                     }
                     ShowContainer @iParams
-                } elseif ($ShowItem) {
+                }
+                elseif ($ShowItem) {
                     $unresolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($childItem.PSPath)
                     $name = Split-Path $unresolvedPath -Leaf
                     $iParams = @{
@@ -300,11 +326,12 @@ function Get-DowserTopology {
         }
     }
 
-    Process {
+    process {
         Write-Verbose "Detected parameter set $($PSCmdlet.ParameterSetName)"
         if ($PSCmdlet.ParameterSetName -eq "Path") {
             $resolvedPaths = @($Path | Resolve-Path | ForEach-Object { $_.Path })
-        } else {
+        }
+        else {
             $resolvedPaths = @($LiteralPath)
         }
         Write-Verbose "Using these PSBoundParameters"

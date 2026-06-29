@@ -74,7 +74,12 @@ function Test-DowserExtractable {
 
         [string]$Filter = '*.exe',
 
-        [string]$SevenZipPath = $(if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }),
+        [string]$SevenZipPath = $(if ($IsWindows -eq $false) {
+                '7z' 
+            }
+            else {
+                Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' 
+            }),
 
         [switch]$SkipSevenZip
     )
@@ -83,12 +88,21 @@ function Test-DowserExtractable {
         $has7Zip = $false
         if (-not $SkipSevenZip) {
             $has7Zip = Test-Path -LiteralPath $SevenZipPath
-            if ($has7Zip) { Write-Verbose "7-Zip found at: $SevenZipPath" }
-            else { Write-Verbose "7-Zip not found at $SevenZipPath - static analysis only" }
+            if ($has7Zip) {
+                Write-Verbose "7-Zip found at: $SevenZipPath" 
+            }
+            else {
+                Write-Verbose "7-Zip not found at $SevenZipPath - static analysis only" 
+            }
         }
 
         # expand.exe for native CAB detection
-        $expandExe = if ($IsWindows -eq $false) { $null } else { Join-Path $env:SystemRoot 'System32\expand.exe' }
+        $expandExe = if ($IsWindows -eq $false) {
+            $null 
+        }
+        else {
+            Join-Path $env:SystemRoot 'System32\expand.exe' 
+        }
         $hasExpand = $expandExe -and (Test-Path $expandExe)
 
         # -------------------------------------------------------------------
@@ -118,9 +132,9 @@ function Test-DowserExtractable {
         # Framework-specific PE section names [HIGH_CONFIDENCE]
         # -------------------------------------------------------------------
         $sectionFingerprints = @{
-            '.ndata'        = @{ Framework = 'NSIS';       Extractable = $true;  Note = 'NSIS installer - unique section' }
-            '.wixburn'      = @{ Framework = 'WiX_Burn';   Extractable = $true;  Note = 'WiX Burn bootstrapper' }
-            '.go.buildinfo' = @{ Framework = 'Go_Native';  Extractable = $false; Note = 'Go binary (1.13+)' }
+            '.ndata'        = @{ Framework = 'NSIS'; Extractable = $true; Note = 'NSIS installer - unique section' }
+            '.wixburn'      = @{ Framework = 'WiX_Burn'; Extractable = $true; Note = 'WiX Burn bootstrapper' }
+            '.go.buildinfo' = @{ Framework = 'Go_Native'; Extractable = $false; Note = 'Go binary (1.13+)' }
         }
         # UPX and Delphi checked separately (need multiple section matches)
 
@@ -128,36 +142,36 @@ function Test-DowserExtractable {
         # VersionInfo fingerprints (expanded from research)
         # -------------------------------------------------------------------
         $frameworkFingerprints = [ordered]@{
-            'NSIS'             = @{ Patterns = @('Nullsoft', 'NSIS', 'Nullsoft Install System'); Extractable = $true }
-            'InnoSetup'        = @{ Patterns = @('Inno Setup', 'Jordan Russell', 'Martijn Laan'); Extractable = $true }
-            'InstallShield'    = @{ Patterns = @('InstallShield', 'Flexera', 'Acresso', 'Macrovision'); Extractable = $true }
-            'WiX'              = @{ Patterns = @('Windows Installer XML', 'WiX Toolset'); Extractable = $true }
-            'WinRAR_SFX'       = @{ Patterns = @('WinRAR SFX', 'WinRAR self-extracting', 'WinRAR archiver', 'Alexander Roshal', 'win.rar GmbH'); Extractable = $true }
-            '7Zip_SFX'         = @{ Patterns = @('7-Zip Self-extracting', '7-Zip SFX', '7z SFX', 'Igor Pavlov'); Extractable = $true }
-            'WinZip_SFX'       = @{ Patterns = @('WinZip Self-Extractor', 'WZSFX', 'WZSEPE32'); Extractable = $true }
-            'IExpress'         = @{ Patterns = @('IExpress'); Extractable = $true }
-            'AdvancedInstaller'= @{ Patterns = @('Caphyon', 'Advanced Installer'); Extractable = $true }
-            'InstallAware'     = @{ Patterns = @('InstallAware Software'); Extractable = $false }
-            'ps2exe'           = @{ Patterns = @('PS2EXE', 'ps2exe', 'Ingo Karstein', 'Markus Scholtes', 'MScholtes'); Extractable = $false }
-            'AutoIt'           = @{ Patterns = @('AutoIt v3 Script', 'AutoIt Team', 'Jonathan Bennett', 'Aut2Exe'); Extractable = $false }
-            'AutoHotkey'       = @{ Patterns = @('AutoHotkey Foundation', 'AutoHotkey.com'); Extractable = $false }
-            'PyInstaller'      = @{ Patterns = @('PyInstaller'); Extractable = $false }
-            'Electron'         = @{ Patterns = @('Electron'); Extractable = $false }
-            'Squirrel'         = @{ Patterns = @('Squirrel.Windows'); Extractable = $false }
+            'NSIS'              = @{ Patterns = @('Nullsoft', 'NSIS', 'Nullsoft Install System'); Extractable = $true }
+            'InnoSetup'         = @{ Patterns = @('Inno Setup', 'Jordan Russell', 'Martijn Laan'); Extractable = $true }
+            'InstallShield'     = @{ Patterns = @('InstallShield', 'Flexera', 'Acresso', 'Macrovision'); Extractable = $true }
+            'WiX'               = @{ Patterns = @('Windows Installer XML', 'WiX Toolset'); Extractable = $true }
+            'WinRAR_SFX'        = @{ Patterns = @('WinRAR SFX', 'WinRAR self-extracting', 'WinRAR archiver', 'Alexander Roshal', 'win.rar GmbH'); Extractable = $true }
+            '7Zip_SFX'          = @{ Patterns = @('7-Zip Self-extracting', '7-Zip SFX', '7z SFX', 'Igor Pavlov'); Extractable = $true }
+            'WinZip_SFX'        = @{ Patterns = @('WinZip Self-Extractor', 'WZSFX', 'WZSEPE32'); Extractable = $true }
+            'IExpress'          = @{ Patterns = @('IExpress'); Extractable = $true }
+            'AdvancedInstaller' = @{ Patterns = @('Caphyon', 'Advanced Installer'); Extractable = $true }
+            'InstallAware'      = @{ Patterns = @('InstallAware Software'); Extractable = $false }
+            'ps2exe'            = @{ Patterns = @('PS2EXE', 'ps2exe', 'Ingo Karstein', 'Markus Scholtes', 'MScholtes'); Extractable = $false }
+            'AutoIt'            = @{ Patterns = @('AutoIt v3 Script', 'AutoIt Team', 'Jonathan Bennett', 'Aut2Exe'); Extractable = $false }
+            'AutoHotkey'        = @{ Patterns = @('AutoHotkey Foundation', 'AutoHotkey.com'); Extractable = $false }
+            'PyInstaller'       = @{ Patterns = @('PyInstaller'); Extractable = $false }
+            'Electron'          = @{ Patterns = @('Electron'); Extractable = $false }
+            'Squirrel'          = @{ Patterns = @('Squirrel.Windows'); Extractable = $false }
         }
 
         # Also check OriginalFilename separately (very reliable for some tools)
         $originalFilenameFingerprints = @{
-            'AutoHotkey.exe'   = @{ Framework = 'AutoHotkey';  Extractable = $false }
-            'AutoHotkey64.exe' = @{ Framework = 'AutoHotkey';  Extractable = $false }
-            'AutoIt3.exe'      = @{ Framework = 'AutoIt';      Extractable = $false }
-            '7z.sfx'           = @{ Framework = '7Zip_SFX';    Extractable = $true }
-            '7zS.sfx'          = @{ Framework = '7Zip_SFX';    Extractable = $true }
-            '7zSD.sfx'         = @{ Framework = '7Zip_SFX';    Extractable = $true }
-            'Default.SFX'      = @{ Framework = 'WinRAR_SFX';  Extractable = $true }
-            'WinCon.SFX'       = @{ Framework = 'WinRAR_SFX';  Extractable = $true }
-            'WZSFX.EXE'        = @{ Framework = 'WinZip_SFX';  Extractable = $true }
-            'WZSEPE32.EXE'     = @{ Framework = 'WinZip_SFX';  Extractable = $true }
+            'AutoHotkey.exe'   = @{ Framework = 'AutoHotkey'; Extractable = $false }
+            'AutoHotkey64.exe' = @{ Framework = 'AutoHotkey'; Extractable = $false }
+            'AutoIt3.exe'      = @{ Framework = 'AutoIt'; Extractable = $false }
+            '7z.sfx'           = @{ Framework = '7Zip_SFX'; Extractable = $true }
+            '7zS.sfx'          = @{ Framework = '7Zip_SFX'; Extractable = $true }
+            '7zSD.sfx'         = @{ Framework = '7Zip_SFX'; Extractable = $true }
+            'Default.SFX'      = @{ Framework = 'WinRAR_SFX'; Extractable = $true }
+            'WinCon.SFX'       = @{ Framework = 'WinRAR_SFX'; Extractable = $true }
+            'WZSFX.EXE'        = @{ Framework = 'WinZip_SFX'; Extractable = $true }
+            'WZSEPE32.EXE'     = @{ Framework = 'WinZip_SFX'; Extractable = $true }
         }
 
         # -------------------------------------------------------------------
@@ -165,12 +179,12 @@ function Test-DowserExtractable {
         # -------------------------------------------------------------------
         # Format: Name, Bytes, MinLength
         $overlaySignatures = @(
-            @{ Name = '7z';   Bytes = [byte[]]@(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C); Extractable = $true }
+            @{ Name = '7z'; Bytes = [byte[]]@(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C); Extractable = $true }
             @{ Name = 'RAR4'; Bytes = [byte[]]@(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00); Extractable = $true }
             @{ Name = 'RAR5'; Bytes = [byte[]]@(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00); Extractable = $true }
-            @{ Name = 'CAB';  Bytes = [byte[]]@(0x4D, 0x53, 0x43, 0x46); Extractable = $true }
-            @{ Name = 'WIM';  Bytes = [byte[]]@(0x4D, 0x53, 0x57, 0x49, 0x4D, 0x00, 0x00, 0x00); Extractable = $true }
-            @{ Name = 'MSI';  Bytes = [byte[]]@(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1); Extractable = $true }
+            @{ Name = 'CAB'; Bytes = [byte[]]@(0x4D, 0x53, 0x43, 0x46); Extractable = $true }
+            @{ Name = 'WIM'; Bytes = [byte[]]@(0x4D, 0x53, 0x57, 0x49, 0x4D, 0x00, 0x00, 0x00); Extractable = $true }
+            @{ Name = 'MSI'; Bytes = [byte[]]@(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1); Extractable = $true }
         )
 
         # ZIP EOCD signature for backward scan
@@ -191,9 +205,13 @@ function Test-DowserExtractable {
 
         function Test-ByteMatch {
             param([byte[]]$Source, [int]$Offset, [byte[]]$Pattern)
-            if ($Offset + $Pattern.Length -gt $Source.Length) { return $false }
+            if ($Offset + $Pattern.Length -gt $Source.Length) {
+                return $false 
+            }
             for ($i = 0; $i -lt $Pattern.Length; $i++) {
-                if ($Source[$Offset + $i] -ne $Pattern[$i]) { return $false }
+                if ($Source[$Offset + $i] -ne $Pattern[$i]) {
+                    return $false 
+                }
             }
             return $true
         }
@@ -205,9 +223,13 @@ function Test-DowserExtractable {
             for ($i = $Start; $i -le $limit; $i++) {
                 $match = $true
                 for ($j = 0; $j -lt $pLen; $j++) {
-                    if ($Source[$i + $j] -ne $Pattern[$j]) { $match = $false; break }
+                    if ($Source[$i + $j] -ne $Pattern[$j]) {
+                        $match = $false; break 
+                    }
                 }
-                if ($match) { return $i }
+                if ($match) {
+                    return $i 
+                }
             }
             return -1
         }
@@ -223,7 +245,9 @@ function Test-DowserExtractable {
                     File        = $true
                     ErrorAction = 'SilentlyContinue'
                 }
-                if ($Recurse) { $gciParams.Recurse = $true }
+                if ($Recurse) {
+                    $gciParams.Recurse = $true 
+                }
                 $exeFiles = @(Get-ChildItem @gciParams)
                 if ($exeFiles.Count -eq 0) {
                     Write-Warning "No files matching '$Filter' found in: $inputPath"
@@ -243,24 +267,24 @@ function Test-DowserExtractable {
                 Write-Verbose "Analyzing: $($file.FullName)"
 
                 $result = [PSCustomObject]@{
-                    Path             = $file.FullName
-                    Name             = $file.Name
-                    SizeBytes        = $file.Length
-                    Size             = Format-DowserSize -DataValue $file.Length
-                    IsPE             = $false
-                    IsNET            = $false
-                    Extractable      = $false
-                    Classification   = 'Unknown'
-                    InstallerType    = $null
-                    ArchiveType      = $null
-                    DetectionMethod  = 'None'
-                    Confidence       = 'None'
-                    FileCount        = 0
-                    Details          = ''
-                    SectionNames     = ''
-                    HasOverlay       = $false
-                    OverlaySize      = 0
-                    Detections       = [System.Collections.Generic.List[string]]::new()
+                    Path            = $file.FullName
+                    Name            = $file.Name
+                    SizeBytes       = $file.Length
+                    Size            = Format-DowserSize -DataValue $file.Length
+                    IsPE            = $false
+                    IsNET           = $false
+                    Extractable     = $false
+                    Classification  = 'Unknown'
+                    InstallerType   = $null
+                    ArchiveType     = $null
+                    DetectionMethod = 'None'
+                    Confidence      = 'None'
+                    FileCount       = 0
+                    Details         = ''
+                    SectionNames    = ''
+                    HasOverlay      = $false
+                    OverlaySize     = 0
+                    Detections      = [System.Collections.Generic.List[string]]::new()
                 }
 
                 # =============================================================
@@ -330,8 +354,8 @@ function Test-DowserExtractable {
                 # =============================================================
                 # Step 2: Parse COFF + Optional Header + COM_DESCRIPTOR
                 # =============================================================
-                $numSections    = [BitConverter]::ToUInt16($bytes, $peOffset + 6)
-                $sizeOfOptHdr   = [BitConverter]::ToUInt16($bytes, $peOffset + 20)
+                $numSections = [BitConverter]::ToUInt16($bytes, $peOffset + 6)
+                $sizeOfOptHdr = [BitConverter]::ToUInt16($bytes, $peOffset + 20)
                 $optHeaderStart = $peOffset + 24
                 $sectionTableOff = $optHeaderStart + $sizeOfOptHdr
 
@@ -344,14 +368,19 @@ function Test-DowserExtractable {
                 }
 
                 # COM_DESCRIPTOR (data directory index 14) - .NET detection
-                $ddBaseOffset = if ($isPE32Plus) { 112 } else { 96 }
+                $ddBaseOffset = if ($isPE32Plus) {
+                    112 
+                }
+                else {
+                    96 
+                }
                 $ddStart = $optHeaderStart + $ddBaseOffset
                 if ($ddStart + 4 -lt $bytes.Length) {
                     $numberOfRvaAndSizes = [BitConverter]::ToInt32($bytes, $ddStart)
                     if ($numberOfRvaAndSizes -gt 14) {
                         $comDescOff = $ddStart + 4 + (14 * 8)
                         if ($comDescOff + 8 -lt $bytes.Length) {
-                            $comRVA  = [BitConverter]::ToUInt32($bytes, $comDescOff)
+                            $comRVA = [BitConverter]::ToUInt32($bytes, $comDescOff)
                             $comSize = [BitConverter]::ToUInt32($bytes, $comDescOff + 4)
                             if ($comRVA -gt 0 -and $comSize -ge 72) {
                                 $result.IsNET = $true
@@ -369,13 +398,17 @@ function Test-DowserExtractable {
                 $maxSectionEnd = 0
                 for ($s = 0; $s -lt $numSections; $s++) {
                     $sOff = $sectionTableOff + ($s * 40)
-                    if ($sOff + 40 -gt $bytes.Length) { break }
-                    $sName   = [System.Text.Encoding]::ASCII.GetString($bytes, $sOff, 8).TrimEnd([char]0)
-                    $rawOff  = [BitConverter]::ToUInt32($bytes, $sOff + 20)
+                    if ($sOff + 40 -gt $bytes.Length) {
+                        break 
+                    }
+                    $sName = [System.Text.Encoding]::ASCII.GetString($bytes, $sOff, 8).TrimEnd([char]0)
+                    $rawOff = [BitConverter]::ToUInt32($bytes, $sOff + 20)
                     $rawSize = [BitConverter]::ToUInt32($bytes, $sOff + 16)
                     $sections += [PSCustomObject]@{ Name = $sName; RawOffset = $rawOff; RawSize = $rawSize }
                     $end = $rawOff + $rawSize
-                    if ($end -gt $maxSectionEnd) { $maxSectionEnd = $end }
+                    if ($end -gt $maxSectionEnd) {
+                        $maxSectionEnd = $end 
+                    }
                 }
                 $sectionNameList = $sections | ForEach-Object { $_.Name }
                 $result.SectionNames = $sectionNameList -join ', '
@@ -389,7 +422,12 @@ function Test-DowserExtractable {
                         if (-not $result.InstallerType) {
                             $result.InstallerType = $sfVal.Framework
                             $result.Extractable = $sfVal.Extractable
-                            $result.Classification = if ($sfVal.Extractable) { 'Extractable' } else { 'DecompileRequired' }
+                            $result.Classification = if ($sfVal.Extractable) {
+                                'Extractable' 
+                            }
+                            else {
+                                'DecompileRequired' 
+                            }
                             $result.DetectionMethod = 'SectionName'
                             $result.Confidence = 'High'
                             $result.Details = $sfVal.Note
@@ -547,7 +585,12 @@ function Test-DowserExtractable {
                         if (-not $result.InstallerType) {
                             $result.InstallerType = $ofFp.Framework
                             $result.Extractable = $ofFp.Extractable
-                            $result.Classification = if ($ofFp.Extractable) { 'Extractable' } else { 'DecompileRequired' }
+                            $result.Classification = if ($ofFp.Extractable) {
+                                'Extractable' 
+                            }
+                            else {
+                                'DecompileRequired' 
+                            }
                             $result.DetectionMethod = 'VersionInfo'
                             $result.Confidence = 'High'
                             $result.Details = "Matched OriginalFilename: $origFn"
@@ -564,7 +607,12 @@ function Test-DowserExtractable {
                                     if (-not $result.InstallerType) {
                                         $result.InstallerType = $fw.Key
                                         $result.Extractable = $fw.Value.Extractable
-                                        $result.Classification = if ($fw.Value.Extractable) { 'Extractable' } else { 'DecompileRequired' }
+                                        $result.Classification = if ($fw.Value.Extractable) {
+                                            'Extractable' 
+                                        }
+                                        else {
+                                            'DecompileRequired' 
+                                        }
                                         $result.DetectionMethod = 'VersionInfo'
                                         $result.Confidence = 'High'
                                         $result.Details = "Matched '$pattern' in version strings"
@@ -573,7 +621,9 @@ function Test-DowserExtractable {
                                     break
                                 }
                             }
-                            if ($matched) { break }
+                            if ($matched) {
+                                break 
+                            }
                         }
                     }
                 }
@@ -591,7 +641,10 @@ function Test-DowserExtractable {
                     $headStr = [System.Text.Encoding]::ASCII.GetString($bytes, 0, $scanEnd)
                     $tailStr = if ($tailStart -gt 0) {
                         [System.Text.Encoding]::ASCII.GetString($bytes, $tailStart, $bytes.Length - $tailStart)
-                    } else { '' }
+                    }
+                    else {
+                        '' 
+                    }
                     $scanText = $headStr + $tailStr
 
                     if ($scanText.Contains([char]0xFF + ' Go buildinf:') -or $scanText.Contains('.go.buildinfo')) {
@@ -731,21 +784,29 @@ function Test-DowserExtractable {
 
                         $separatorIndices = @()
                         for ($idx = 0; $idx -lt $7zLines.Count; $idx++) {
-                            if ($7zLines[$idx] -match '^-{10,}') { $separatorIndices += $idx }
+                            if ($7zLines[$idx] -match '^-{10,}') {
+                                $separatorIndices += $idx 
+                            }
                         }
 
                         $listedFileNames = @()
                         $listedDirCount = 0
                         if ($separatorIndices.Count -ge 2) {
                             $listStart = $separatorIndices[0] + 1
-                            $listEnd   = $separatorIndices[1] - 1
+                            $listEnd = $separatorIndices[1] - 1
                             for ($idx = $listStart; $idx -le $listEnd; $idx++) {
                                 $listLine = $7zLines[$idx]
-                                if ([string]::IsNullOrWhiteSpace($listLine)) { continue }
+                                if ([string]::IsNullOrWhiteSpace($listLine)) {
+                                    continue 
+                                }
                                 if ($listLine -match '[\.DRHSA]{5}\s+(\d+)\s+(\d+)\s+(.+)$') {
                                     $entryName = $Matches[3].Trim()
-                                    if ($listLine -match '\sD[\.RHSA]*\s') { $listedDirCount++ }
-                                    else { $listedFileNames += $entryName }
+                                    if ($listLine -match '\sD[\.RHSA]*\s') {
+                                        $listedDirCount++ 
+                                    }
+                                    else {
+                                        $listedFileNames += $entryName 
+                                    }
                                 }
                             }
                         }
@@ -755,9 +816,16 @@ function Test-DowserExtractable {
                         foreach ($name in $listedFileNames) {
                             $isPeSec = $false
                             foreach ($pat in $peSectionPatterns) {
-                                if ($name -match $pat) { $isPeSec = $true; break }
+                                if ($name -match $pat) {
+                                    $isPeSec = $true; break 
+                                }
                             }
-                            if ($isPeSec) { $peSections += $name } else { $realFiles += $name }
+                            if ($isPeSec) {
+                                $peSections += $name 
+                            }
+                            else {
+                                $realFiles += $name 
+                            }
                         }
 
                         $detectedArchiveType = $null
@@ -775,18 +843,30 @@ function Test-DowserExtractable {
                             $result.FileCount = $realFiles.Count
                             $result.DetectionMethod = '7Zip'
                             $result.Confidence = 'High'
-                            $result.ArchiveType = if ($detectedArchiveType) { $detectedArchiveType } else {
+                            $result.ArchiveType = if ($detectedArchiveType) {
+                                $detectedArchiveType 
+                            }
+                            else {
                                 ($foundTypes | Where-Object { $_ -notin $nonExtractable7zTypes } | Select-Object -First 1)
                             }
-                            if (-not $result.ArchiveType) { $result.ArchiveType = $foundTypes[0] }
+                            if (-not $result.ArchiveType) {
+                                $result.ArchiveType = $foundTypes[0] 
+                            }
                             $result.Details = "7-Zip: $($realFiles.Count) extractable files (Type: $($foundTypes -join ', '))"
                             $result.Detections.Add("7-Zip: Type=$($foundTypes -join ','), $($realFiles.Count) real files [HIGH_CONFIDENCE]")
                             Write-Verbose "  7-Zip: EXTRACTABLE - $($realFiles.Count) files, Type=$($foundTypes -join ', ')"
                         }
                         elseif ($peSections.Count -gt 0 -and $realFiles.Count -eq 0) {
                             $hasRsrc = [bool]($peSections | Where-Object { $_ -match '\.rsrc' })
-                            $classification = if ($hasRsrc -and -not $result.InstallerType) { 'ResourcesOnly' } else { $result.Classification }
-                            if ($classification -eq 'Unknown') { $classification = 'DecompileRequired' }
+                            $classification = if ($hasRsrc -and -not $result.InstallerType) {
+                                'ResourcesOnly' 
+                            }
+                            else {
+                                $result.Classification 
+                            }
+                            if ($classification -eq 'Unknown') {
+                                $classification = 'DecompileRequired' 
+                            }
                             $result.Extractable = $false
                             $result.Classification = $classification
                             $result.FileCount = 0

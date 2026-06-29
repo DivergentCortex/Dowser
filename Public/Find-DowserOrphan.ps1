@@ -54,7 +54,9 @@ function Find-DowserOrphan {
         $exclude = $false
         foreach ($ex in $ExcludePaths) {
             # match the segment on either path separator
-            if (($path -like "*\$ex\*") -or ($path -like "*/$ex/*")) { $exclude = $true; break }
+            if (($path -like "*\$ex\*") -or ($path -like "*/$ex/*")) {
+                $exclude = $true; break 
+            }
         }
         -not $exclude
     }
@@ -81,7 +83,9 @@ function Find-DowserOrphan {
 
         try {
             $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
-            if ([string]::IsNullOrWhiteSpace($content)) { continue }
+            if ([string]::IsNullOrWhiteSpace($content)) {
+                continue 
+            }
 
             $tokens = $content -split $splitPattern | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 

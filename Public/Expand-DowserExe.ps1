@@ -63,7 +63,12 @@ function Expand-DowserExe {
         [Parameter(Position = 1)]
         [string]$Destination,
 
-        [string]$SevenZipPath = $(if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }),
+        [string]$SevenZipPath = $(if ($IsWindows -eq $false) {
+                '7z' 
+            }
+            else {
+                Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' 
+            }),
 
         [switch]$Force,
 
@@ -132,7 +137,9 @@ function Expand-DowserExe {
 
                 Write-Verbose "Extracting $($file.Name) -> $dest"
                 $7zArgs = @('x', $file.FullName, "-o$dest", '-y')
-                if ($Force) { $7zArgs += '-aoa' }  # overwrite all
+                if ($Force) {
+                    $7zArgs += '-aoa' 
+                }  # overwrite all
 
                 $output = & $SevenZipPath @7zArgs 2>&1 | Out-String
                 $exitCode = $LASTEXITCODE
@@ -152,9 +159,19 @@ function Expand-DowserExe {
                     Success        = $success
                     ExitCode       = $exitCode
                     Classification = $testResult.Classification
-                    FileCount      = if ($success) { $extractedCount } else { 0 }
+                    FileCount      = if ($success) {
+                        $extractedCount 
+                    }
+                    else {
+                        0 
+                    }
                     ArchiveType    = $testResult.ArchiveType
-                    Details        = if ($success) { "Extracted to $dest" } else { "7-Zip exit code: $exitCode" }
+                    Details        = if ($success) {
+                        "Extracted to $dest" 
+                    }
+                    else {
+                        "7-Zip exit code: $exitCode" 
+                    }
                 }
 
                 if ($PassThru) {

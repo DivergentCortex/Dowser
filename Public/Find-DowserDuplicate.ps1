@@ -79,10 +79,10 @@ function Find-DowserDuplicate {
 
         [long]$MinSize = 0,
 
-        [ValidateSet('Name','PartialName','NameSize','Content','Chunk','All')]
+        [ValidateSet('Name', 'PartialName', 'NameSize', 'Content', 'Chunk', 'All')]
         [string[]]$Mode = @('All'),
 
-        [ValidateSet('SHA256','SHA1','MD5')]
+        [ValidateSet('SHA256', 'SHA1', 'MD5')]
         [string]$HashAlgorithm = 'SHA256',
 
         [long]$ChunkSize = 1MB,
@@ -95,22 +95,26 @@ function Find-DowserDuplicate {
 
         [Switch]$ReviewBeforeDelete,
 
-        [ValidateRange(1,32)]
+        [ValidateRange(1, 32)]
         [int]$ChunkSequenceLength = 3
     )
 
     if (-not (Test-Path -Path $Path)) {
-        Throw "Path '$Path' not found."
+        throw "Path '$Path' not found."
     }
 
     Write-Verbose "Scanning '$Path'..."
 
     $files = Get-ChildItem -Path $Path -File -Recurse |
         Where-Object {
-            if ($_.Length -lt $MinSize) { return $false }
+            if ($_.Length -lt $MinSize) {
+                return $false 
+            }
             if ($Exclude) {
                 foreach ($pattern in $Exclude) {
-                    if ($_.FullName -like $pattern) { return $false }
+                    if ($_.FullName -like $pattern) {
+                        return $false 
+                    }
                 }
             }
             return $true
@@ -153,14 +157,16 @@ function Find-DowserDuplicate {
                 $read = $fs.Read($buffer, 0, [int]$remaining)
                 $hash = (Get-FileHash -Algorithm $Algorithm -InputStream ([System.IO.MemoryStream]::new($buffer, 0, $read))).Hash
                 $results.Add([PSCustomObject]@{
-                    Hash       = $hash
-                    File       = $File.FullName
-                    Offset     = $position
-                    Length     = $read
-                    ChunkIndex = $chunkIndex
-                })
+                        Hash       = $hash
+                        File       = $File.FullName
+                        Offset     = $position
+                        Length     = $read
+                        ChunkIndex = $chunkIndex
+                    })
                 $chunkIndex++
-                if ($Overlap -ge $Size) { break }
+                if ($Overlap -ge $Size) {
+                    break 
+                }
                 $position += $Size - $Overlap
             }
         }
@@ -171,11 +177,11 @@ function Find-DowserDuplicate {
         return $results
     }
 
-    $runName      = $Mode -contains 'All' -or $Mode -contains 'Name'
-    $runPartial   = $Mode -contains 'All' -or $Mode -contains 'PartialName'
-    $runNameSize  = $Mode -contains 'All' -or $Mode -contains 'NameSize'
-    $runContent   = $Mode -contains 'All' -or $Mode -contains 'Content'
-    $runChunk     = $Mode -contains 'All' -or $Mode -contains 'Chunk'
+    $runName = $Mode -contains 'All' -or $Mode -contains 'Name'
+    $runPartial = $Mode -contains 'All' -or $Mode -contains 'PartialName'
+    $runNameSize = $Mode -contains 'All' -or $Mode -contains 'NameSize'
+    $runContent = $Mode -contains 'All' -or $Mode -contains 'Content'
+    $runChunk = $Mode -contains 'All' -or $Mode -contains 'Chunk'
 
     $dupSets = [System.Collections.Generic.List[object]]::new()
 
@@ -186,14 +192,14 @@ function Find-DowserDuplicate {
 
         foreach ($group in $groups) {
             $dupSets.Add([PSCustomObject]@{
-                Mode     = 'Name'
-                MatchKey = $group.Group[0].Name
-                Count    = $group.Count
-                Hash     = $null
-                Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
-                    [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                    Mode     = 'Name'
+                    MatchKey = $group.Group[0].Name
+                    Count    = $group.Count
+                    Hash     = $null
+                    Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
+                            [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                        })
                 })
-            })
         }
     }
 
@@ -205,18 +211,20 @@ function Find-DowserDuplicate {
         foreach ($group in $groups) {
             # name mode already caught exact dupes
             $uniqueNames = $group.Group | Select-Object -ExpandProperty Name -Unique
-            if (@($uniqueNames).Count -le 1 -and $runName) { continue }
+            if (@($uniqueNames).Count -le 1 -and $runName) {
+                continue 
+            }
 
             $stem = Get-NormalizedStem $group.Group[0].Name
             $dupSets.Add([PSCustomObject]@{
-                Mode     = 'PartialName'
-                MatchKey = "~$stem ($(@($uniqueNames) -join ', '))"
-                Count    = $group.Count
-                Hash     = $null
-                Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
-                    [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                    Mode     = 'PartialName'
+                    MatchKey = "~$stem ($(@($uniqueNames) -join ', '))"
+                    Count    = $group.Count
+                    Hash     = $null
+                    Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
+                            [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                        })
                 })
-            })
         }
     }
 
@@ -227,21 +235,23 @@ function Find-DowserDuplicate {
 
         foreach ($group in $groups) {
             $dupSets.Add([PSCustomObject]@{
-                Mode     = 'NameSize'
-                MatchKey = "$($group.Group[0].Name) [$($group.Group[0].Length) B]"
-                Count    = $group.Count
-                Hash     = $null
-                Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
-                    [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                    Mode     = 'NameSize'
+                    MatchKey = "$($group.Group[0].Name) [$($group.Group[0].Length) B]"
+                    Count    = $group.Count
+                    Hash     = $null
+                    Files    = @($group.Group | Sort-Object FullName | ForEach-Object {
+                            [PSCustomObject]@{ Path = $_.FullName; Size = $_.Length; Offset = $null; Length = $_.Length }
+                        })
                 })
-            })
         }
     }
 
     if ($runContent) {
-        $hashGroups = [System.Collections.Generic.Dictionary[string,System.Collections.Generic.List[object]]]::new()
+        $hashGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new()
         foreach ($file in $files) {
-            if (-not (Test-Path -LiteralPath $file.FullName)) { continue }
+            if (-not (Test-Path -LiteralPath $file.FullName)) {
+                continue 
+            }
             try {
                 $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm $HashAlgorithm -ErrorAction Stop).Hash
             }
@@ -249,7 +259,9 @@ function Find-DowserDuplicate {
                 Write-Verbose "Skipping unreadable file: $($file.FullName)"
                 continue
             }
-            if (-not $hash) { continue }
+            if (-not $hash) {
+                continue 
+            }
             if (-not $hashGroups.ContainsKey($hash)) {
                 $hashGroups[$hash] = [System.Collections.Generic.List[object]]::new()
             }
@@ -260,22 +272,24 @@ function Find-DowserDuplicate {
             if ($hashGroups[$hash].Count -gt 1) {
                 $firstName = Split-Path $hashGroups[$hash][0].Path -Leaf
                 $dupSets.Add([PSCustomObject]@{
-                    Mode     = 'Content'
-                    MatchKey = $firstName
-                    Count    = $hashGroups[$hash].Count
-                    Hash     = $hash
-                    Files    = @($hashGroups[$hash] | Sort-Object Path | ForEach-Object {
-                        [PSCustomObject]@{ Path = $_.Path; Size = $_.Size; Offset = $null; Length = $_.Size }
+                        Mode     = 'Content'
+                        MatchKey = $firstName
+                        Count    = $hashGroups[$hash].Count
+                        Hash     = $hash
+                        Files    = @($hashGroups[$hash] | Sort-Object Path | ForEach-Object {
+                                [PSCustomObject]@{ Path = $_.Path; Size = $_.Size; Offset = $null; Length = $_.Size }
+                            })
                     })
-                })
             }
         }
     }
 
     if ($runChunk) {
-        $chunkGroups = [System.Collections.Generic.Dictionary[string,System.Collections.Generic.List[object]]]::new()
+        $chunkGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new()
         foreach ($file in $files) {
-            if (-not (Test-Path -LiteralPath $file.FullName)) { continue }
+            if (-not (Test-Path -LiteralPath $file.FullName)) {
+                continue 
+            }
             try {
                 $chunks = Get-ChunkHashes -File $file -Size $ChunkSize -Overlap $ChunkOverlap -Algorithm $HashAlgorithm
             }
@@ -284,16 +298,18 @@ function Find-DowserDuplicate {
                 continue
             }
             foreach ($entry in $chunks) {
-                if (-not $entry.Hash) { continue }
+                if (-not $entry.Hash) {
+                    continue 
+                }
                 if (-not $chunkGroups.ContainsKey($entry.Hash)) {
                     $chunkGroups[$entry.Hash] = [System.Collections.Generic.List[object]]::new()
                 }
                 $chunkGroups[$entry.Hash].Add([PSCustomObject]@{
-                    Path   = $entry.File
-                    Size   = $entry.Length
-                    Offset = $entry.Offset
-                    Length = $entry.Length
-                })
+                        Path   = $entry.File
+                        Size   = $entry.Length
+                        Offset = $entry.Offset
+                        Length = $entry.Length
+                    })
             }
         }
 
@@ -301,14 +317,14 @@ function Find-DowserDuplicate {
             if ($chunkGroups[$hash].Count -gt 1) {
                 $firstName = Split-Path $chunkGroups[$hash][0].Path -Leaf
                 $dupSets.Add([PSCustomObject]@{
-                    Mode     = 'Chunk'
-                    MatchKey = $firstName
-                    Count    = $chunkGroups[$hash].Count
-                    Hash     = $hash
-                    Files    = @($chunkGroups[$hash] | Sort-Object Path | ForEach-Object {
-                        [PSCustomObject]@{ Path = $_.Path; Size = $_.Size; Offset = $_.Offset; Length = $_.Length }
+                        Mode     = 'Chunk'
+                        MatchKey = $firstName
+                        Count    = $chunkGroups[$hash].Count
+                        Hash     = $hash
+                        Files    = @($chunkGroups[$hash] | Sort-Object Path | ForEach-Object {
+                                [PSCustomObject]@{ Path = $_.Path; Size = $_.Size; Offset = $_.Offset; Length = $_.Length }
+                            })
                     })
-                })
             }
         }
     }
@@ -316,7 +332,9 @@ function Find-DowserDuplicate {
     if ($AutoRemove -or $ReviewBeforeDelete) {
         foreach ($set in $dupSets) {
             $fileList = $set.Files
-            if ($fileList.Count -le 1) { continue }
+            if ($fileList.Count -le 1) {
+                continue 
+            }
             $keep = $fileList[0]
             $toDelete = $fileList | Select-Object -Skip 1
 
@@ -384,7 +402,12 @@ function Find-DowserDuplicate {
         [PSCustomObject]@{
             OutputType = 'TopSets'
             Mode       = $_.Mode
-            FileName   = if ($_.MatchKey.Length -gt 60) { $_.MatchKey.Substring(0, 57) + '...' } else { $_.MatchKey }
+            FileName   = if ($_.MatchKey.Length -gt 60) {
+                $_.MatchKey.Substring(0, 57) + '...' 
+            }
+            else {
+                $_.MatchKey 
+            }
             Duplicates = $_.Count
         }
     }

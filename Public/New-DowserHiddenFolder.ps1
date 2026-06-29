@@ -90,7 +90,7 @@ function New-DowserHiddenFolder {
                     }
                     elseif (-not $leafName.StartsWith('.')) {
                         $dottedName = '.' + $leafName
-                        $parent     = Split-Path -Path $folder.FullName -Parent
+                        $parent = Split-Path -Path $folder.FullName -Parent
                         $dottedPath = Join-Path $parent $dottedName
                         if (Test-Path -LiteralPath $dottedPath) {
                             Write-Warning "Cannot dot-prefix '$Path' for hiding: '$dottedPath' already exists. The folder is NOT hidden."

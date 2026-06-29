@@ -102,8 +102,18 @@ function Get-DowserReport {
         $script:allResults = [System.Collections.ArrayList]::Synchronized((New-Object System.Collections.ArrayList))
         $script:errorCount = 0
 
-        $minBytes = if ($MinSize) { ConvertTo-DowserBytes -SizeString $MinSize } else { $null }
-        $maxBytes = if ($MaxSize) { ConvertTo-DowserBytes -SizeString $MaxSize } else { $null }
+        $minBytes = if ($MinSize) {
+            ConvertTo-DowserBytes -SizeString $MinSize 
+        }
+        else {
+            $null 
+        }
+        $maxBytes = if ($MaxSize) {
+            ConvertTo-DowserBytes -SizeString $MaxSize 
+        }
+        else {
+            $null 
+        }
 
         # wrap bare strings so partial names match
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
@@ -131,7 +141,9 @@ function Get-DowserReport {
             if ($isSingleFile) {
                 Write-Verbose "Single file mode: $resolvedPath"
                 $fileItem = Get-Item -LiteralPath $resolvedPath -Force -ErrorAction SilentlyContinue
-                if (-not $fileItem) { continue }
+                if (-not $fileItem) {
+                    continue 
+                }
 
                 $lineCount = 0
                 $wordCount = 0
@@ -179,7 +191,9 @@ function Get-DowserReport {
                     IsHidden       = [bool]($fileItem.Attributes -band [System.IO.FileAttributes]::Hidden)
                     IsSystem       = [bool]($fileItem.Attributes -band [System.IO.FileAttributes]::System)
                 }
-                if ($IncludeOwner) { $resultProps['Owner'] = $owner }
+                if ($IncludeOwner) {
+                    $resultProps['Owner'] = $owner 
+                }
 
                 $obj = [PSCustomObject]$resultProps
                 [void]$script:allResults.Add($obj)
@@ -204,23 +218,34 @@ function Get-DowserReport {
                 }
                 if ($ScanDepth -eq -1) {
                     $params['Recurse'] = $true
-                } elseif ($ScanDepth -gt 0) {
-                    $params['Recurse'] = $true
-                    $params['Depth']   = $ScanDepth
                 }
-                if ($Pattern -ne "*") { $params['Filter'] = $Pattern }
+                elseif ($ScanDepth -gt 0) {
+                    $params['Recurse'] = $true
+                    $params['Depth'] = $ScanDepth
+                }
+                if ($Pattern -ne "*") {
+                    $params['Filter'] = $Pattern 
+                }
 
                 Get-ChildItem @params | ForEach-Object {
                     $file = $_
                     if ($Extensions) {
                         $matchesExt = $false
                         foreach ($ext in $Extensions) {
-                            if ($file.Name -like $ext) { $matchesExt = $true; break }
+                            if ($file.Name -like $ext) {
+                                $matchesExt = $true; break 
+                            }
                         }
-                        if (-not $matchesExt) { return }
+                        if (-not $matchesExt) {
+                            return 
+                        }
                     }
-                    if ($MinBytes -and $file.Length -lt $MinBytes) { return }
-                    if ($MaxBytes -and $file.Length -gt $MaxBytes) { return }
+                    if ($MinBytes -and $file.Length -lt $MinBytes) {
+                        return 
+                    }
+                    if ($MaxBytes -and $file.Length -gt $MaxBytes) {
+                        return 
+                    }
                     $file.FullName
                 }
             }
@@ -229,7 +254,8 @@ function Get-DowserReport {
                 $topLevelDirs = Get-ChildItem -Path $resolvedPath -Directory -ErrorAction SilentlyContinue
                 if ($Depth -ne 0 -and $topLevelDirs) {
                     $scanTargets = @($resolvedPath) + @($topLevelDirs.FullName)
-                } else {
+                }
+                else {
                     $scanTargets = @($resolvedPath)
                 }
 
@@ -246,9 +272,11 @@ function Get-DowserReport {
                     [void]$ps.AddArgument($Extensions)
                     if (@($scanTargets).Count -gt 1 -and $target -eq $resolvedPath) {
                         $targetDepth = 0
-                    } elseif (@($scanTargets).Count -gt 1 -and $Depth -gt 0) {
+                    }
+                    elseif (@($scanTargets).Count -gt 1 -and $Depth -gt 0) {
                         $targetDepth = $Depth - 1
-                    } else {
+                    }
+                    else {
                         $targetDepth = $Depth
                     }
                     [void]$ps.AddArgument($targetDepth)
@@ -272,7 +300,9 @@ function Get-DowserReport {
                 foreach ($j in $gatherJobs) {
                     try {
                         $res = $j.Pipe.EndInvoke($j.Result)
-                        foreach ($r in $res) { $filesFound.Add($r) }
+                        foreach ($r in $res) {
+                            $filesFound.Add($r) 
+                        }
                     }
                     catch {
                         Write-Verbose "Error in file gather thread: $_"
@@ -285,13 +315,16 @@ function Get-DowserReport {
                 $gatherPool.Close()
                 $gatherPool.Dispose()
 
-            } else {
+            }
+            else {
                 Write-Verbose "Single-threaded file gathering"
                 $gatherResults = & $gatherScriptBlock $resolvedPath $Pattern $Extensions $Depth $minBytes $maxBytes
-                foreach ($r in $gatherResults) { $filesFound.Add($r) }
+                foreach ($r in $gatherResults) {
+                    $filesFound.Add($r) 
+                }
             }
 
-            $allPaths  = $filesFound.ToArray() | Select-Object -Unique
+            $allPaths = $filesFound.ToArray() | Select-Object -Unique
             $fileCount = @($allPaths).Count
             Write-Verbose "Found $fileCount files matching criteria"
 
@@ -314,18 +347,20 @@ function Get-DowserReport {
                     try {
                         $fileItem = Get-Item -LiteralPath $filePath -Force -ErrorAction Stop
                     }
-                    catch { continue }
+                    catch {
+                        continue 
+                    }
 
                     $lineCount = 0
                     $wordCount = 0
                     $charCount = 0
                     try {
-                        $reader  = [System.IO.StreamReader]::new($filePath)
+                        $reader = [System.IO.StreamReader]::new($filePath)
                         $content = $reader.ReadToEnd()
                         $reader.Close()
                         $reader.Dispose()
                         if ($content) {
-                            $lines     = $content -split "`n"
+                            $lines = $content -split "`n"
                             $lineCount = $lines.Count
                             $charCount = $content.Length
                             $wordCount = ($content -split '\s+' | Where-Object { $_ -ne '' }).Count
@@ -340,30 +375,42 @@ function Get-DowserReport {
                     $owner = $null
                     if ($DoIncludeOwner) {
                         try {
-                            $acl   = Get-Acl -LiteralPath $fileItem.FullName -ErrorAction Stop
+                            $acl = Get-Acl -LiteralPath $fileItem.FullName -ErrorAction Stop
                             $owner = $acl.Owner
                         }
-                        catch { $owner = "ACCESS DENIED" }
+                        catch {
+                            $owner = "ACCESS DENIED" 
+                        }
                     }
 
                     # cant reach Format-DowserSize from runspace scope
-                    $bytes        = $fileItem.Length
+                    $bytes = $fileItem.Length
                     $sizeFormatted = "$bytes B"
-                    if ($bytes -ge 1TB)      { $sizeFormatted = "{0:N2} TB" -f ($bytes / 1TB) }
-                    elseif ($bytes -ge 1GB)  { $sizeFormatted = "{0:N2} GB" -f ($bytes / 1GB) }
-                    elseif ($bytes -ge 1MB)  { $sizeFormatted = "{0:N2} MB" -f ($bytes / 1MB) }
-                    elseif ($bytes -ge 1KB)  { $sizeFormatted = "{0:N2} KB" -f ($bytes / 1KB) }
+                    if ($bytes -ge 1TB) {
+                        $sizeFormatted = "{0:N2} TB" -f ($bytes / 1TB) 
+                    }
+                    elseif ($bytes -ge 1GB) {
+                        $sizeFormatted = "{0:N2} GB" -f ($bytes / 1GB) 
+                    }
+                    elseif ($bytes -ge 1MB) {
+                        $sizeFormatted = "{0:N2} MB" -f ($bytes / 1MB) 
+                    }
+                    elseif ($bytes -ge 1KB) {
+                        $sizeFormatted = "{0:N2} KB" -f ($bytes / 1KB) 
+                    }
 
                     $relFolder = '.'
                     if ($ScanRoot -and $fileItem.DirectoryName) {
-                        $sep      = [System.IO.Path]::DirectorySeparatorChar
+                        $sep = [System.IO.Path]::DirectorySeparatorChar
                         $normRoot = $ScanRoot.Replace('/', $sep).TrimEnd($sep)
-                        $normDir  = $fileItem.DirectoryName.Replace('/', $sep).TrimEnd($sep)
+                        $normDir = $fileItem.DirectoryName.Replace('/', $sep).TrimEnd($sep)
                         if ([string]::Equals($normDir, $normRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
                             $relFolder = '.'
-                        } elseif ($normDir.StartsWith($normRoot + $sep, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        }
+                        elseif ($normDir.StartsWith($normRoot + $sep, [System.StringComparison]::OrdinalIgnoreCase)) {
                             $relFolder = $normDir.Substring($normRoot.Length + 1)
-                        } else {
+                        }
+                        else {
                             $relFolder = Split-Path $fileItem.DirectoryName -Leaf
                         }
                     }
@@ -387,7 +434,9 @@ function Get-DowserReport {
                         IsHidden       = [bool]($fileItem.Attributes -band [System.IO.FileAttributes]::Hidden)
                         IsSystem       = [bool]($fileItem.Attributes -band [System.IO.FileAttributes]::System)
                     }
-                    if ($DoIncludeOwner) { $props['Owner'] = $owner }
+                    if ($DoIncludeOwner) {
+                        $props['Owner'] = $owner 
+                    }
 
                     $results += [PSCustomObject]$props
                 }
@@ -396,7 +445,9 @@ function Get-DowserReport {
 
             if ($UseRunspaces) {
                 $chunkSize = [Math]::Ceiling($fileCount / $ThreadCount)
-                if ($chunkSize -lt 1) { $chunkSize = 1 }
+                if ($chunkSize -lt 1) {
+                    $chunkSize = 1 
+                }
 
                 $analyzePool = [RunspaceFactory]::CreateRunspacePool(1, $ThreadCount)
                 $analyzePool.Open()
@@ -404,7 +455,7 @@ function Get-DowserReport {
 
                 $counter = 0
                 while ($counter -lt $fileCount) {
-                    $chunk    = $allPaths | Select-Object -Skip $counter -First $chunkSize
+                    $chunk = $allPaths | Select-Object -Skip $counter -First $chunkSize
                     $counter += $chunkSize
 
                     $ps = [PowerShell]::Create()
@@ -431,7 +482,9 @@ function Get-DowserReport {
                 foreach ($j in $analyzeJobs) {
                     try {
                         $jobResults = $j.Pipe.EndInvoke($j.Result)
-                        foreach ($row in $jobResults) { [void]$script:allResults.Add($row) }
+                        foreach ($row in $jobResults) {
+                            [void]$script:allResults.Add($row) 
+                        }
                     }
                     catch {
                         Write-Verbose "Error in analysis thread: $_"
@@ -444,10 +497,13 @@ function Get-DowserReport {
                 $analyzePool.Close()
                 $analyzePool.Dispose()
 
-            } else {
+            }
+            else {
                 Write-Verbose "Single-threaded file analysis"
                 $analysisResults = & $analyzeScriptBlock $allPaths ([bool]$IncludeOwner) $resolvedPath
-                foreach ($row in $analysisResults) { [void]$script:allResults.Add($row) }
+                foreach ($row in $analysisResults) {
+                    [void]$script:allResults.Add($row) 
+                }
             }
         }
     }
@@ -461,11 +517,14 @@ function Get-DowserReport {
         if ($Depth -ne 0) {
             $sortedResults = $script:allResults | Sort-Object RelativeFolder, $SortBy
             if ($Descending) {
-                $sortedResults = $script:allResults | Sort-Object RelativeFolder, @{Expression = $SortBy; Descending = $true}
+                $sortedResults = $script:allResults | Sort-Object RelativeFolder, @{Expression = $SortBy; Descending = $true }
             }
-        } else {
+        }
+        else {
             $sortParams = @{ Property = $SortBy }
-            if ($Descending) { $sortParams['Descending'] = $true }
+            if ($Descending) {
+                $sortParams['Descending'] = $true 
+            }
             $sortedResults = $script:allResults | Sort-Object @sortParams
         }
 
@@ -527,11 +586,14 @@ function Get-DowserReport {
             foreach ($obj in $sortedResults) {
                 $obj.PSObject.TypeNames.Insert(0, $groupedType)
             }
-        } else {
+        }
+        else {
             $defaultDisplay = @('Name', 'SizeFormatted', 'LineCount', 'WordCount', 'CharCount', 'LastWriteTime', 'CreationTime')
-            if ($IncludeOwner) { $defaultDisplay += 'Owner' }
-            $defaultSet  = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet', [string[]]$defaultDisplay)
-            $memberInfo  = [System.Management.Automation.PSMemberInfo[]]@($defaultSet)
+            if ($IncludeOwner) {
+                $defaultDisplay += 'Owner' 
+            }
+            $defaultSet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet', [string[]]$defaultDisplay)
+            $memberInfo = [System.Management.Automation.PSMemberInfo[]]@($defaultSet)
             foreach ($obj in $sortedResults) {
                 $obj | Add-Member -MemberType MemberSet -Name PSStandardMembers -Value $memberInfo -Force
             }
@@ -539,16 +601,26 @@ function Get-DowserReport {
 
         $sortedResults | Write-Output
 
-        $duration      = New-TimeSpan -Start $script:startTime -End (Get-Date)
-        $totalFiles    = @($sortedResults).Count
-        $totalSize     = ($sortedResults | Measure-Object -Property Size -Sum).Sum
-        $totalLines    = ($sortedResults | Where-Object { $_.LineCount -ge 0 } | Measure-Object -Property LineCount -Sum).Sum
-        $totalWords    = ($sortedResults | Where-Object { $_.WordCount -ge 0 } | Measure-Object -Property WordCount -Sum).Sum
-        $totalChars    = ($sortedResults | Where-Object { $_.CharCount -ge 0 } | Measure-Object -Property CharCount -Sum).Sum
-        $binaryFiles   = ($sortedResults | Where-Object { $_.LineCount -eq -1 }).Count
+        $duration = New-TimeSpan -Start $script:startTime -End (Get-Date)
+        $totalFiles = @($sortedResults).Count
+        $totalSize = ($sortedResults | Measure-Object -Property Size -Sum).Sum
+        $totalLines = ($sortedResults | Where-Object { $_.LineCount -ge 0 } | Measure-Object -Property LineCount -Sum).Sum
+        $totalWords = ($sortedResults | Where-Object { $_.WordCount -ge 0 } | Measure-Object -Property WordCount -Sum).Sum
+        $totalChars = ($sortedResults | Where-Object { $_.CharCount -ge 0 } | Measure-Object -Property CharCount -Sum).Sum
+        $binaryFiles = ($sortedResults | Where-Object { $_.LineCount -eq -1 }).Count
         $readableFiles = $totalFiles - $binaryFiles
-        $avgSize       = if ($totalFiles -gt 0)    { [long]($totalSize / $totalFiles) } else { 0 }
-        $avgLines      = if ($readableFiles -gt 0) { [Math]::Round($totalLines / $readableFiles, 1) } else { 0 }
+        $avgSize = if ($totalFiles -gt 0) {
+            [long]($totalSize / $totalFiles) 
+        }
+        else {
+            0 
+        }
+        $avgLines = if ($readableFiles -gt 0) {
+            [Math]::Round($totalLines / $readableFiles, 1) 
+        }
+        else {
+            0 
+        }
 
         $extensionBreakdown = $sortedResults | Group-Object Extension |
             Sort-Object Count -Descending |
@@ -557,20 +629,20 @@ function Get-DowserReport {
 
         Write-Verbose ""
         Write-Verbose "--- Get-DowserReport Summary ---"
-        Write-Verbose ("  {0,-22}: {1}"    -f "Total Files",         $totalFiles)
-        Write-Verbose ("  {0,-22}: {1}"    -f "Readable Files",      $readableFiles)
-        Write-Verbose ("  {0,-22}: {1}"    -f "Binary/Locked Files", $binaryFiles)
-        Write-Verbose ("  {0,-22}: {1}"    -f "Total Size",          (Format-DowserSize -DataValue $totalSize))
-        Write-Verbose ("  {0,-22}: {1}"    -f "Average File Size",   (Format-DowserSize -DataValue $avgSize))
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Lines",         $totalLines)
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Words",         $totalWords)
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Characters",    $totalChars)
-        Write-Verbose ("  {0,-22}: {1}"    -f "Avg Lines/File",      $avgLines)
+        Write-Verbose ("  {0,-22}: {1}" -f "Total Files", $totalFiles)
+        Write-Verbose ("  {0,-22}: {1}" -f "Readable Files", $readableFiles)
+        Write-Verbose ("  {0,-22}: {1}" -f "Binary/Locked Files", $binaryFiles)
+        Write-Verbose ("  {0,-22}: {1}" -f "Total Size", (Format-DowserSize -DataValue $totalSize))
+        Write-Verbose ("  {0,-22}: {1}" -f "Average File Size", (Format-DowserSize -DataValue $avgSize))
+        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Lines", $totalLines)
+        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Words", $totalWords)
+        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Characters", $totalChars)
+        Write-Verbose ("  {0,-22}: {1}" -f "Avg Lines/File", $avgLines)
         if ($script:errorCount -gt 0) {
             Write-Verbose ("  {0,-22}: {1}" -f "Errors Encountered", $script:errorCount)
         }
-        Write-Verbose ("  {0,-22}: {1}"      -f "Top Extensions",  ($extensionBreakdown -join ", "))
-        Write-Verbose ("  {0,-22}: {1:F2}s"  -f "Execution Time",  $duration.TotalSeconds)
+        Write-Verbose ("  {0,-22}: {1}" -f "Top Extensions", ($extensionBreakdown -join ", "))
+        Write-Verbose ("  {0,-22}: {1:F2}s" -f "Execution Time", $duration.TotalSeconds)
         Write-Verbose ""
 
         if ($ExportCsv) {
@@ -613,7 +685,9 @@ function Get-DowserReport {
 </div>
 "@
                 $displayProps = @('Name', 'Directory', 'SizeFormatted', 'LineCount', 'WordCount', 'CharCount', 'LastWriteTime', 'CreationTime', 'Extension')
-                if ($IncludeOwner) { $displayProps += 'Owner' }
+                if ($IncludeOwner) {
+                    $displayProps += 'Owner' 
+                }
 
                 $tableHtml = $sortedResults |
                     Select-Object $displayProps |
@@ -684,47 +758,64 @@ function Compare-DowserReport {
 
         function Format-Delta {
             param([long]$Value)
-            if ($Value -gt 0) { return "+$Value" }
-            if ($Value -lt 0) { return "$Value" }
+            if ($Value -gt 0) {
+                return "+$Value" 
+            }
+            if ($Value -lt 0) {
+                return "$Value" 
+            }
             return "0"
         }
 
         function Format-SizeDelta {
             param([long]$Bytes)
-            $sign = if ($Bytes -ge 0) { "+" } else { "" }
-            if ([Math]::Abs($Bytes) -ge 1MB) { return "$sign$("{0:N2}" -f ($Bytes / 1MB)) MB" }
-            if ([Math]::Abs($Bytes) -ge 1KB) { return "$sign$("{0:N2}" -f ($Bytes / 1KB)) KB" }
+            $sign = if ($Bytes -ge 0) {
+                "+" 
+            }
+            else {
+                "" 
+            }
+            if ([Math]::Abs($Bytes) -ge 1MB) {
+                return "$sign$("{0:N2}" -f ($Bytes / 1MB)) MB" 
+            }
+            if ([Math]::Abs($Bytes) -ge 1KB) {
+                return "$sign$("{0:N2}" -f ($Bytes / 1KB)) KB" 
+            }
             return "$sign$Bytes B"
         }
     }
 
     process {
         $beforeMap = @{}
-        foreach ($item in $Before) { $beforeMap[$item.Name] = $item }
+        foreach ($item in $Before) {
+            $beforeMap[$item.Name] = $item 
+        }
 
         $afterMap = @{}
-        foreach ($item in $After) { $afterMap[$item.Name] = $item }
+        foreach ($item in $After) {
+            $afterMap[$item.Name] = $item 
+        }
 
         foreach ($name in $afterMap.Keys) {
             if (-not $beforeMap.ContainsKey($name)) {
                 $a = $afterMap[$name]
                 [void]$results.Add([PSCustomObject]@{
-                    Status        = "NEW"
-                    Name          = $name
-                    SizeBefore    = $null
-                    SizeAfter     = $a.SizeFormatted
-                    SizeDelta     = Format-SizeDelta $a.Size
-                    LinesBefore   = $null
-                    LinesAfter    = $a.LineCount
-                    LinesDelta    = Format-Delta $a.LineCount
-                    WordsBefore   = $null
-                    WordsAfter    = $a.WordCount
-                    WordsDelta    = Format-Delta $a.WordCount
-                    CharsBefore   = $null
-                    CharsAfter    = $a.CharCount
-                    CharsDelta    = Format-Delta $a.CharCount
-                    LastWriteTime = $a.LastWriteTime
-                })
+                        Status        = "NEW"
+                        Name          = $name
+                        SizeBefore    = $null
+                        SizeAfter     = $a.SizeFormatted
+                        SizeDelta     = Format-SizeDelta $a.Size
+                        LinesBefore   = $null
+                        LinesAfter    = $a.LineCount
+                        LinesDelta    = Format-Delta $a.LineCount
+                        WordsBefore   = $null
+                        WordsAfter    = $a.WordCount
+                        WordsDelta    = Format-Delta $a.WordCount
+                        CharsBefore   = $null
+                        CharsAfter    = $a.CharCount
+                        CharsDelta    = Format-Delta $a.CharCount
+                        LastWriteTime = $a.LastWriteTime
+                    })
             }
         }
 
@@ -732,22 +823,22 @@ function Compare-DowserReport {
             if (-not $afterMap.ContainsKey($name)) {
                 $b = $beforeMap[$name]
                 [void]$results.Add([PSCustomObject]@{
-                    Status        = "REMOVED"
-                    Name          = $name
-                    SizeBefore    = $b.SizeFormatted
-                    SizeAfter     = $null
-                    SizeDelta     = Format-SizeDelta (-$b.Size)
-                    LinesBefore   = $b.LineCount
-                    LinesAfter    = $null
-                    LinesDelta    = Format-Delta (-$b.LineCount)
-                    WordsBefore   = $b.WordCount
-                    WordsAfter    = $null
-                    WordsDelta    = Format-Delta (-$b.WordCount)
-                    CharsBefore   = $b.CharCount
-                    CharsAfter    = $null
-                    CharsDelta    = Format-Delta (-$b.CharCount)
-                    LastWriteTime = $b.LastWriteTime
-                })
+                        Status        = "REMOVED"
+                        Name          = $name
+                        SizeBefore    = $b.SizeFormatted
+                        SizeAfter     = $null
+                        SizeDelta     = Format-SizeDelta (-$b.Size)
+                        LinesBefore   = $b.LineCount
+                        LinesAfter    = $null
+                        LinesDelta    = Format-Delta (-$b.LineCount)
+                        WordsBefore   = $b.WordCount
+                        WordsAfter    = $null
+                        WordsDelta    = Format-Delta (-$b.WordCount)
+                        CharsBefore   = $b.CharCount
+                        CharsAfter    = $null
+                        CharsDelta    = Format-Delta (-$b.CharCount)
+                        LastWriteTime = $b.LastWriteTime
+                    })
             }
         }
 
@@ -756,7 +847,7 @@ function Compare-DowserReport {
                 $b = $beforeMap[$name]
                 $a = $afterMap[$name]
 
-                $sizeDiff = $a.Size      - $b.Size
+                $sizeDiff = $a.Size - $b.Size
                 $lineDiff = $a.LineCount - $b.LineCount
                 $wordDiff = $a.WordCount - $b.WordCount
                 $charDiff = $a.CharCount - $b.CharCount
@@ -765,40 +856,41 @@ function Compare-DowserReport {
 
                 if ($isChanged) {
                     [void]$results.Add([PSCustomObject]@{
-                        Status        = "CHANGED"
-                        Name          = $name
-                        SizeBefore    = $b.SizeFormatted
-                        SizeAfter     = $a.SizeFormatted
-                        SizeDelta     = Format-SizeDelta $sizeDiff
-                        LinesBefore   = $b.LineCount
-                        LinesAfter    = $a.LineCount
-                        LinesDelta    = Format-Delta $lineDiff
-                        WordsBefore   = $b.WordCount
-                        WordsAfter    = $a.WordCount
-                        WordsDelta    = Format-Delta $wordDiff
-                        CharsBefore   = $b.CharCount
-                        CharsAfter    = $a.CharCount
-                        CharsDelta    = Format-Delta $charDiff
-                        LastWriteTime = $a.LastWriteTime
-                    })
-                } elseif ($ShowUnchanged) {
+                            Status        = "CHANGED"
+                            Name          = $name
+                            SizeBefore    = $b.SizeFormatted
+                            SizeAfter     = $a.SizeFormatted
+                            SizeDelta     = Format-SizeDelta $sizeDiff
+                            LinesBefore   = $b.LineCount
+                            LinesAfter    = $a.LineCount
+                            LinesDelta    = Format-Delta $lineDiff
+                            WordsBefore   = $b.WordCount
+                            WordsAfter    = $a.WordCount
+                            WordsDelta    = Format-Delta $wordDiff
+                            CharsBefore   = $b.CharCount
+                            CharsAfter    = $a.CharCount
+                            CharsDelta    = Format-Delta $charDiff
+                            LastWriteTime = $a.LastWriteTime
+                        })
+                }
+                elseif ($ShowUnchanged) {
                     [void]$results.Add([PSCustomObject]@{
-                        Status        = "UNCHANGED"
-                        Name          = $name
-                        SizeBefore    = $b.SizeFormatted
-                        SizeAfter     = $a.SizeFormatted
-                        SizeDelta     = "0 B"
-                        LinesBefore   = $b.LineCount
-                        LinesAfter    = $a.LineCount
-                        LinesDelta    = "0"
-                        WordsBefore   = $b.WordCount
-                        WordsAfter    = $a.WordCount
-                        WordsDelta    = "0"
-                        CharsBefore   = $b.CharCount
-                        CharsAfter    = $a.CharCount
-                        CharsDelta    = "0"
-                        LastWriteTime = $a.LastWriteTime
-                    })
+                            Status        = "UNCHANGED"
+                            Name          = $name
+                            SizeBefore    = $b.SizeFormatted
+                            SizeAfter     = $a.SizeFormatted
+                            SizeDelta     = "0 B"
+                            LinesBefore   = $b.LineCount
+                            LinesAfter    = $a.LineCount
+                            LinesDelta    = "0"
+                            WordsBefore   = $b.WordCount
+                            WordsAfter    = $a.WordCount
+                            WordsDelta    = "0"
+                            CharsBefore   = $b.CharCount
+                            CharsAfter    = $a.CharCount
+                            CharsDelta    = "0"
+                            LastWriteTime = $a.LastWriteTime
+                        })
                 }
             }
         }
@@ -817,42 +909,54 @@ function Compare-DowserReport {
 
         $sorted | Write-Output
 
-        $newCount       = @($sorted | Where-Object { $_.Status -eq 'NEW' }).Count
-        $changedCount   = @($sorted | Where-Object { $_.Status -eq 'CHANGED' }).Count
-        $removedCount   = @($sorted | Where-Object { $_.Status -eq 'REMOVED' }).Count
+        $newCount = @($sorted | Where-Object { $_.Status -eq 'NEW' }).Count
+        $changedCount = @($sorted | Where-Object { $_.Status -eq 'CHANGED' }).Count
+        $removedCount = @($sorted | Where-Object { $_.Status -eq 'REMOVED' }).Count
         $unchangedCount = @($Before).Count - $changedCount - $removedCount
 
-        $allChanged     = $sorted | Where-Object { $_.Status -ne 'UNCHANGED' }
+        $allChanged = $sorted | Where-Object { $_.Status -ne 'UNCHANGED' }
         $totalSizeDelta = 0
         $totalLineDelta = 0
         $totalWordDelta = 0
         $totalCharDelta = 0
         foreach ($item in $allChanged) {
-            $b = if ($beforeMap.ContainsKey($item.Name)) { $beforeMap[$item.Name] } else { $null }
-            $a = if ($afterMap.ContainsKey($item.Name))  { $afterMap[$item.Name]  } else { $null }
+            $b = if ($beforeMap.ContainsKey($item.Name)) {
+                $beforeMap[$item.Name] 
+            }
+            else {
+                $null 
+            }
+            $a = if ($afterMap.ContainsKey($item.Name)) {
+                $afterMap[$item.Name]  
+            }
+            else {
+                $null 
+            }
             if ($a -and $b) {
                 $totalSizeDelta += ($a.Size - $b.Size)
                 $totalLineDelta += ($a.LineCount - $b.LineCount)
                 $totalWordDelta += ($a.WordCount - $b.WordCount)
                 $totalCharDelta += ($a.CharCount - $b.CharCount)
-            } elseif ($a) {
-                $totalSizeDelta += $a.Size;      $totalLineDelta += $a.LineCount
+            }
+            elseif ($a) {
+                $totalSizeDelta += $a.Size; $totalLineDelta += $a.LineCount
                 $totalWordDelta += $a.WordCount; $totalCharDelta += $a.CharCount
-            } elseif ($b) {
-                $totalSizeDelta -= $b.Size;      $totalLineDelta -= $b.LineCount
+            }
+            elseif ($b) {
+                $totalSizeDelta -= $b.Size; $totalLineDelta -= $b.LineCount
                 $totalWordDelta -= $b.WordCount; $totalCharDelta -= $b.CharCount
             }
         }
 
         Write-Verbose ""
         Write-Verbose "--- Compare-DowserReport Summary ---"
-        Write-Verbose ("  {0,-18}: {1}" -f "New Files",      $newCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Changed Files",  $changedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Removed Files",  $removedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Unchanged Files",$unchangedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Size",       (Format-SizeDelta $totalSizeDelta))
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Lines",      (Format-Delta $totalLineDelta))
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Words",      (Format-Delta $totalWordDelta))
+        Write-Verbose ("  {0,-18}: {1}" -f "New Files", $newCount)
+        Write-Verbose ("  {0,-18}: {1}" -f "Changed Files", $changedCount)
+        Write-Verbose ("  {0,-18}: {1}" -f "Removed Files", $removedCount)
+        Write-Verbose ("  {0,-18}: {1}" -f "Unchanged Files", $unchangedCount)
+        Write-Verbose ("  {0,-18}: {1}" -f "Net Size", (Format-SizeDelta $totalSizeDelta))
+        Write-Verbose ("  {0,-18}: {1}" -f "Net Lines", (Format-Delta $totalLineDelta))
+        Write-Verbose ("  {0,-18}: {1}" -f "Net Words", (Format-Delta $totalWordDelta))
         Write-Verbose ("  {0,-18}: {1}" -f "Net Characters", (Format-Delta $totalCharDelta))
         Write-Verbose ""
     }
