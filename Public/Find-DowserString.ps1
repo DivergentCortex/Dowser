@@ -257,7 +257,7 @@ function Find-DowserString {
             catch {
                 $resolvedFile = $Path
             }
-            Write-Information "[Find-DowserString] Single file mode: '$resolvedFile'" -InformationAction Continue
+            Write-Log "Single file mode: '$resolvedFile'"
             $allFiles = @($resolvedFile)
 
             # default single-file output to truncated line content unless overridden

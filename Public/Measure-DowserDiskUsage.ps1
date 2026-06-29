@@ -22,7 +22,7 @@ function Measure-DowserDiskUsage {
     biggest directories (by rollup size), biggest individual files, and
     file counts/sizes grouped by extension. Each section is emitted as
     structured PSCustomObjects to the pipeline and rendered as formatted
-    console output via Write-Verbose.
+    console output via Write-Log.
 
     Unlike Measure-DowserDirectory (which measures immediate subdirs only
     with no ranking or extension breakdown), Measure-DowserDiskUsage
@@ -162,13 +162,13 @@ function Measure-DowserDiskUsage {
                     $dirFiles = $currentDir.EnumerateFiles()
                 }
                 catch {
-                    Write-Verbose "Access denied (files) in $($currentDir.FullName): $($_.Exception.Message)"
+                    Write-Log "Access denied (files) in $($currentDir.FullName): $($_.Exception.Message)" -Severity Verbose
                 }
 
                 if ($dirFiles) {
                     foreach ($fi in $dirFiles) {
                         if ($fi.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                            Write-Verbose "Skipping reparse point file: $($fi.FullName)"
+                            Write-Log "Skipping reparse point file: $($fi.FullName)" -Severity Verbose
                             continue
                         }
 
@@ -220,7 +220,7 @@ function Measure-DowserDiskUsage {
                     $subDirs = $currentDir.EnumerateDirectories()
                 }
                 catch {
-                    Write-Verbose "Access denied (dirs) in $($currentDir.FullName): $($_.Exception.Message)"
+                    Write-Log "Access denied (dirs) in $($currentDir.FullName): $($_.Exception.Message)" -Severity Verbose
                 }
 
                 if ($subDirs) {
@@ -352,30 +352,30 @@ function Measure-DowserDiskUsage {
 
             $sep = '-' * 70
             Write-Log "Measure-DowserDiskUsage scan complete: '$resolvedRoot' total $( Format-DowserSize -DataValue $totalBytes ) ($totalCount files)"
-            Write-Verbose $sep
-            Write-Verbose "Disk Usage Report: $resolvedRoot"
-            Write-Verbose ("Total: {0}  ({1} files)" -f (Format-DowserSize -DataValue $totalBytes), $totalCount)
-            Write-Verbose $sep
+            Write-Log $sep
+            Write-Log "Disk Usage Report: $resolvedRoot"
+            Write-Log ("Total: {0}  ({1} files)" -f (Format-DowserSize -DataValue $totalBytes), $totalCount)
+            Write-Log $sep
 
-            Write-Verbose ''
-            Write-Verbose "BIGGEST DIRECTORIES (top $TopN)"
-            Write-Verbose $sep
+            Write-Log ' '
+            Write-Log "BIGGEST DIRECTORIES (top $TopN)"
+            Write-Log $sep
             foreach ($d in $dirObjects) {
-                Write-Verbose ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $d.RelPath, $d.Size, $d.PctOfTotal, $d.Bar)
+                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $d.RelPath, $d.Size, $d.PctOfTotal, $d.Bar)
             }
 
-            Write-Verbose ''
-            Write-Verbose "BIGGEST FILES (top $TopN)"
-            Write-Verbose $sep
+            Write-Log ' '
+            Write-Log "BIGGEST FILES (top $TopN)"
+            Write-Log $sep
             foreach ($f in $fileObjects) {
-                Write-Verbose ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $f.RelPath, $f.Size, $f.PctOfTotal, $f.Bar)
+                Write-Log ("{0,-50} {1,10}  {2,5}%  [{3}]" -f $f.RelPath, $f.Size, $f.PctOfTotal, $f.Bar)
             }
 
-            Write-Verbose ''
-            Write-Verbose 'BY EXTENSION'
-            Write-Verbose $sep
+            Write-Log ' '
+            Write-Log 'BY EXTENSION'
+            Write-Log $sep
             foreach ($e in $extObjects) {
-                Write-Verbose ("{0,-12} {1,10}  {2,5}%  {3,6} files  [{4}]" -f `
+                Write-Log ("{0,-12} {1,10}  {2,5}%  {3,6} files  [{4}]" -f `
                         $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar)
             }
 

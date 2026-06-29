@@ -16,7 +16,7 @@ function Measure-DowserDirectory {
 
         Alias: dsize
         Source: Get-DirectorySizeCounts.ps1 (standalone scripts)
-        Ported: removed legacy write-alias dot-source and replaced custom write-alias calls with Write-Verbose.
+        Ported: removed legacy write-alias dot-source and replaced custom write-alias calls with Write-Log.
         Output improved: NewestFile/OldestFile split into separate Name/Date properties instead
         of a single concatenated string.
         Related: Get-DowserTree (tree traversal), Get-DowserReport (per-file metrics)

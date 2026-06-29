@@ -168,7 +168,7 @@ function Get-DowserTopology {
             $str += "$teeChar"
             $str += "-" * ($IndentSize - 1)
             $str
-            Write-Verbose "Ending $($MyInvocation.MyCommand)"
+            Write-Log "Ending $($MyInvocation.MyCommand)" -Severity Verbose
         }
 
         function ShowProperty() {
@@ -178,7 +178,7 @@ function Get-DowserTopology {
                 [string]$Value,
                 [bool[]]$IsLast
             )
-            Write-Verbose "Starting $($MyInvocation.MyCommand)"
+            Write-Log "Starting $($MyInvocation.MyCommand)" -Severity Verbose
             $indentStr = GetIndentString $IsLast
             $propStr = "${indentStr} $Name = "
             $availableWidth = $host.UI.RawUI.BufferSize.Width - $propStr.Length - 1
@@ -191,7 +191,7 @@ function Get-DowserTopology {
             }
             $propStr += $val
             $propStr
-            Write-Verbose "Ending $($MyInvocation.MyCommand)"
+            Write-Log "Ending $($MyInvocation.MyCommand)" -Severity Verbose
         }
 
         function ShowItem {
@@ -205,8 +205,8 @@ function Get-DowserTopology {
                 [ValidateSet("topcontainer", "childcontainer", "file")]
                 [string]$ItemType
             )
-            Write-Verbose "Starting $($MyInvocation.MyCommand)"
-            $PSBoundParameters | Out-String | Write-Verbose
+            Write-Log "Starting $($MyInvocation.MyCommand)" -Severity Verbose
+            Write-Log ($PSBoundParameters | Out-String) -Severity Verbose
             if ($IsLast.Count -eq 0) {
                 if ($Color) {
                     Write-Output "$($script:top)$("$(Resolve-Path $Path)")$([char]0x1b)[0m"
@@ -228,13 +228,13 @@ function Get-DowserTopology {
                         "file" {
                             foreach ($item in ($global:PSAnsiFileMap | Where-Object Pattern)) {
                                 if ($name -match $item.pattern -and (-not $done)) {
-                                    Write-Verbose "Detected a $($item.description) file"
+                                    Write-Log "Detected a $($item.description) file" -Severity Verbose
                                     Write-Output "$indentStr$($item.ansi)$($Name)$([char]0x1b)[0m"
                                     $done = $True
                                 }
                             }
                             if (-not $done) {
-                                Write-Verbose "No ansi match for $Name"
+                                Write-Log "No ansi match for $Name" -Severity Verbose
                                 Write-Output "$indentStr$Name$([char]0x1b)[0m"
                             }
                         }
@@ -272,7 +272,7 @@ function Get-DowserTopology {
                     ShowProperty @showParams
                 }
             }
-            Write-Verbose "Ending $($MyInvocation.MyCommand)"
+            Write-Log "Ending $($MyInvocation.MyCommand)" -Severity Verbose
         }
 
         function ShowContainer {
@@ -284,8 +284,8 @@ function Get-DowserTopology {
                 [switch]$IsTop,
                 [switch]$Color
             )
-            Write-Verbose "Starting $($MyInvocation.MyCommand) on $Path"
-            $PSBoundParameters | Out-String | Write-Verbose
+            Write-Log "Starting $($MyInvocation.MyCommand) on $Path" -Severity Verbose
+            Write-Log ($PSBoundParameters | Out-String) -Severity Verbose
             if ($IsLast.Count -gt $Depth) {
                 return 
             }
@@ -345,7 +345,7 @@ function Get-DowserTopology {
                     ShowItem @iParams
                 }
             }
-            Write-Verbose "Ending $($MyInvocation.MyCommand)"
+            Write-Log "Ending $($MyInvocation.MyCommand)" -Severity Verbose
         }
     }
 
