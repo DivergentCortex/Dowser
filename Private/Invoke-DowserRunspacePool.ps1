@@ -103,6 +103,8 @@ function Invoke-DowserRunspacePool {
             return
         }
 
+        Write-Log "Starting Invoke-DowserRunspacePool"
+
         $totalItems = $inputItems.Count
         $ComputedMaxThreads = [Math]::Max(1, $ThreadCount)
 
@@ -209,7 +211,7 @@ function Invoke-DowserRunspacePool {
                 }
             }
             catch {
-                Write-Warning "Error in worker thread: $($_.Exception.Message)"
+                Write-Log "Invoke-DowserRunspacePool failed collecting worker result: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
             }
             finally {
                 $j.Pipe.Dispose()
@@ -221,6 +223,7 @@ function Invoke-DowserRunspacePool {
         
         Write-Progress -Activity $ProgressActivity -Completed
 
+        Write-Log "Ending Invoke-DowserRunspacePool"
         return $results.ToArray()
     }
 }
