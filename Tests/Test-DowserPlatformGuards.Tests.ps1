@@ -13,9 +13,9 @@
       Add-Type -OutputType compile that throws on pwsh 7.
     - Get-DowserTopology -InColor does not crash on this host.
     - The 7-Zip default-parameter expression resolves to the bare '7z' on Linux.
-    - The log-cleanup function was renamed to the approved-verb name
-      Remove-DowserOldLogFiles and the old Cleanup-LogFiles name is gone.
-    - Get-ExecutionContextInfo returns the NonWindows shape on Linux.
+    - The log-cleanup function is the Witness-aligned name Clear-LogFile
+      and the old Cleanup-LogFiles name is gone.
+    - Get-PlatformContext returns the non-Windows platform shape on Linux.
 
     The PS 5.1 ($IsWindows = $null) and Windows ($IsWindows = $true) branches
     cannot be executed on this host; they are covered by reasoning in the
@@ -117,8 +117,8 @@ Describe '7-Zip default-parameter expression resolves on non-Windows' -Skip:($Is
 }
 
 Describe 'Log-cleanup function rename' {
-    It 'exposes Remove-DowserOldLogFiles after dot-sourcing Write-Log.ps1' {
-        Get-Command Remove-DowserOldLogFiles -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+    It 'exposes Clear-LogFile after dot-sourcing Write-Log.ps1' {
+        Get-Command Clear-LogFile -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
 
     It 'no longer defines the unapproved-verb name Cleanup-LogFiles' {
@@ -131,10 +131,10 @@ Describe 'Log-cleanup function rename' {
     }
 }
 
-Describe 'Get-ExecutionContextInfo on non-Windows' -Skip:($IsWindows -ne $false) {
-    It 'returns the NonWindows session shape' {
-        $ctx = Get-ExecutionContextInfo
-        $ctx.SessionType | Should -Be 'NonWindows'
+Describe 'Get-PlatformContext on non-Windows' -Skip:($IsWindows -ne $false) {
+    It 'returns the non-Windows platform shape' {
+        $ctx = Get-PlatformContext
+        $ctx.Platform | Should -BeIn @('Linux', 'macOS')
         $ctx.IsSystem | Should -BeFalse
     }
 }
