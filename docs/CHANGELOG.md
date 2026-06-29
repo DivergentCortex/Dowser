@@ -2,6 +2,32 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.040] - 2026-06-29
+### fix(logging): Demote diagnostic Write-Log calls to Severity Verbose so they are off by default
+
+What changed:
+- Added -Severity Verbose to every diagnostic/operational Write-Log call across all Public functions and Private helpers; the prior pass had wrongly left them bare (Info), which made them always-on. Verbose severity is suppressed unless the caller runs with -Verbose (Write-Log honors the caller VerbosePreference via its preference bridge)
+- Left the per-function Starting/Ending announce lines bare (Info) so a normal run still logs which function ran; left -Severity Warning and -Severity Error untouched (always-on)
+- Verified by grep: zero bare Write-Log calls remain anywhere except the Starting/Ending announces; all 33 module files parse clean (AST)
+
+Why:
+- Operational traces that were originally Write-Verbose must stay off by default and only surface when the user passes -Verbose; promoting them to Info spammed the console and log on every normal run. Now a default run logs only the announce plus warnings and errors, and -Verbose reveals the full trace
+
+
+## [2026.06.29.039] - 2026-06-29
+### fix(Public): Demote operational diagnostics from always-on Info to Verbose in five Public functions
+
+What changed:
+- ConvertTo-DowserBase64.ps1: added -Severity Verbose to 7 bare Write-Log calls (decode/encode path traces, clipboard state, file save confirmation, length report)
+- ConvertTo-DowserExe.ps1: added -Severity Verbose to 6 bare Write-Log calls (compile and ConfuserEx operation traces in both ConvertTo-DowserExe and ConvertTo-DowserExeConfuserEx)
+- ConvertTo-DowserIco.ps1: added -Severity Verbose to 4 bare Write-Log calls (UNC staging, icon write confirmation, temp cleanup)
+- Expand-DowserExe.ps1: added -Severity Verbose to 6 bare Write-Log calls (7-Zip path, extractability check, directory creation, extraction start, extraction count, result detail)
+- Test-DowserExtractable.ps1: adding -Severity Verbose to 20 bare Write-Log calls (7-Zip probe, file enumeration, per-file analysis traces, signature matches, native ZIP/CAB probes, 7-Zip oracle results)
+
+Why:
+- A prior pass converted Write-Verbose diagnostics to bare Write-Log with no -Severity, making them always-on Info. These are operational step traces, not user-facing outcomes. They must be -Severity Verbose so they are silent by default and only surface when the caller passes -Verbose.
+
+
 ## [2026.06.29.038] - 2026-06-29
 ### refactor(logging): Route all logging through Write-Log and harden error handling across every script
 
