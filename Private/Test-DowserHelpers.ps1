@@ -28,7 +28,6 @@ if ($bytes1 -eq 1048576 -and $bytes2 -eq 1610612736 -and $bytes3 -eq 1024) {
 Write-Information "Testing Get-DowserSortKey..." -InformationAction Continue
 $key1 = Get-DowserSortKey -InputString "File-1"
 $key2 = Get-DowserSortKey -InputString "File-10"
-# key1 should have "00001", key2 should have "00010"
 if ($key1 -contains "00001" -and $key2 -contains "00010") {
     Write-Information "Get-DowserSortKey PASSED" -InformationAction Continue
 } else {
