@@ -211,7 +211,7 @@ function Test-DowserIntegrity {
             $zipNativeAvailable = $true
         }
         catch {
-            Write-Verbose "System.IO.Compression unavailable: $($_.Exception.Message)"
+            Write-Log "System.IO.Compression unavailable: $($_.Exception.Message)" -Severity Verbose
             $zipNativeAvailable = $false
         }
 
@@ -684,7 +684,7 @@ function Test-DowserIntegrity {
                     }
                 }
 
-                Write-Verbose "Testing ($processedCount): $relPath"
+                Write-Log "Testing ($processedCount): $relPath" -Severity Verbose
 
                 $ext = $file.Extension.ToLowerInvariant()
 

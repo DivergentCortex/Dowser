@@ -147,7 +147,7 @@ function Get-DowserTopology {
         function GetIndentString {
             [CmdletBinding()]
             param([bool[]]$IsLast)
-            Write-Verbose "Starting $($MyInvocation.MyCommand)"
+            Write-Log "Starting $($MyInvocation.MyCommand)" -Severity Verbose
             $str = ''
             for ($i = 0; $i -lt $IsLast.Count - 1; $i++) {
                 $sepChar = if ($IsLast[$i]) {

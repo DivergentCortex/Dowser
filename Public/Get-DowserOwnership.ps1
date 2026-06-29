@@ -124,7 +124,7 @@ function Get-DowserOwnership {
                         $ShellFile = $ShellFolder.ParseName($FileInformation.Name)
                     }
                     catch {
-                        Write-Verbose "Shell.Application COM not available on this platform; skipping extended metadata."
+                        Write-Log "Shell.Application COM not available on this platform; skipping extended metadata." -Severity Verbose
                     }
                 }
                 if ($IsWindows -eq $false) {

@@ -209,7 +209,7 @@ function Get-DowserMap {
                     }
                 }
                 catch {
-                    Write-Verbose "Size measurement failed for '$folderPath': $_" 
+                    Write-Log "Size measurement failed for '$folderPath': $_" -Severity Verbose 
                 }
                 $SizeCache[$folderPath] = $sizeBytes
             }
@@ -226,7 +226,7 @@ function Get-DowserMap {
                     $count = $counted.Count
                 }
                 catch {
-                    Write-Verbose "PS1 count failed for '$folderPath': $_" 
+                    Write-Log "PS1 count failed for '$folderPath': $_" -Severity Verbose 
                 }
                 $PsCountCache[$folderPath] = $count
             }
@@ -569,7 +569,7 @@ function Get-DowserMap {
                 }
             }
             catch {
-                Write-Verbose "Error in pre-scan thread: $_"
+                Write-Log "Error in pre-scan thread: $_" -Severity Verbose
             }
             finally {
                 $j.Pipe.Dispose() 
@@ -786,7 +786,7 @@ function Get-DowserMap {
                 }
             }
             catch {
-                Write-Verbose "Match-cache scan failed for '$($current.Path)': $_" 
+                Write-Log "Match-cache scan failed for '$($current.Path)': $_" -Severity Verbose 
             }
         }
         $MatchCache[$cacheKey] = $false
@@ -846,7 +846,7 @@ function Get-DowserMap {
                 }
             }
             catch {
-                Write-Verbose "Include-folder scan failed for '$($current.Path)': $_" 
+                Write-Log "Include-folder scan failed for '$($current.Path)': $_" -Severity Verbose 
             }
         }
         $IncludeFolderCache[$cacheKey] = $false

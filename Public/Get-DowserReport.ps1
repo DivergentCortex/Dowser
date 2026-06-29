@@ -140,7 +140,7 @@ function Get-DowserReport {
         # wrap bare strings so partial names match
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
             $Pattern = "*$Pattern*"
-            Write-Verbose "Pattern auto-wrapped to: $Pattern"
+            Write-Log "Pattern auto-wrapped to: $Pattern" -Severity Verbose
         }
 
         Write-Log "Starting Get-DowserReport"
@@ -161,7 +161,7 @@ function Get-DowserReport {
             # SINGLE FILE MODE - skip runspaces entirely
             # ================================================================
             if ($isSingleFile) {
-                Write-Verbose "Single file mode: $resolvedPath"
+                Write-Log "Single file mode: $resolvedPath" -Severity Verbose
                 $fileItem = Get-Item -LiteralPath $resolvedPath -Force -ErrorAction SilentlyContinue
                 if (-not $fileItem) {
                     continue 
@@ -180,7 +180,7 @@ function Get-DowserReport {
                     }
                 }
                 catch {
-                    Write-Verbose "Could not read content of $($fileItem.FullName): $_"
+                    Write-Log "Could not read content of $($fileItem.FullName): $_" -Severity Verbose
                 }
 
                 $owner = $null
@@ -327,7 +327,7 @@ function Get-DowserReport {
                         }
                     }
                     catch {
-                        Write-Verbose "Error in file gather thread: $_"
+                        Write-Log "Error in file gather thread: $_" -Severity Verbose
                         $script:errorCount++
                     }
                     finally {
@@ -339,7 +339,7 @@ function Get-DowserReport {
 
             }
             else {
-                Write-Verbose "Single-threaded file gathering"
+                Write-Log "Single-threaded file gathering" -Severity Verbose
                 $gatherResults = & $gatherScriptBlock $resolvedPath $Pattern $Extensions $Depth $minBytes $maxBytes
                 foreach ($r in $gatherResults) {
                     $filesFound.Add($r) 
@@ -348,7 +348,7 @@ function Get-DowserReport {
 
             $allPaths = $filesFound.ToArray() | Select-Object -Unique
             $fileCount = @($allPaths).Count
-            Write-Verbose "Found $fileCount files matching criteria"
+            Write-Log "Found $fileCount files matching criteria" -Severity Verbose
 
             if ($fileCount -eq 0) {
                 Write-Log "Get-DowserReport no files found in '$resolvedPath' matching criteria" -Severity Warning
@@ -509,7 +509,7 @@ function Get-DowserReport {
                         }
                     }
                     catch {
-                        Write-Verbose "Error in analysis thread: $_"
+                        Write-Log "Error in analysis thread: $_" -Severity Verbose
                         $script:errorCount++
                     }
                     finally {
@@ -521,7 +521,7 @@ function Get-DowserReport {
 
             }
             else {
-                Write-Verbose "Single-threaded file analysis"
+                Write-Log "Single-threaded file analysis" -Severity Verbose
                 $analysisResults = & $analyzeScriptBlock $allPaths ([bool]$IncludeOwner) $resolvedPath
                 foreach ($row in $analysisResults) {
                     [void]$script:allResults.Add($row) 
@@ -650,23 +650,23 @@ function Get-DowserReport {
             Select-Object -First 10 |
             ForEach-Object { "$($_.Name): $($_.Count)" }
 
-        Write-Verbose ""
-        Write-Verbose "--- Get-DowserReport Summary ---"
-        Write-Verbose ("  {0,-22}: {1}" -f "Total Files", $totalFiles)
-        Write-Verbose ("  {0,-22}: {1}" -f "Readable Files", $readableFiles)
-        Write-Verbose ("  {0,-22}: {1}" -f "Binary/Locked Files", $binaryFiles)
-        Write-Verbose ("  {0,-22}: {1}" -f "Total Size", (Format-DowserSize -DataValue $totalSize))
-        Write-Verbose ("  {0,-22}: {1}" -f "Average File Size", (Format-DowserSize -DataValue $avgSize))
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Lines", $totalLines)
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Words", $totalWords)
-        Write-Verbose ("  {0,-22}: {1:N0}" -f "Total Characters", $totalChars)
-        Write-Verbose ("  {0,-22}: {1}" -f "Avg Lines/File", $avgLines)
+        Write-Log "" -Severity Verbose
+        Write-Log "--- Get-DowserReport Summary ---" -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Total Files", $totalFiles) -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Readable Files", $readableFiles) -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Binary/Locked Files", $binaryFiles) -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Total Size", (Format-DowserSize -DataValue $totalSize)) -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Average File Size", (Format-DowserSize -DataValue $avgSize)) -Severity Verbose
+        Write-Log ("  {0,-22}: {1:N0}" -f "Total Lines", $totalLines) -Severity Verbose
+        Write-Log ("  {0,-22}: {1:N0}" -f "Total Words", $totalWords) -Severity Verbose
+        Write-Log ("  {0,-22}: {1:N0}" -f "Total Characters", $totalChars) -Severity Verbose
+        Write-Log ("  {0,-22}: {1}" -f "Avg Lines/File", $avgLines) -Severity Verbose
         if ($script:errorCount -gt 0) {
-            Write-Verbose ("  {0,-22}: {1}" -f "Errors Encountered", $script:errorCount)
+            Write-Log ("  {0,-22}: {1}" -f "Errors Encountered", $script:errorCount) -Severity Verbose
         }
-        Write-Verbose ("  {0,-22}: {1}" -f "Top Extensions", ($extensionBreakdown -join ", "))
-        Write-Verbose ("  {0,-22}: {1:F2}s" -f "Execution Time", $duration.TotalSeconds)
-        Write-Verbose ""
+        Write-Log ("  {0,-22}: {1}" -f "Top Extensions", ($extensionBreakdown -join ", ")) -Severity Verbose
+        Write-Log ("  {0,-22}: {1:F2}s" -f "Execution Time", $duration.TotalSeconds) -Severity Verbose
+        Write-Log "" -Severity Verbose
 
         if ($ExportCsv) {
             Write-Log "Get-DowserReport exporting CSV to '$ExportCsv'"
@@ -988,16 +988,15 @@ function Compare-DowserReport {
         }
 
         Write-Log "Ending Compare-DowserReport"
-        Write-Verbose ""
-        Write-Verbose "--- Compare-DowserReport Summary ---"
-        Write-Verbose ("  {0,-18}: {1}" -f "New Files", $newCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Changed Files", $changedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Removed Files", $removedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Unchanged Files", $unchangedCount)
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Size", (Format-SizeDelta $totalSizeDelta))
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Lines", (Format-Delta $totalLineDelta))
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Words", (Format-Delta $totalWordDelta))
-        Write-Verbose ("  {0,-18}: {1}" -f "Net Characters", (Format-Delta $totalCharDelta))
-        Write-Verbose ""
+        Write-Log "" -Severity Verbose
+        Write-Log "--- Compare-DowserReport Summary ---" -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "New Files", $newCount) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Changed Files", $changedCount) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Removed Files", $removedCount) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Unchanged Files", $unchangedCount) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Net Size", (Format-SizeDelta $totalSizeDelta)) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Net Lines", (Format-Delta $totalLineDelta)) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Net Words", (Format-Delta $totalWordDelta)) -Severity Verbose
+        Write-Log ("  {0,-18}: {1}" -f "Net Characters", (Format-Delta $totalCharDelta)) -Severity Verbose
     }
 }

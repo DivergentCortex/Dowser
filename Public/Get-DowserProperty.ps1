@@ -92,10 +92,10 @@ function Get-DowserProperty {
         $IsDirectory = [bool]$FileItem.PSIsContainer
 
         if ($IsDirectory -and -not $IncludeDirectories) {
-            Write-Verbose "Skipping directory input (use -IncludeDirectories to include): $ResolvedFilePath"
+            Write-Log "Skipping directory input (use -IncludeDirectories to include): $ResolvedFilePath" -Severity Verbose
             return
         }
-        Write-Verbose "Analyzing file: $ResolvedFilePath"
+        Write-Log "Analyzing file: $ResolvedFilePath" -Severity Verbose
 
         $FileDetails = [PSCustomObject]@{
             FilePath         = $ResolvedFilePath
@@ -122,7 +122,7 @@ function Get-DowserProperty {
         }
 
         try {
-            Write-Verbose "Getting basic file information..."
+            Write-Log "Getting basic file information..." -Severity Verbose
 
             if (-not $IsDirectory) {
                 $FileDetails | Add-Member -MemberType NoteProperty -Name 'Size' -Value $FileItem.Length
@@ -136,7 +136,7 @@ function Get-DowserProperty {
             $FileDetails | Add-Member -MemberType NoteProperty -Name 'IsHidden' -Value (($FileItem.Attributes -band [System.IO.FileAttributes]::Hidden) -eq [System.IO.FileAttributes]::Hidden)
             $FileDetails | Add-Member -MemberType NoteProperty -Name 'IsSystem' -Value (($FileItem.Attributes -band [System.IO.FileAttributes]::System) -eq [System.IO.FileAttributes]::System)
 
-            Write-Verbose "Getting version information..."
+            Write-Log "Getting version information..." -Severity Verbose
             try {
                 if ($IsDirectory) {
                     throw [System.InvalidOperationException]::new('Version information is not applicable to directories.') 
@@ -201,12 +201,12 @@ function Get-DowserProperty {
                 $FileDetails | Add-Member -MemberType NoteProperty -Name 'IsSpecialBuild' -Value $VersionInfo.IsSpecialBuild
             }
             catch {
-                Write-Verbose "Version information not available or error: $($_.Exception.Message)"
+                Write-Log "Version information not available or error: $($_.Exception.Message)" -Severity Verbose
             }
 
             # shell COM is windows only, $IsWindows null on 5.1 means windows
             if ($IsWindows -ne $false) {
-                Write-Verbose "Getting extended properties using COM object..."
+                Write-Log "Getting extended properties using COM object..." -Severity Verbose
                 try {
                     $Shell = New-Object -ComObject Shell.Application
                     $FolderPath = Split-Path $ResolvedFilePath
@@ -237,24 +237,24 @@ function Get-DowserProperty {
                             [System.Runtime.InteropServices.Marshal]::ReleaseComObject($File) | Out-Null
                         }
                         else {
-                            Write-Verbose "Could not parse file name in folder: $FileName"
+                            Write-Log "Could not parse file name in folder: $FileName" -Severity Verbose
                         }
                         [System.Runtime.InteropServices.Marshal]::ReleaseComObject($Folder) | Out-Null
                     }
                     else {
-                        Write-Verbose "Could not access folder via Shell.Application: $FolderPath"
+                        Write-Log "Could not access folder via Shell.Application: $FolderPath" -Severity Verbose
                     }
                     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($Shell) | Out-Null
                 }
                 catch {
-                    Write-Verbose "Extended properties COM object error: $($_.Exception.Message)"
+                    Write-Log "Extended properties COM object error: $($_.Exception.Message)" -Severity Verbose
                 }
             }
             else {
-                Write-Verbose "Extended file properties via Shell.Application not available on this platform."
+                Write-Log "Extended file properties via Shell.Application not available on this platform." -Severity Verbose
             }
 
-            Write-Verbose "Calculating file hashes..."
+            Write-Log "Calculating file hashes..." -Severity Verbose
             try {
                 if ($IsDirectory) {
                     throw [System.InvalidOperationException]::new('Hash calculation is not applicable to directories.') 
@@ -267,12 +267,12 @@ function Get-DowserProperty {
                 $FileDetails | Add-Member -MemberType NoteProperty -Name 'SHA256Hash' -Value $SHA256Hash.Hash
             }
             catch {
-                Write-Verbose "Hash calculation error: $($_.Exception.Message)"
+                Write-Log "Hash calculation error: $($_.Exception.Message)" -Severity Verbose
             }
 
             # opt-in, slow, windows only
             if (($IsWindows -ne $false) -and $IncludeSignature) {
-                Write-Verbose "Getting digital signature information..."
+                Write-Log "Getting digital signature information..." -Severity Verbose
                 try {
                     if ($IsDirectory) {
                         throw [System.InvalidOperationException]::new('Digital signature is not applicable to directories.') 
@@ -297,15 +297,15 @@ function Get-DowserProperty {
                     }
                 }
                 catch {
-                    Write-Verbose "Digital signature error: $($_.Exception.Message)"
+                    Write-Log "Digital signature error: $($_.Exception.Message)" -Severity Verbose
                 }
             }
             elseif ($IncludeSignature -and -not $IsWindows) {
-                Write-Verbose "Authenticode signature inspection requires Windows."
+                Write-Log "Authenticode signature inspection requires Windows." -Severity Verbose
             }
 
             if (-not $IsDirectory -and $ResolvedFilePath -match '\.(exe|dll)$') {
-                Write-Verbose "Getting .NET assembly information..."
+                Write-Log "Getting .NET assembly information..." -Severity Verbose
                 try {
                     $Assembly = [System.Reflection.Assembly]::LoadFile($ResolvedFilePath)
                     $FileDetails | Add-Member -MemberType NoteProperty -Name 'DotNetVersion' -Value $Assembly.ImageRuntimeVersion
@@ -327,12 +327,12 @@ function Get-DowserProperty {
                     }
                 }
                 catch {
-                    Write-Verbose ".NET assembly information not available: $($_.Exception.Message)"
+                    Write-Log ".NET assembly information not available: $($_.Exception.Message)" -Severity Verbose
                 }
             }
 
             if (-not $IsDirectory -and $ResolvedFilePath -match '\.(exe|dll)$') {
-                Write-Verbose "Getting PE header information..."
+                Write-Log "Getting PE header information..." -Severity Verbose
                 try {
                     $FileStream = [System.IO.File]::OpenRead($ResolvedFilePath)
                     $BinaryReader = New-Object System.IO.BinaryReader($FileStream)
@@ -367,7 +367,7 @@ function Get-DowserProperty {
                     $FileStream.Close()
                 }
                 catch {
-                    Write-Verbose "PE header analysis error: $($_.Exception.Message)"
+                    Write-Log "PE header analysis error: $($_.Exception.Message)" -Severity Verbose
                     if ($BinaryReader) {
                         $BinaryReader.Close() 
                     }
@@ -381,7 +381,7 @@ function Get-DowserProperty {
             Write-Log "Get-DowserProperty failed analyzing '$FilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         }
 
-        Write-Verbose "File analysis complete"
+        Write-Log "File analysis complete" -Severity Verbose
         return $FileDetails
     }
 

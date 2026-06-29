@@ -84,7 +84,7 @@ function Measure-DowserDirectory {
             }
 
             foreach ($dir in $directoryItems) {
-                Write-Verbose "Searching $($dir.FullName)"
+                Write-Log "Searching $($dir.FullName)" -Severity Verbose
 
                 $subFolderItems = $null
                 try {
@@ -121,7 +121,7 @@ function Measure-DowserDirectory {
                     OldestFileDate  = $oldestFile.LastWriteTime
                 }
 
-                Write-Verbose "Complete $($dir.FullName)"
+                Write-Log "Complete $($dir.FullName)" -Severity Verbose
             }
         }
     }

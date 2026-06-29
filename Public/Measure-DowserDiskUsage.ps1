@@ -146,14 +146,14 @@ function Measure-DowserDiskUsage {
                 $currentDir = $queue.Dequeue()
 
                 if ($excludeSet.Count -gt 0 -and $excludeSet.Contains($currentDir.Name)) {
-                    Write-Verbose "Skipping excluded directory: $($currentDir.FullName)"
+                    Write-Log "Skipping excluded directory: $($currentDir.FullName)" -Severity Verbose
                     continue
                 }
 
                 # skip symlinks and junctions to dodge loops, but never the root
                 $isRoot = $dirComparer.Equals($currentDir.FullName, $resolvedRoot)
                 if (-not $isRoot -and ($currentDir.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
-                    Write-Verbose "Skipping reparse point: $($currentDir.FullName)"
+                    Write-Log "Skipping reparse point: $($currentDir.FullName)" -Severity Verbose
                     continue
                 }
 
