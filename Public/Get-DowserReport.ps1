@@ -1,69 +1,91 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    File metrics reporting tool with parallel runspace processing.
-.DESCRIPTION
-    Scans a single file, folder, or entire directory tree and produces a detailed
-    metrics report including file size, line count, word count, character count,
-    timestamps, attributes, and optionally file ownership.
-
-    Uses RunspacePool-based parallel processing for both file gathering and file
-    analysis phases.
-.PARAMETER Path
-    The file or directory path(s) to analyze. Accepts pipeline input.
-    Can be a single file, a folder, or multiple paths.
-.PARAMETER Pattern
-    Wildcard pattern to match file names (e.g., "*.ps1", "*.log"). Default is "*".
-.PARAMETER Extensions
-    Array of extension filters (e.g., '*.ps1','*.txt','*.csv').
-.PARAMETER Depth
-    How many levels deep to scan. Default is 0 (target folder only).
-    Use -1 for unlimited recursion. Examples: 0 = current folder only,
-    1 = target + immediate subfolders, -1 = full recursive.
-.PARAMETER IncludeOwner
-    Include file owner from ACL. Slower due to Get-Acl calls. Off by default.
-.PARAMETER MinSize
-    Minimum file size filter (e.g., "1KB", "10MB").
-.PARAMETER MaxSize
-    Maximum file size filter (e.g., "500MB", "1GB").
-.PARAMETER UseRunspaces
-    Enable multi-threaded processing. Default is $true.
-.PARAMETER ThreadCount
-    Number of threads for parallel processing. Defaults to processor count.
-.PARAMETER ExportCsv
-    Path to automatically export results as CSV.
-.PARAMETER ExportHtml
-    Path to automatically export results as formatted HTML report.
-.PARAMETER SortBy
-    Property to sort results by. Default is 'FullName'.
-.PARAMETER Descending
-    Sort results in descending order.
-.EXAMPLE
-    Get-DowserReport -Path "D:\Scripts"
-.EXAMPLE
-    Get-DowserReport -Path "D:\Scripts\MyScript.ps1"
-.EXAMPLE
-    Get-DowserReport -Path "D:\Logs" -Extensions '*.log','*.txt' -Depth -1 -ExportCsv "D:\report.csv"
-.EXAMPLE
-    Get-DowserReport -Path "D:\Projects" -IncludeOwner -SortBy Size -Descending
-.EXAMPLE
-    Get-DowserReport -Path "D:\Projects" -Depth -1
-.OUTPUTS
-    PSCustomObject — structured file metrics for downstream processing.
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Ported from: Get-FileReport.ps1 (standalone scripts)
-    Uses: Private\Format-DowserSize, Private\ConvertTo-DowserBytes
-    Note: The runspace analyzeScriptBlock contains a local inline size formatter
-          (FormatSizeLocal) because module-scope functions are not reachable from
-          runspace threads. This is intentional — do not refactor it out.
-#>
 
 # two-phase parallel file report. gather dirs first, analyze chunks in phase 2.
 # runspace block has its own size formatter, cant reach Format-DowserSize from there
 # ConvertTo-DowserBytes handles MinSize/MaxSize string parsing from module Private.
 
 function Get-DowserReport {
+    <#
+    .SYNOPSIS
+        File metrics reporting tool with parallel runspace processing.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Ported from: Get-FileReport.ps1 (standalone scripts)
+        Uses: Private\Format-DowserSize, Private\ConvertTo-DowserBytes
+        Note: The runspace analyzeScriptBlock contains a local inline size formatter
+              because module-scope functions are not reachable from runspace threads.
+              This is intentional. Do not refactor it out.
+    .DESCRIPTION
+        Scans a single file, folder, or entire directory tree and produces a detailed
+        metrics report including file size, line count, word count, character count,
+        timestamps, attributes, and optionally file ownership.
+
+        Uses RunspacePool-based parallel processing for both file gathering and file
+        analysis phases.
+    .PARAMETER Path
+        The file or directory path(s) to analyze. Accepts pipeline input.
+        Can be a single file, a folder, or multiple paths.
+    .PARAMETER Pattern
+        Wildcard pattern to match file names (e.g., "*.ps1", "*.log"). Default is "*".
+    .PARAMETER Extensions
+        Array of extension filters (e.g., '*.ps1','*.txt','*.csv').
+    .PARAMETER Depth
+        How many levels deep to scan. Default is 0 (target folder only).
+        Use -1 for unlimited recursion. Examples: 0 = current folder only,
+        1 = target + immediate subfolders, -1 = full recursive.
+    .PARAMETER IncludeOwner
+        Include file owner from ACL. Slower due to Get-Acl calls. Off by default.
+    .PARAMETER MinSize
+        Minimum file size filter (e.g., "1KB", "10MB").
+    .PARAMETER MaxSize
+        Maximum file size filter (e.g., "500MB", "1GB").
+    .PARAMETER UseRunspaces
+        Enable multi-threaded processing. Default is $true.
+    .PARAMETER ThreadCount
+        Number of threads for parallel processing. Defaults to processor count.
+    .PARAMETER ExportCsv
+        Path to automatically export results as CSV.
+    .PARAMETER ExportHtml
+        Path to automatically export results as formatted HTML report.
+    .PARAMETER SortBy
+        Property to sort results by. Default is 'FullName'.
+    .PARAMETER Descending
+        Sort results in descending order.
+    .EXAMPLE
+        Get-DowserReport -Path "D:\Scripts"
+
+        Reports metrics for the files directly under D:\Scripts.
+    .EXAMPLE
+        Get-DowserReport -Path "D:\Scripts\MyScript.ps1"
+
+        Reports metrics for a single file.
+    .EXAMPLE
+        Get-DowserReport -Path "D:\Logs" -Extensions '*.log','*.txt' -Depth -1 -ExportCsv "D:\report.csv"
+
+        Recursively reports .log and .txt files and exports the result to CSV.
+    .EXAMPLE
+        Get-DowserReport -Path "D:\Projects" -IncludeOwner -SortBy Size -Descending
+
+        Reports with owner column, sorted by size descending.
+    .EXAMPLE
+        Get-DowserReport -Path "D:\Projects" -Depth -1
+
+        Recursively reports every file under D:\Projects.
+    .INPUTS
+        System.String
+        You can pipe one or more paths to this function.
+    .OUTPUTS
+        PSCustomObject
+        Structured file metrics for downstream processing.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
@@ -724,6 +746,15 @@ function Compare-DowserReport {
     <#
     .SYNOPSIS
         Compares two Get-DowserReport snapshots and shows what changed.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
         Takes a "before" and "after" set of Get-DowserReport results and produces
         a detailed diff showing new files, removed files, and changed files with
@@ -739,8 +770,11 @@ function Compare-DowserReport {
         # ... make changes ...
         $after = Get-DowserReport -Path .\project
         Compare-DowserReport -Before $before -After $after
+
+        Captures a baseline, then diffs it against a fresh snapshot after edits.
     .OUTPUTS
-        PSCustomObject with change status and deltas for each file.
+        PSCustomObject
+        One object per file carrying change status and per-metric deltas.
     #>
     [CmdletBinding()]
     param(

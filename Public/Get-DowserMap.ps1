@@ -148,7 +148,7 @@ function Get-DowserMap {
         [string]$MarkdownFile,
         [switch]$EmitSummary,
 
-        # Internal (for recursion) — dont mess with these
+        # Internal (for recursion), dont mess with these
         [string]$Indent = "",
         [int]$CurrentDepth = 0,
         [Parameter(DontShow = $true)]
@@ -259,7 +259,7 @@ function Get-DowserMap {
         $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
     }
 
-    # folder exclude defaults — opinionated but documented. use -NoDefaultExcludes to bypass.
+    # folder exclude defaults, opinionated but documented. use -NoDefaultExcludes to bypass.
     $defaultExcludes = @(
         '__pycache__', 'node_modules', '.git', '.svn', '.hg', '.vs', '.vscode', 'obj', '.idea',
         'dist', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv', 'env', '.env',

@@ -1,10 +1,24 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Tests files and directories for corruption or structural integrity issues.
+function Test-DowserIntegrity {
+    <#
+    .SYNOPSIS
+        Tests files and directories for corruption or structural integrity issues.
 
-.DESCRIPTION
-    Layered integrity validation. Not one magic "is this corrupt" test.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: dintegrity, dinteg
+        Related: Test-DowserExtractable, Get-DowserReport, Expand-DowserExe
+
+    .DESCRIPTION
+        Layered integrity validation. Not one magic "is this corrupt" test.
     "Corrupt" depends on file type, so this cmdlet dispatches by category
     and reports what it checked and how confident it is.
 
@@ -118,13 +132,10 @@
         Select-Object RelativePath, @{Name='Length'; Expression={$_.SizeBytes}}, SHA256 |
         Export-Csv .\SPACE8_baseline.csv -NoTypeInformation
 
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Alias: dintegrity, dinteg
-    Related: Test-DowserExtractable, Get-DowserReport, Expand-DowserExe
+.OUTPUTS
+    Default: a single summary PSCustomObject (full per-file array stashed in
+    $global:DowserIntegrityDetails). With -Detailed: per-file PSCustomObject results.
 #>
-
-function Test-DowserIntegrity {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
