@@ -191,10 +191,10 @@ function Test-DowserIntegrity {
         Write-Log "Starting Test-DowserIntegrity"
         $sevenZipAvailable = (-not $SkipSevenZip) -and (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)
         if ($sevenZipAvailable) {
-            Write-Log "Test-DowserIntegrity 7-Zip found at '$SevenZipPath'"
+            Write-Log "Test-DowserIntegrity 7-Zip found at '$SevenZipPath'" -Severity Verbose
         }
         else {
-            Write-Log "Test-DowserIntegrity 7-Zip not available; native-only validation for archives."
+            Write-Log "Test-DowserIntegrity 7-Zip not available; native-only validation for archives." -Severity Verbose
         }
 
         $expandExe = if ($IsWindows -eq $false) {
@@ -233,7 +233,7 @@ function Test-DowserIntegrity {
                     $baseline[$row.RelativePath.ToUpperInvariant()] = $row
                 }
             }
-            Write-Log "Test-DowserIntegrity loaded baseline: $($baseline.Count) entries from '$BaselineCsv'"
+            Write-Log "Test-DowserIntegrity loaded baseline: $($baseline.Count) entries from '$BaselineCsv'" -Severity Verbose
             # baseline compare needs hashes
             $ComputeHash = $true
         }
@@ -662,7 +662,7 @@ function Test-DowserIntegrity {
                     Write-Log "Test-DowserIntegrity no files matching '$Filter' found in '$inputPath'" -Severity Warning
                     continue
                 }
-                Write-Log "Test-DowserIntegrity found $($files.Count) file(s) in '$inputPath'"
+                Write-Log "Test-DowserIntegrity found $($files.Count) file(s) in '$inputPath'" -Severity Verbose
             }
             elseif (Test-Path -LiteralPath $inputPath -PathType Leaf) {
                 $files = @(Get-Item -LiteralPath $inputPath -ErrorAction SilentlyContinue)
@@ -1010,7 +1010,7 @@ function Test-DowserIntegrity {
     end {
         # publish detail to the global even in detailed mode
         $global:DowserIntegrityDetails = $allResults.ToArray()
-        Write-Log "Test-DowserIntegrity processed $($allResults.Count) file(s)"
+        Write-Log "Test-DowserIntegrity processed $($allResults.Count) file(s)" -Severity Verbose
 
         if ($Detailed) {
             # per-file objects already streamed in process

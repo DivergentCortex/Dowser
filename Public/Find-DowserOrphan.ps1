@@ -71,9 +71,9 @@ function Find-DowserOrphan {
         return
     }
 
-    Write-Log "Scanning for orphan files in: $SearchPath"
+    Write-Log "Scanning for orphan files in: $SearchPath" -Severity Verbose
 
-    Write-Log "Inventorying files..."
+    Write-Log "Inventorying files..." -Severity Verbose
     $allFiles = Get-ChildItem -Path $SearchPath -Recurse -File | Where-Object {
         $path = $_.FullName
         $exclude = $false
@@ -87,7 +87,7 @@ function Find-DowserOrphan {
     }
 
     $fileCount = $allFiles.Count
-    Write-Log "Found $fileCount files."
+    Write-Log "Found $fileCount files." -Severity Verbose
 
     $tokenMap = @{}
 
@@ -98,7 +98,7 @@ function Find-DowserOrphan {
     $scannerCount = $scannerFiles.Count
     $processed = 0
 
-    Write-Log "Analyzing content of $scannerCount text files..."
+    Write-Log "Analyzing content of $scannerCount text files..." -Severity Verbose
 
     foreach ($file in $scannerFiles) {
         $processed++
@@ -130,7 +130,7 @@ function Find-DowserOrphan {
     $orphans = @()
     $referenced = @()
 
-    Write-Log "Checking for references..."
+    Write-Log "Checking for references..." -Severity Verbose
 
     foreach ($file in $allFiles) {
         $name = $file.Name
@@ -155,11 +155,11 @@ function Find-DowserOrphan {
         }
     }
 
-    Write-Log "Analysis Complete. Total: $fileCount | Referenced: $($referenced.Count) | Orphans: $($orphans.Count)"
+    Write-Log "Analysis Complete. Total: $fileCount | Referenced: $($referenced.Count) | Orphans: $($orphans.Count)" -Severity Verbose
 
     if ($orphans.Count -gt 0) {
         # preview summary to log so the return stays clean fileinfo objects
-        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Log
+        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Log -Severity Verbose
     }
 
     Write-Log "Ending Find-DowserOrphan"
