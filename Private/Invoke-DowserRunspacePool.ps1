@@ -102,9 +102,12 @@ function Invoke-DowserRunspacePool {
 
         if ($BatchSize -gt 0) {
             $chunkSize = $BatchSize
-        } else {
+        }
+        else {
             $chunkSize = [Math]::Ceiling($totalItems / $ComputedMaxThreads)
-            if ($chunkSize -lt 1) { $chunkSize = 1 }
+            if ($chunkSize -lt 1) {
+                $chunkSize = 1 
+            }
         }
 
         $progressQueue = $null
@@ -151,7 +154,12 @@ function Invoke-DowserRunspacePool {
             
             if ($UseProgressQueue) {
                 $itemsProcessed = $progressQueue.Count
-                $pct = if ($totalItems -gt 0) { [Math]::Min(100, [int](($itemsProcessed / $totalItems) * 100)) } else { 0 }
+                $pct = if ($totalItems -gt 0) {
+                    [Math]::Min(100, [int](($itemsProcessed / $totalItems) * 100)) 
+                }
+                else {
+                    0 
+                }
                 
                 $elapsed = (Get-Date) - $startTime
                 $etaDisplay = 'calculating...'
@@ -164,13 +172,19 @@ function Invoke-DowserRunspacePool {
                 }
 
                 Write-Progress -Activity $ProgressActivity `
-                               -Status "$ProgressStatus ($itemsProcessed / $totalItems items) - ETA: $etaDisplay" `
-                               -PercentComplete $pct
-            } else {
-                $pct = if ($totalJobs -gt 0) { [Math]::Min(100, [int](($completedChunks / $totalJobs) * 100)) } else { 0 }
+                    -Status "$ProgressStatus ($itemsProcessed / $totalItems items) - ETA: $etaDisplay" `
+                    -PercentComplete $pct
+            }
+            else {
+                $pct = if ($totalJobs -gt 0) {
+                    [Math]::Min(100, [int](($completedChunks / $totalJobs) * 100)) 
+                }
+                else {
+                    0 
+                }
                 Write-Progress -Activity $ProgressActivity `
-                               -Status "$ProgressStatus ($completedChunks / $totalJobs jobs completed)" `
-                               -PercentComplete $pct
+                    -Status "$ProgressStatus ($completedChunks / $totalJobs jobs completed)" `
+                    -PercentComplete $pct
             }
             
             Start-Sleep -Milliseconds 200
@@ -187,9 +201,11 @@ function Invoke-DowserRunspacePool {
                         [void]$results.Add($r)
                     }
                 }
-            } catch {
+            }
+            catch {
                 Write-Warning "Error in worker thread: $($_.Exception.Message)"
-            } finally {
+            }
+            finally {
                 $j.Pipe.Dispose()
             }
         }
