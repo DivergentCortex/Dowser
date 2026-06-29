@@ -4,17 +4,22 @@ function Get-SafeLogIdentity {
     if ($IsWindows -ne $false) {
         try {
             return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        } catch {
+        }
+        catch {
             return $env:USERNAME
         }
     }
     # Linux/macOS: use environment variables
-    if ($env:USER) { return $env:USER }
-    if ($env:LOGNAME) { return $env:LOGNAME }
+    if ($env:USER) {
+        return $env:USER 
+    }
+    if ($env:LOGNAME) {
+        return $env:LOGNAME 
+    }
     return 'unknown'
 }
 
-Function Write-Log {
+function Write-Log {
     <#
     .SYNOPSIS
         Write to a log file in CMTrace-compatible format with automatic log management.
@@ -112,7 +117,7 @@ Function Write-Log {
         The $LogFilePath variable is read automatically - no parameter needed.
     #>
     [CmdletBinding()]
-    Param (
+    param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [string]$Message,
 
@@ -147,9 +152,24 @@ Function Write-Log {
     #   $Global:WriteLogMaxAgeDays     = 7       # Delete logs older than N days (default: 7)
 
     # Get settings from globals or use defaults
-    $autoCleanup    = if (Test-Path Variable:Global:WriteLogAutoCleanup) { $Global:WriteLogAutoCleanup } else { $true }
-    $maxSizeMB      = if (Test-Path Variable:Global:WriteLogMaxSizeMB) { $Global:WriteLogMaxSizeMB } else { 10 }
-    $maxAgeDays     = if (Test-Path Variable:Global:WriteLogMaxAgeDays) { $Global:WriteLogMaxAgeDays } else { 7 }
+    $autoCleanup = if (Test-Path Variable:Global:WriteLogAutoCleanup) {
+        $Global:WriteLogAutoCleanup 
+    }
+    else {
+        $true 
+    }
+    $maxSizeMB = if (Test-Path Variable:Global:WriteLogMaxSizeMB) {
+        $Global:WriteLogMaxSizeMB 
+    }
+    else {
+        10 
+    }
+    $maxAgeDays = if (Test-Path Variable:Global:WriteLogMaxAgeDays) {
+        $Global:WriteLogMaxAgeDays 
+    }
+    else {
+        7 
+    }
 
     # REQUIRE $LogFilePath to be set - no TEMP fallback ever
     # caller must set $LogFilePath before dot-sourcing Write-Log.ps1
@@ -166,14 +186,38 @@ Function Write-Log {
     }
 
     # Granular output control via global variables (all default to $true if not defined)
-    $verboseToConsole = if (Test-Path Variable:Global:VerboseConsole) { $Global:VerboseConsole } else { $true }
-    $verboseToLogfile = if (Test-Path Variable:Global:VerboseLogfile) { $Global:VerboseLogfile } else { $true }
-    $debugToConsole   = if (Test-Path Variable:Global:DebugConsole) { $Global:DebugConsole } else { $true }
-    $debugToLogfile   = if (Test-Path Variable:Global:DebugLogfile) { $Global:DebugLogfile } else { $true }
+    $verboseToConsole = if (Test-Path Variable:Global:VerboseConsole) {
+        $Global:VerboseConsole 
+    }
+    else {
+        $true 
+    }
+    $verboseToLogfile = if (Test-Path Variable:Global:VerboseLogfile) {
+        $Global:VerboseLogfile 
+    }
+    else {
+        $true 
+    }
+    $debugToConsole = if (Test-Path Variable:Global:DebugConsole) {
+        $Global:DebugConsole 
+    }
+    else {
+        $true 
+    }
+    $debugToLogfile = if (Test-Path Variable:Global:DebugLogfile) {
+        $Global:DebugLogfile 
+    }
+    else {
+        $true 
+    }
 
     # Early return if both outputs disabled for this severity (performance optimization)
-    if ($Severity -eq "Verbose" -and (-not $verboseToConsole) -and (-not $verboseToLogfile)) { return }
-    if ($Severity -eq "Debug" -and (-not $debugToConsole) -and (-not $debugToLogfile)) { return }
+    if ($Severity -eq "Verbose" -and (-not $verboseToConsole) -and (-not $verboseToLogfile)) {
+        return 
+    }
+    if ($Severity -eq "Debug" -and (-not $debugToConsole) -and (-not $debugToLogfile)) {
+        return 
+    }
 
     # Store original location
     $originalLocation = Get-Location
@@ -184,7 +228,8 @@ Function Write-Log {
         Set-Location C:
     }
     
-    try {        # Get caller information more reliably
+    try {
+        # Get caller information more reliably
         # First, get the call stack
         $callStack = Get-PSCallStack
         
@@ -206,7 +251,7 @@ Function Write-Log {
             if ($callerInfo.ScriptLineNumber) {
                 $lineNumber = $callerInfo.ScriptLineNumber
             }
-              # Determine the calling function name
+            # Determine the calling function name
             if ($callerInfo.Command) {
                 $callerFunctionName = $callerInfo.Command
                 
@@ -214,12 +259,13 @@ Function Write-Log {
                 if ($callerFunctionName -like "*.ps1") {
                     $callerFunctionName = [System.IO.Path]::GetFileNameWithoutExtension($callerFunctionName)
                     Write-Verbose "Call from script body: $callerFunctionName"
-                } else {
+                }
+                else {
                     Write-Verbose "Call from function: $callerFunctionName"
                 }
             }
         }
-          # Component resolution priority:
+        # Component resolution priority:
         # 1. Explicitly provided Component parameter
         # 2. Caller function name from call stack (prioritized over Script:Component)
         # 3. Script:Component if defined in the calling script
@@ -241,7 +287,8 @@ Function Write-Log {
         }
         
         # Final check - make sure Component isn't empty
-        if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {            # One last attempt - try to get it from MyInvocation of the caller
+        if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {
+            # One last attempt - try to get it from MyInvocation of the caller
             if ($callStack.Count -gt 1 -and $null -ne $callStack[1].InvocationInfo -and $null -ne $callStack[1].InvocationInfo.MyCommand) {
                 $Component = $callStack[1].InvocationInfo.MyCommand.Name
             }
@@ -262,22 +309,34 @@ Function Write-Log {
 
         # Get correct severity type mapping for CMTrace - numeric codes
         $severityType = "1" # Default to Info
-        if ($Severity -eq "Error") { $severityType = "3" }
-        elseif ($Severity -eq "Warning") { $severityType = "2" }
-        elseif ($Severity -eq "Info") { $severityType = "1" }
-        elseif ($Severity -eq "Success") { $severityType = "1" } # Map to Info for CMTrace
-        elseif ($Severity -eq "Verbose") { $severityType = "4" }
-        elseif ($Severity -eq "Debug") { $severityType = "5" }
+        if ($Severity -eq "Error") {
+            $severityType = "3" 
+        }
+        elseif ($Severity -eq "Warning") {
+            $severityType = "2" 
+        }
+        elseif ($Severity -eq "Info") {
+            $severityType = "1" 
+        }
+        elseif ($Severity -eq "Success") {
+            $severityType = "1" 
+        } # Map to Info for CMTrace
+        elseif ($Severity -eq "Verbose") {
+            $severityType = "4" 
+        }
+        elseif ($Severity -eq "Debug") {
+            $severityType = "5" 
+        }
 
         # Build CMTrace compatible log line - NO SPACES between attributes
         $logline = "<![LOG[$Message]LOG]!>" + 
-            "<time=`"$LogTime`" " + 
-            "date=`"$LogDate`" " + 
-            "component=`"$Component`" " + 
-            "context=`"$(Get-SafeLogIdentity)`" " + 
-            "type=`"$severityType`" " + 
-            "thread=`"$PID`" " + 
-            "file=`"$Source`">"
+        "<time=`"$LogTime`" " + 
+        "date=`"$LogDate`" " + 
+        "component=`"$Component`" " + 
+        "context=`"$(Get-SafeLogIdentity)`" " + 
+        "type=`"$severityType`" " + 
+        "thread=`"$PID`" " + 
+        "file=`"$Source`">"
 
         # Create log directory if needed
         $logDir = Split-Path $Logfile
@@ -287,9 +346,15 @@ Function Write-Log {
 
         # Check if console output is enabled for this severity
         $shouldWriteConsole = switch ($Severity) {
-            'Verbose' { $verboseToConsole }
-            'Debug'   { $debugToConsole }
-            default   { $true }
+            'Verbose' {
+                $verboseToConsole 
+            }
+            'Debug' {
+                $debugToConsole 
+            }
+            default {
+                $true 
+            }
         }
 
         # Write to console if enabled
@@ -316,7 +381,8 @@ Function Write-Log {
             # Determine final message color (use -Color parameter if specified, otherwise default)
             $finalMessageColor = if ($PSBoundParameters.ContainsKey('Color')) {
                 $Color
-            } else {
+            }
+            else {
                 $config.MessageColor
             }
 
@@ -334,9 +400,15 @@ Function Write-Log {
 
         # Check if logfile output is enabled for this severity
         $shouldWriteLogfile = switch ($Severity) {
-            'Verbose' { $verboseToLogfile }
-            'Debug'   { $debugToLogfile }
-            default   { $true }
+            'Verbose' {
+                $verboseToLogfile 
+            }
+            'Debug' {
+                $debugToLogfile 
+            }
+            default {
+                $true 
+            }
         }
 
         # ==================== SIZE-BASED LOG ROTATION ====================
@@ -359,33 +431,42 @@ Function Write-Log {
                 # RENAME old file to archive name (removes it from original path)
                 try {
                     Rename-Item -Path $Logfile -NewName $archiveName -Force
-                } catch {
+                }
+                catch {
                     # If rename fails, continue writing to current file
                 }
 
                 # $Logfile path now doesn't exist - will be created fresh
                 # Log rotation event as first entry in new log
                 $rotationMsg = "<![LOG[LOG ROTATION: Previous log archived to $archiveName (exceeded ${maxSizeMB}MB)]LOG]!>" +
-                    "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
-                    "context=`"$(Get-SafeLogIdentity)`" " +
-                    "type=`"1`" thread=`"$PID`" file=`"Write-Log.ps1`">"
+                "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
+                "context=`"$(Get-SafeLogIdentity)`" " +
+                "type=`"1`" thread=`"$PID`" file=`"Write-Log.ps1`">"
 
                 try {
                     [System.IO.File]::WriteAllText($Logfile, "$rotationMsg`r`n")
-                } catch { }
+                }
+                catch { 
+                }
             }
         }
 
         # ==================== AUTO-CLEANUP (ONCE PER SESSION) ====================
         # Run cleanup once on first Write-Log call in this session
-        $cleanupAlreadyRan = if (Test-Path Variable:Script:WriteLogCleanupRan) { $Script:WriteLogCleanupRan } else { $false }
+        $cleanupAlreadyRan = if (Test-Path Variable:Script:WriteLogCleanupRan) {
+            $Script:WriteLogCleanupRan 
+        }
+        else {
+            $false 
+        }
         if ($autoCleanup -and (-not $cleanupAlreadyRan) -and (Test-Path $Logfile)) {
             $Script:WriteLogCleanupRan = $true  # Set BEFORE cleanup to prevent recursion
             $logFolder = Split-Path $Logfile
             if (Test-Path $logFolder) {
                 try {
                     Remove-DowserOldLogFiles -LogFolder $logFolder -MaxAgeDays $maxAgeDays
-                } catch {
+                }
+                catch {
                     # Cleanup failure shouldn't break logging
                     Write-Warning "Auto-cleanup failed: $_"
                 }
@@ -414,9 +495,9 @@ Function Write-Log {
                     # If we had to retry, log that fact for visibility into file contention
                     if ($retryCount -gt 0) {
                         $retryNote = "<![LOG[WRITE-LOG FILE CONTENTION: Previous entry required $retryCount retry attempt(s) due to file lock on $Logfile]LOG]!>" +
-                            "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
-                            "context=`"$(Get-SafeLogIdentity)`" " +
-                            "type=`"2`" thread=`"$PID`" file=`"Write-Log.ps1`">"
+                        "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
+                        "context=`"$(Get-SafeLogIdentity)`" " +
+                        "type=`"2`" thread=`"$PID`" file=`"Write-Log.ps1`">"
                         $streamWriter.WriteLine($retryNote)
                     }
                 }
@@ -425,7 +506,8 @@ Function Write-Log {
                     $retryCount++
                     if ($retryCount -le $MaxRetries) {
                         Start-Sleep -Milliseconds ([int]($RetryDelay * 1000))
-                    } else {
+                    }
+                    else {
                         Write-Warning "Failed to write to log after $MaxRetries retries (file locked): $Logfile"
                     }
                 }
@@ -435,8 +517,12 @@ Function Write-Log {
                     break
                 }
                 finally {
-                    if ($null -ne $streamWriter) { $streamWriter.Close() }
-                    if ($null -ne $fileStream) { $fileStream.Close() }
+                    if ($null -ne $streamWriter) {
+                        $streamWriter.Close() 
+                    }
+                    if ($null -ne $fileStream) {
+                        $fileStream.Close() 
+                    }
                 }
             }
         }
@@ -444,14 +530,18 @@ Function Write-Log {
     finally {
         # Return to original location if possible (SCCM drive may have disconnected)
         if ($isSCCMDrive) {
-            try { Set-Location $originalLocation -ErrorAction SilentlyContinue } catch { }
+            try {
+                Set-Location $originalLocation -ErrorAction SilentlyContinue 
+            }
+            catch { 
+            }
         }
     }
 }
 
-Function Remove-DowserOldLogFiles {
+function Remove-DowserOldLogFiles {
     [CmdletBinding()]
-    Param(
+    param(
         [Parameter(Mandatory = $true)]
         [string]$LogFolder,
 
@@ -480,7 +570,7 @@ Function Remove-DowserOldLogFiles {
         }
     }
 
-    $cutoff  = (Get-Date).AddDays(-$MaxAgeDays)
+    $cutoff = (Get-Date).AddDays(-$MaxAgeDays)
     $expired = $logFiles | Where-Object { $_.LastWriteTime -lt $cutoff }
 
     if (-not $expired -or @($expired).Count -eq 0) {
@@ -510,7 +600,7 @@ function Write-LogFinal {
       (for example, in Remove-HpAdminLocal.ps1) so that cleanup only occurs once.
     #>
     [CmdletBinding()]
-    Param(
+    param(
         [Parameter(Mandatory = $true)]
         [string]$Message,
         
@@ -554,8 +644,8 @@ function Get-ExecutionContextInfo {
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
 
-    $isSystem   = $identity.Name -eq 'NT AUTHORITY\SYSTEM'
-    $isAdmin    = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+    $isSystem = $identity.Name -eq 'NT AUTHORITY\SYSTEM'
+    $isAdmin = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 
     # Best-effort "interactive" guess: has a non-empty USERNAME and explorer.exe for that user
     $interactiveUser = $null
@@ -564,14 +654,21 @@ function Get-ExecutionContextInfo {
         if ($explorer) {
             $interactiveUser = ($explorer | Select-Object -First 1).UserName
         }
-    } catch {}
+    }
+    catch {
+    }
 
     [pscustomobject]@{
         IdentityName    = $identity.Name
         LogonType       = $identity.AuthenticationType
         IsSystem        = $isSystem
         IsAdmin         = $isAdmin
-        UserDomainUser  = if ($env:USERDOMAIN -and $env:USERNAME) { "$($env:USERDOMAIN)\$($env:USERNAME)" } else { $null }
+        UserDomainUser  = if ($env:USERDOMAIN -and $env:USERNAME) {
+            "$($env:USERDOMAIN)\$($env:USERNAME)" 
+        }
+        else {
+            $null 
+        }
         InteractiveUser = $interactiveUser
         ProcessId       = $PID
         HostName        = $env:COMPUTERNAME
@@ -579,9 +676,9 @@ function Get-ExecutionContextInfo {
 }
 
 
-Function Initialize-Log {
+function Initialize-Log {
     [CmdletBinding()]
-    Param (
+    param (
         [Parameter(Mandatory = $false)]
         [string]$LogFilePath = $LogFilePath,
 
@@ -599,7 +696,8 @@ Function Initialize-Log {
             if ([string]::IsNullOrWhiteSpace($ScriptName)) {
                 $ScriptName = "Unknown Script"
             }
-        } catch {
+        }
+        catch {
             $ScriptName = "Unknown Script"
         }
     }
