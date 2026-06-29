@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.038] - 2026-06-29
+### refactor(logging): Route all logging through Write-Log and harden error handling across every script
+
+What changed:
+- Converted every native Write-Host, Write-Verbose, Write-Warning, Write-Error, Write-Debug, and Write-Information across all Public functions and Private helpers to Write-Log; Info is the default so normal entries are bare Write-Log, Warning/Error use -Severity, and -Severity Verbose is reserved for genuinely high-volume per-item traces (per-node tree helpers, per-file access-denied, report rows that fire in bulk)
+- Verified zero native Write-* remain anywhere except inside Write-Log.ps1 itself (the logger, which cannot call itself) and two Find-DowserString CBH example strings that search for the literal text 'Write-Host'
+- Added Starting/Ending announce lines (bare Write-Log) to every real-work function; trivial pure helpers (ConvertTo-DowserBytes, Format-DowserSize, Get-DowserSortKey) deliberately left untouched to avoid slop
+- Hardened error handling to the sandwich pattern: risky operations wrapped in try/catch, catches log the real exception (GetType().Name, ScriptLineNumber, Message) instead of a generic message, empty/silent catch blocks given real Write-Log lines, no nested try/catch
+- Write-Progress (UI) and pipeline data output (Write-Output) left intact; logs continue to land in logs/Dowser_<yyyyMMdd>.log (dated file, already configured by the module loader). All 33 module files parse clean (AST verified)
+
+Why:
+- The module mixed native Write-* cmdlets with gated Write-Verbose, so operational activity and errors were not reliably captured in the log file; routing everything through Write-Log gives one console-plus-file surface by default, and the sandwich error handling ensures real diagnostics reach the log instead of generic or swallowed errors
+
+
 ## [2026.06.29.037] - 2026-06-29
 ### docs(CBH): Standardize comment-based help across the module with signature in NOTES
 
