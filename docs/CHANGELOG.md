@@ -2,6 +2,18 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.041] - 2026-06-29
+### test(Tests): Fix platform-guard tests for Write-Log model and add a logging contract test
+
+What changed:
+- Fixed the 5 failing tests in Test-DowserPlatformGuards.Tests.ps1. They broke because the logging refactor routes warnings and verbose through Write-Log (console plus log file) instead of PowerShell native Warning/Verbose streams, so -WarningVariable and 4>&1 captured nothing, and dot-sourced functions hit FATAL: No log file path set. The tests now Initialize-Log to a temp log file in BeforeAll (redirecting the module script scope via the module session state) and assert against the log file content instead of the streams
+- Added Tests/Test-DowserLogging.Tests.ps1 (14 tests): Initialize-Log creates the dated file and writes the SCRIPT START banner; bare Write-Log lands as type 1 Info always; Write-Log -Severity Verbose is suppressed by default and only written when VerboseLogfile is on (type 4); Write-Log -Severity Warning is always written (type 2); CMTrace wire format markers and time/date fields present; Write-Log throws FATAL when no path is configured
+- Full suite now 110 passed, 0 failed (independently re-run)
+
+Why:
+- The logging refactor changed where diagnostics go (Write-Log file, not the native streams), so stream-based test assertions no longer saw the messages; the tests had to assert against the log file, and a dedicated logging test was added to lock the Write-Log severity-gating contract
+
+
 ## [2026.06.29.040] - 2026-06-29
 ### fix(logging): Demote diagnostic Write-Log calls to Severity Verbose so they are off by default
 
