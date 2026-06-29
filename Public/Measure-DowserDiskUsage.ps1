@@ -75,7 +75,7 @@ function Measure-DowserDiskUsage {
     )
 
     begin {
-        # Parse -MinSize once so process block can filter
+        # parse once so process can filter cheaply
         $minBytes = $null
         if ($PSBoundParameters.ContainsKey('MinSize') -and $MinSize) {
             $minBytes = ConvertTo-DowserBytes -SizeString $MinSize
@@ -84,7 +84,6 @@ function Measure-DowserDiskUsage {
 
     process {
         foreach ($rootPath in $Path) {
-            # Resolve to absolute path
             $resolvedRoot = (Resolve-Path -LiteralPath $rootPath -ErrorAction SilentlyContinue).Path
             if (-not $resolvedRoot) {
                 Write-Warning "Cannot resolve path: $rootPath"
@@ -98,12 +97,8 @@ function Measure-DowserDiskUsage {
             Write-Progress -Activity 'Measure-DowserDiskUsage' `
                 -Status "Enumerating files under $resolvedRoot" -PercentComplete 0
 
-            # --- Phase 1: enumerate all files -----------------------------------------
-            # Per-directory rollup via ancestor walk; streaming to avoid large buffers.
-            # On case-sensitive filesystems (Linux) use Ordinal so that sibling dirs
-            # 'Foo' and 'foo' are tracked as distinct keys. On Windows, OrdinalIgnoreCase
-            # to match the case-insensitive filesystem. $IsWindows is $null on PS 5.1
-            # (Windows-only runtime), so treat $null as Windows.
+            # ordinal on case-sensitive linux so Foo and foo stay distinct keys
+            # IsWindows null on 5.1 means windows, use ignorecase there
             $dirComparer = if ($IsWindows -eq $false) {
                 [System.StringComparer]::Ordinal
             }
@@ -139,15 +134,13 @@ function Measure-DowserDiskUsage {
                     continue
                 }
 
-                # Skip reparse points (symlinks, junctions) encountered during descent
-                # to avoid infinite loops -- but never skip the root the caller gave us.
+                # skip symlinks and junctions to dodge loops, but never the root
                 $isRoot = $dirComparer.Equals($currentDir.FullName, $resolvedRoot)
                 if (-not $isRoot -and ($currentDir.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
                     Write-Verbose "Skipping reparse point: $($currentDir.FullName)"
                     continue
                 }
 
-                # Enumerate files in this directory
                 $dirFiles = $null
                 try {
                     $dirFiles = $currentDir.EnumerateFiles()
@@ -182,8 +175,7 @@ function Measure-DowserDiskUsage {
                             Extension = $ext
                         })
 
-                        # Bubble size up through every ancestor to (and including) resolvedRoot.
-                        # Use the same comparison strategy as $dirComparer for the stop test.
+                        # roll size up every ancestor through resolvedRoot
                         $ancestor = $currentDir.FullName
                         while ($true) {
                             if (-not $dirSizes.ContainsKey($ancestor)) {
@@ -203,7 +195,6 @@ function Measure-DowserDiskUsage {
                     }
                 }
 
-                # Enqueue subdirectories
                 $subDirs = $null
                 try {
                     $subDirs = $currentDir.EnumerateDirectories()
@@ -222,7 +213,6 @@ function Measure-DowserDiskUsage {
             Write-Progress -Activity 'Measure-DowserDiskUsage' `
                 -Status 'Building report sections' -PercentComplete 80
 
-            # --- Phase 2: biggest directories (exclude root itself) -------------------
             $bigDirs = $dirSizes.GetEnumerator() |
                 Where-Object { -not $dirComparer.Equals($_.Key, $resolvedRoot) } |
                 Sort-Object Value -Descending |
@@ -251,7 +241,6 @@ function Measure-DowserDiskUsage {
                 }
             }
 
-            # --- Phase 3: biggest files -----------------------------------------------
             $filteredFiles = if ($null -ne $minBytes) {
                 $allFiles | Where-Object { $_.SizeBytes -ge $minBytes }
             }
@@ -284,7 +273,6 @@ function Measure-DowserDiskUsage {
                 }
             }
 
-            # --- Phase 4: by extension ------------------------------------------------
             $extMap   = [System.Collections.Generic.Dictionary[string, long]]::new(
                 [System.StringComparer]::OrdinalIgnoreCase)
             $extCount = [System.Collections.Generic.Dictionary[string, int]]::new(
@@ -325,7 +313,6 @@ function Measure-DowserDiskUsage {
 
             Write-Progress -Activity 'Measure-DowserDiskUsage' -Completed
 
-            # --- Phase 5: summary object ----------------------------------------------
             $summaryObject = [PSCustomObject][Ordered]@{
                 Section    = 'Summary'
                 RootPath   = $resolvedRoot
@@ -335,7 +322,6 @@ function Measure-DowserDiskUsage {
                 ScannedAt  = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
             }
 
-            # --- Console sections via Write-Verbose -----------------------------------
             $sep = '-' * 70
             Write-Verbose $sep
             Write-Verbose "Disk Usage Report: $resolvedRoot"
@@ -364,13 +350,11 @@ function Measure-DowserDiskUsage {
                     $e.Extension, $e.Size, $e.PctOfTotal, $e.FileCount, $e.Bar)
             }
 
-            # Emit to pipeline
             $summaryObject
             foreach ($o in $dirObjects)  { $o }
             foreach ($o in $fileObjects) { $o }
             foreach ($o in $extObjects)  { $o }
 
-            # --- Phase 6: HTML export -------------------------------------------------
             if ($ExportHtml) {
                 try {
                     $htmlContent = _Build-DduHtml `
@@ -396,8 +380,7 @@ function Measure-DowserDiskUsage {
     end {}
 }
 
-# Internal helper: builds the self-contained HTML treemap report.
-# Lives in this file because it is only called by Measure-DowserDiskUsage.
+# lives here, only Measure-DowserDiskUsage calls it
 function _Build-DduHtml {
     param(
         [PSCustomObject]$SummaryObject,
@@ -411,7 +394,7 @@ function _Build-DduHtml {
         [System.StringComparer]$DirComparer
     )
 
-    # CSS reuses the exact dark palette from Get-DowserReport.ps1 (#1e1e1e bg, #569cd6, #4ec9b0, etc.)
+    # palette must match Get-DowserReport.ps1
     $css = @'
 <style>
     body { font-family: Segoe UI, Tahoma, sans-serif; margin: 20px; background: #1e1e1e; color: #d4d4d4; }
@@ -436,7 +419,6 @@ function _Build-DduHtml {
 </style>
 '@
 
-    # Summary banner
     $summaryHtml = @"
 <div class='summary'>
     <span><span class='label'>Root:</span>       <span class='value'>$([System.Security.SecurityElement]::Escape($SummaryObject.RootPath))</span></span>
@@ -446,15 +428,10 @@ function _Build-DduHtml {
 </div>
 "@
 
-    # Treemap: slice-and-dice (horizontal strips), area proportional to real disk usage.
-    # Built from IMMEDIATE children of root only (non-overlapping partition) so there is
-    # no double-counting of nested dirs. Widths are SizeBytes / TotalBytes * 100 so the
-    # visual area honestly represents the fraction of the whole tree.
-    # A remainder block "(root files)" is added for bytes not under any immediate subdir.
+    # immediate children only so nested dirs are not double-counted
     $tmColors = @('#264f78','#1e5f5f','#3a3a6b','#1e4d4d','#2d4a2d','#4d2d2d','#4d3a1e','#2d2d4d')
     $tmDenominator = if ($TotalBytes -gt 0) { [double]$TotalBytes } else { 1.0 }
 
-    # Collect immediate children of RootPath from $DirSizes
     $immChildren = [System.Collections.Generic.List[PSCustomObject]]::new()
     foreach ($kv in $DirSizes.GetEnumerator()) {
         if ($DirComparer.Equals($kv.Key, $RootPath)) { continue }
@@ -464,10 +441,9 @@ function _Build-DduHtml {
             $immChildren.Add([PSCustomObject]@{ Name = $childName; SizeBytes = $kv.Value })
         }
     }
-    # Sort by size desc, limit to TopN for readability
     $tmItems = @($immChildren | Sort-Object SizeBytes -Descending | Select-Object -First ([Math]::Min($TopN, 20)))
 
-    # Remainder = bytes not under any immediate subdir (root-level files + items beyond TopN)
+    # remainder is bytes outside any immediate subdir
     $allImmTotal = [long]0
     foreach ($ic in $immChildren) { $allImmTotal += $ic.SizeBytes }
     $rootFileBytes = $TotalBytes - $allImmTotal
@@ -483,7 +459,7 @@ function _Build-DduHtml {
         $color    = $tmColors[$colorIdx % $tmColors.Count]
         $colorIdx++
 
-        # data-* attributes carry safe escaped strings; JS reads via textContent
+        # data attrs hold escaped strings, js reads them via textContent
         $tmBlocksHtml += @"
 <div class='ddu-block' style='left:${leftPct}%;top:0;width:${widthPct}%;height:100%;background:${color};'
      data-path='$label' data-size='$sizeStr' data-pct='$pct'
@@ -494,7 +470,6 @@ function _Build-DduHtml {
 "@
         $leftPct = [Math]::Round($leftPct + $widthPct, 2)
     }
-    # Remainder block for root-level files (or items beyond TopN)
     if ($rootFileBytes -gt 0) {
         $widthPct = [Math]::Round($rootFileBytes / $tmDenominator * 100, 2)
         $sizeStr  = [System.Security.SecurityElement]::Escape((Format-DowserSize -DataValue $rootFileBytes))
@@ -509,7 +484,7 @@ function _Build-DduHtml {
 "@
     }
 
-    # Tooltip JS uses textContent only -- no innerHTML on user data
+    # textContent only here, never innerHTML on user data
     $treemapHtml = @"
 <div id='ddu-treemap'>
 $tmBlocksHtml
@@ -544,7 +519,6 @@ $tmBlocksHtml
 </script>
 "@
 
-    # Build ranked tables
     $dirTableHtml  = _DduTableHtml -Rows $DirObjects  `
         -Cols @('RelPath','Size','PctOfTotal','Bar') `
         -Headers @('Directory','Size','% of Total','Bar')
@@ -581,7 +555,6 @@ $tmBlocksHtml
 "@
 }
 
-# Internal helper: renders an HTML table from an array of ordered objects.
 function _DduTableHtml {
     param($Rows, [string[]]$Cols, [string[]]$Headers)
     $sb = [System.Text.StringBuilder]::new()

@@ -48,14 +48,12 @@ function Find-DowserOrphan {
     $SearchPath = Resolve-Path $SearchPath
     Write-Verbose "Scanning for orphan files in: $SearchPath"
 
-    # 1. Get all files
     Write-Verbose "Inventorying files..."
     $allFiles = Get-ChildItem -Path $SearchPath -Recurse -File | Where-Object {
         $path = $_.FullName
         $exclude = $false
         foreach ($ex in $ExcludePaths) {
-            # Match the excluded segment regardless of path separator so exclusions
-            # work on both Windows (\) and Linux (/).
+            # match the segment on either path separator
             if (($path -like "*\$ex\*") -or ($path -like "*/$ex/*")) { $exclude = $true; break }
         }
         -not $exclude
@@ -64,16 +62,9 @@ function Find-DowserOrphan {
     $fileCount = $allFiles.Count
     Write-Verbose "Found $fileCount files."
 
-    # 2. Build Token Map
-    # Map: Token (string) -> HashSet of SourceFilePaths (where the token was seen)
     $tokenMap = @{}
-    
-    # Regex to split content into tokens. 
-    # We split on anything that isn't a valid filename character roughly.
-    # Or simpler: split on whitespace, quotes, slashes, common punctuation.
-    # Keeping it simple: Split by non-word characters but keep dots and hyphens potentially?
-    # Actually, filenames can contain dots, hyphens, underscores.
-    # Let's split by [^a-zA-Z0-9._-] to capture potential filenames.
+
+    # keep dots hyphens underscores so filenames survive the split
     $splitPattern = "[^a-zA-Z0-9._-]"
 
     $scannerFiles = $allFiles | Where-Object { $TextExtensions -contains $_.Extension }
@@ -89,11 +80,9 @@ function Find-DowserOrphan {
         }
 
         try {
-            # Read file content as a single string
             $content = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
             if ([string]::IsNullOrWhiteSpace($content)) { continue }
 
-            # Split into tokens
             $tokens = $content -split $splitPattern | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
             foreach ($token in $tokens) {
@@ -109,7 +98,6 @@ function Find-DowserOrphan {
     }
     Write-Progress -Activity "Indexing Content" -Completed
 
-    # 3. Identify Orphans
     $orphans = @()
     $referenced = @()
 
@@ -120,7 +108,7 @@ function Find-DowserOrphan {
         $isReferenced = $false
 
         if ($tokenMap.ContainsKey($name)) {
-            # Check if any file OTHER than itself references it
+            # a file referencing only itself is still an orphan
             $referencingFiles = $tokenMap[$name]
             foreach ($refFile in $referencingFiles) {
                 if ($refFile -ne $file.FullName) {
@@ -138,7 +126,6 @@ function Find-DowserOrphan {
         }
     }
 
-    # 4. Output Results
     Write-Verbose "`nAnalysis Complete."
     Write-Verbose "Total Files: $fileCount"
     Write-Verbose "Referenced:  $($referenced.Count)"
@@ -146,8 +133,7 @@ function Find-DowserOrphan {
 
     if ($orphans.Count -gt 0) {
         Write-Verbose "`nPotential Orphan Files (No external references found):"
-        # Route the formatted preview to Write-Verbose only; the pipeline return
-        # below stays clean FileInfo objects (no Format-Table formatting records).
+        # preview to verbose so the return stays clean fileinfo objects
         $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Verbose
     }
 

@@ -123,12 +123,10 @@ function Find-DowserDuplicate {
 
     Write-Verbose "Found $(@($files).Count) files. Analyzing..."
 
-    # --- helpers ---
-
     function Get-NormalizedStem {
         param([string]$FileName)
         $stem = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
-        # strip common duplicate suffixes: " - Copy", " (1)", "_backup", "_v2", "_old", etc.
+        # strip copy backup and version suffixes
         $stem = $stem -replace '\s*[-_]?\s*(?:copy|backup|old|new|original|bak)\s*\d*$', ''
         $stem = $stem -replace '\s*\(\d+\)$', ''
         $stem = $stem -replace '\s*[-_]\s*v?\d+$', ''
@@ -173,8 +171,6 @@ function Find-DowserDuplicate {
         return $results
     }
 
-    # --- mode flags ---
-
     $runName      = $Mode -contains 'All' -or $Mode -contains 'Name'
     $runPartial   = $Mode -contains 'All' -or $Mode -contains 'PartialName'
     $runNameSize  = $Mode -contains 'All' -or $Mode -contains 'NameSize'
@@ -182,8 +178,6 @@ function Find-DowserDuplicate {
     $runChunk     = $Mode -contains 'All' -or $Mode -contains 'Chunk'
 
     $dupSets = [System.Collections.Generic.List[object]]::new()
-
-    # --- Name mode: exact filename match (ignoring path/size) ---
 
     if ($runName) {
         $groups = $files |
@@ -203,15 +197,13 @@ function Find-DowserDuplicate {
         }
     }
 
-    # --- PartialName mode: normalized stem matching ---
-
     if ($runPartial) {
         $groups = $files |
             Group-Object -Property { Get-NormalizedStem $_.Name } |
             Where-Object { $_.Count -gt 1 }
 
         foreach ($group in $groups) {
-            # skip if all files have the exact same name (already caught by Name mode)
+            # name mode already caught exact dupes
             $uniqueNames = $group.Group | Select-Object -ExpandProperty Name -Unique
             if (@($uniqueNames).Count -le 1 -and $runName) { continue }
 
@@ -227,8 +219,6 @@ function Find-DowserDuplicate {
             })
         }
     }
-
-    # --- NameSize mode: name + size combo ---
 
     if ($runNameSize) {
         $groups = $files |
@@ -247,8 +237,6 @@ function Find-DowserDuplicate {
             })
         }
     }
-
-    # --- Content mode: full file hash ---
 
     if ($runContent) {
         $hashGroups = [System.Collections.Generic.Dictionary[string,System.Collections.Generic.List[object]]]::new()
@@ -283,8 +271,6 @@ function Find-DowserDuplicate {
             }
         }
     }
-
-    # --- Chunk mode: block-level hash ---
 
     if ($runChunk) {
         $chunkGroups = [System.Collections.Generic.Dictionary[string,System.Collections.Generic.List[object]]]::new()
@@ -327,8 +313,6 @@ function Find-DowserDuplicate {
         }
     }
 
-    # --- AutoRemove / ReviewBeforeDelete ---
-
     if ($AutoRemove -or $ReviewBeforeDelete) {
         foreach ($set in $dupSets) {
             $fileList = $set.Files
@@ -357,11 +341,7 @@ function Find-DowserDuplicate {
         }
     }
 
-    # --- store full detail in global variable ---
-
     $global:dupObjects = $dupSets
-
-    # --- CSV export ---
 
     if ($ReportPath) {
         $exportRows = foreach ($set in $dupSets) {
@@ -380,14 +360,11 @@ function Find-DowserDuplicate {
         Write-Verbose "Report saved to $ReportPath"
     }
 
-    # --- clean summary output ---
-
     if ($dupSets.Count -eq 0) {
         Write-Verbose "No duplicates found."
         return
     }
 
-    # compact counts-by-mode summary
     $modeSummary = $dupSets | Group-Object Mode | ForEach-Object {
         $totalDupes = ($_.Group | Measure-Object -Property Count -Sum).Sum
         [PSCustomObject]@{
@@ -400,10 +377,9 @@ function Find-DowserDuplicate {
 
     Write-Verbose ""
     $modeSummary | Format-Table -AutoSize | Out-String | Write-Verbose
-    # Emit summary objects to the pipeline so callers can capture them.
+    # emit to pipeline so callers can capture
     Write-Output $modeSummary
 
-    # top 15 largest duplicate sets as a quick preview
     $topSets = $dupSets | Sort-Object Count -Descending | Select-Object -First 15 | ForEach-Object {
         [PSCustomObject]@{
             OutputType = 'TopSets'
@@ -415,7 +391,6 @@ function Find-DowserDuplicate {
 
     Write-Verbose "Top duplicate sets (by count):"
     $topSets | Format-Table -AutoSize | Out-String | Write-Verbose
-    # Emit the top-sets preview objects to the pipeline so callers can capture them.
     Write-Output $topSets
 
     Write-Verbose "--- $($dupSets.Count) duplicate set(s) found across $(@($files).Count) files scanned ---"

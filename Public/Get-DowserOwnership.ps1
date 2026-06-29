@@ -85,9 +85,8 @@ function Get-DowserOwnership {
                     continue
                 }
 
-                # COM metadata is Windows-only. On non-Windows, populate real Unix
-                # ownership from the .NET FileInfo instead of returning an empty object.
-                # ($IsWindows is $null on PS 5.1, so -ne $false means Windows.)
+                # com metadata is windows only, fall back to unix fileinfo elsewhere
+                # $IsWindows is null on 5.1 so -ne $false means windows
                 $ShellApplication = $null
                 $ShellFolder      = $null
                 $ShellFile        = $null
@@ -101,8 +100,7 @@ function Get-DowserOwnership {
                     }
                 }
                 if ($IsWindows -eq $false) {
-                    # Unix ownership: User/Group/UnixMode are exposed by Get-Item on
-                    # PowerShell Core for Unix filesystems.
+                    # user/group/unixmode come from get-item on pwsh core unix
                     $MetaDataObject['Owner']    = $FileInformation.User
                     $MetaDataObject['Group']    = $FileInformation.Group
                     $MetaDataObject['UnixMode'] = $FileInformation.UnixMode

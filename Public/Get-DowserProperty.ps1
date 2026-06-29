@@ -84,7 +84,6 @@ function Get-DowserProperty {
             BaseName         = [System.IO.Path]::GetFileNameWithoutExtension($ResolvedFilePath)
             ItemType         = if ($IsDirectory) { 'Directory' } else { 'File' }
 
-            # Common file metadata (Details tab)
             FileDescription  = $null
             ProductName      = $null
             ProductVersion   = $null
@@ -111,7 +110,6 @@ function Get-DowserProperty {
             $FileDetails | Add-Member -MemberType NoteProperty -Name 'IsHidden'       -Value (($FileItem.Attributes -band [System.IO.FileAttributes]::Hidden) -eq [System.IO.FileAttributes]::Hidden)
             $FileDetails | Add-Member -MemberType NoteProperty -Name 'IsSystem'       -Value (($FileItem.Attributes -band [System.IO.FileAttributes]::System) -eq [System.IO.FileAttributes]::System)
 
-            # 2. Version Information
             Write-Verbose "Getting version information..."
             try {
                 if ($IsDirectory) { throw [System.InvalidOperationException]::new('Version information is not applicable to directories.') }
@@ -160,7 +158,7 @@ function Get-DowserProperty {
                 Write-Verbose "Version information not available or error: $($_.Exception.Message)"
             }
 
-            # 3. Extended Properties via Shell.Application COM (Windows-only; $IsWindows is $null on 5.1)
+            # shell COM is windows only, $IsWindows null on 5.1 means windows
             if ($IsWindows -ne $false) {
                 Write-Verbose "Getting extended properties using COM object..."
                 try {
@@ -207,7 +205,6 @@ function Get-DowserProperty {
                 Write-Verbose "Extended file properties via Shell.Application not available on this platform."
             }
 
-            # 4. Hash Information
             Write-Verbose "Calculating file hashes..."
             try {
                 if ($IsDirectory) { throw [System.InvalidOperationException]::new('Hash calculation is not applicable to directories.') }
@@ -222,7 +219,7 @@ function Get-DowserProperty {
                 Write-Verbose "Hash calculation error: $($_.Exception.Message)"
             }
 
-            # 5. Digital Signature (opt-in -- slow, Windows-only; $IsWindows null on 5.1 = Windows)
+            # opt-in, slow, windows only
             if (($IsWindows -ne $false) -and $IncludeSignature) {
                 Write-Verbose "Getting digital signature information..."
                 try {
@@ -243,7 +240,6 @@ function Get-DowserProperty {
                 Write-Verbose "Authenticode signature inspection requires Windows."
             }
 
-            # 6. .NET Assembly Information (exe/dll only)
             if (-not $IsDirectory -and $ResolvedFilePath -match '\.(exe|dll)$') {
                 Write-Verbose "Getting .NET assembly information..."
                 try {
@@ -269,7 +265,6 @@ function Get-DowserProperty {
                 }
             }
 
-            # 7. PE Header (exe/dll only)
             if (-not $IsDirectory -and $ResolvedFilePath -match '\.(exe|dll)$') {
                 Write-Verbose "Getting PE header information..."
                 try {

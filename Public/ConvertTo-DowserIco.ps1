@@ -14,7 +14,7 @@ function ConvertTo-DowserIco {
         $MaxSize = 0
     )
 
-    # platform guard: System.Drawing needs Windows GDI+ ($IsWindows null on 5.1 = Windows)
+    # eq false not -not, $IsWindows is null on 5.1
     if ($IsWindows -eq $false) {
         Write-Warning "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform."
         return $null
@@ -29,7 +29,7 @@ function ConvertTo-DowserIco {
 
     $InputFilePath = (Resolve-Path $InputFilePath).Path
 
-    # If input is a UNC path, copy to temp first for processing
+    # gdi+ chokes on unc, stage to temp first
     $tempFile = $null
     if ($InputFilePath -like '\\*') {
         $tempFile = Join-Path $env:TEMP "$([System.IO.Path]::GetRandomFileName())"
@@ -49,9 +49,8 @@ function ConvertTo-DowserIco {
         $OutputDir = Split-Path $InputFilePath -Parent
         $OutputFile = Join-Path $OutputDir $OutputFileName
     } else {
-        # Resolve tilde/PS-drive paths; output file may not exist yet so use unresolved provider path
+        # unresolved provider path, output does not exist yet
         $OutputFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputFile)
-        # If the user supplied an output path, ensure the directory exists (create if needed)
         $OutputDir = Split-Path $OutputFile -Parent
         if ($OutputDir -and -not (Test-Path $OutputDir)) {
             New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
@@ -59,7 +58,7 @@ function ConvertTo-DowserIco {
     }
 
     try {
-        # Read file into memory (handles UNC paths better)
+        # read into memory, gdi+ unc reads are flaky
         $fileBytes = [System.IO.File]::ReadAllBytes($InputFilePath)
         $ms = New-Object System.IO.MemoryStream(, $fileBytes)
         $bitmap = [System.Drawing.Bitmap]::FromStream($ms)
@@ -68,16 +67,12 @@ function ConvertTo-DowserIco {
         return $false
     }
 
-    # Build multi-size ICO manually using PNG-compressed images (supported on modern Windows)
-    # Accept requested ICO sizes up to 512. ICO directory width/height fields are 1 byte
-    # (0 means 256). For sizes >=256 we set the width/height byte to 0 but embed the
-    # full PNG image data at the requested resolution.
+    # png-compressed ico, dir width/height byte is 0 for sizes >=256
     $IcoSizes = @($IcoSizes)
     if (-not $IcoSizes -or (@($IcoSizes) | Measure-Object).Count -eq 0) {
         $IcoSizes = @(256)
     }
 
-    # Validate sizes: only allow common icon sizes
     $validSizes = @(16,32,48,64,128,256,512)
     $sizes = $IcoSizes | ForEach-Object {
         $n = [int]$_
@@ -94,9 +89,8 @@ function ConvertTo-DowserIco {
     $images = @()
     try {
         foreach ($s in $sizes) {
-            # Create resized bitmap using a compatible 32bpp ARGB pixel format to avoid GetHicon errors
+            # 32bpp argb avoids GetHicon errors
             $resized = New-Object System.Drawing.Bitmap($s, $s, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-            # Preserve original image DPI
             try { $resized.SetResolution($bitmap.HorizontalResolution, $bitmap.VerticalResolution) } catch {}
 
             $g = [System.Drawing.Graphics]::FromImage($resized)
@@ -114,11 +108,9 @@ function ConvertTo-DowserIco {
             $msPng.Dispose()
             $resized.Dispose()
 
-            # store tuple: size, bytes
             $images += ,@($s, $bytes)
         }
 
-        # Write ICO header and directory
         $fs = [System.IO.File]::Open($OutputFile, [System.IO.FileMode]::Create)
         $bw = New-Object System.IO.BinaryWriter($fs)
 
@@ -134,7 +126,7 @@ function ConvertTo-DowserIco {
         foreach ($img in $images) {
             $s = $img[0]
             $bytes = $img[1]
-            # width and height fields are 1 byte; 0 means 256 or larger
+            # width/height byte is 0 for 256 or larger
             if ($s -ge 256) {
                 $widthByte = [byte]0
             } else {
@@ -157,7 +149,6 @@ function ConvertTo-DowserIco {
             $offset += $bytes.Length
         }
 
-        # Write image data
         foreach ($img in $images) {
             $bw.Write($img[1])
         }

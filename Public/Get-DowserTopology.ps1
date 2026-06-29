@@ -32,8 +32,8 @@
     Aliases preserved: pstree, shtree
 #>
 
-# provider-agnostic tree. inner ShowContainer recurses. ordering matters -- depth check must be first.
-# InColor only wires up for FileSystem paths. dont remove the DynamicParam block.
+# depth check must come first or recursion runs away
+# InColor needs the DynamicParam block, do not remove it
 
 function Get-DowserTopology {
 
@@ -77,7 +77,6 @@ function Get-DowserTopology {
     )
 
     DynamicParam {
-        # define the InColor parameter if the path is a FileSystem path
         if ($PSBoundParameters.ContainsKey("Path")) {
             $here = $PSBoundParameters["Path"]
         } elseif ($PSBoundParameters.ContainsKey("LiteralPath")) {
@@ -109,7 +108,7 @@ function Get-DowserTopology {
         }
 
         if ($PSBoundParameters.ContainsKey("InColor")) {
-            # $global:PSAnsiFileMap is a PS7+ construct; on 5.1 it is null and indexing it null-refs.
+            # PSAnsiFileMap is ps7+ only, null on 5.1 and indexing null-refs
             if ($PSVersionTable.PSVersion.Major -ge 7) {
                 $Colorize = $True
                 $script:top   = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi

@@ -64,7 +64,6 @@ function Find-DowserFile {
         $script:startTime = Get-Date
         Write-Verbose "Starting Find-DowserFile at $script:startTime"
         
-        # Load helpers (Assuming we dot-source them, but in a module context they are already available)
         $minBytes = $null
         if (-not [string]::IsNullOrWhiteSpace($MinSize)) {
             $minBytes = ConvertTo-DowserBytes -SizeStr $MinSize
@@ -74,8 +73,7 @@ function Find-DowserFile {
             $maxBytes = ConvertTo-DowserBytes -SizeStr $MaxSize
         }
 
-        # Auto-wrap bare strings in wildcards so partial names match.
-        # Already-wildcarded patterns (containing * or ?) are left alone.
+        # bare strings get wrapped, already-wildcarded left alone
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
             $Pattern = "*$Pattern*"
             Write-Verbose "Pattern auto-wrapped to: $Pattern"
@@ -95,7 +93,7 @@ function Find-DowserFile {
             $filesFound = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
             
             if ($UseRunspaces) {
-                # Initial scan to get top-level directories for partitioning
+                # partition by top-level dirs to spread across threads
                 $topLevelItems = Get-ChildItem -Path $p -Directory -ErrorAction SilentlyContinue
                 if ($Recurse) {
                     $scanTargets = @($p) + @($topLevelItems.FullName)
@@ -153,7 +151,7 @@ function Find-DowserFile {
 
                     if ($ok) {
                         $filesFound.Add($_.FullName)
-                        if ($StopOnFirstMatch) { return } # Break early
+                        if ($StopOnFirstMatch) { return }
                     }
                 }
             }

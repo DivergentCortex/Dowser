@@ -121,7 +121,6 @@ function Find-DowserString {
         $MaxFileSizeBytes  = $MaxFileSizeMB * 1MB
         $ComputedMaxThreads = [Math]::Max(1, $MaxThreads)
 
-        # figure out which search path to use
         $UseAho = $false
         if ($SearchMode -eq 'aho') {
             $UseAho = $true
@@ -131,11 +130,8 @@ function Find-DowserString {
             $UseAho = (-not $UseRegex) -and (@($Patterns).Count -gt 1)
         }
 
-        # Aho-Corasick C# implementation — inline, compiled via Add-Type
-        # workers need this too; since Add-Type loads into the AppDomain (shared by all runspaces),
-        # compiling here makes it available in workers without repassing the source.
-        # the $ahoCode string is still passed as a safety net for workers that might spin up before
-        # the main-thread compile finishes (unlikely but possible).
+        # add-type loads into the shared appdomain so workers see it too
+        # string still passed as a safety net for workers that race the main compile
         $ahoCode = @(
             'using System;'
             'using System.Collections.Generic;'
@@ -195,13 +191,13 @@ function Find-DowserString {
 
         Write-Verbose "Find-DowserString: '$Path' patterns=[$($Patterns -join ', ')] mode=$SearchMode useAho=$UseAho outputMode=$OutputMode threads=$ComputedMaxThreads"
 
-        # results accumulator — survives into end{} since begin/process/end share function scope
+        # lives in function scope so end{} can still see it
         $allResults = [System.Collections.ArrayList]::new()
     }
 
     process {
 
-        # Resolve tilde and PS drive paths before any .NET static method sees them
+        # .net statics choke on tilde and ps drive paths
         try {
             $Path = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
         } catch {
@@ -211,9 +207,7 @@ function Find-DowserString {
 
         # ==================================================================
         # FILE-PATH SHORT-CIRCUIT
-        # if -Path is a single file, skip directory enumeration and gathering.
-        # also resolve mapped-drive paths (H:\) to UNC so runspace workers
-        # that don't inherit the drive mapping can still read the file.
+        # workers don't inherit drive mappings so mapped paths resolve to unc
         # ==================================================================
         $isFilePath = $false
         try {
@@ -229,8 +223,7 @@ function Find-DowserString {
             Write-Information "[Find-DowserString] Single file mode: '$resolvedFile'" -InformationAction Continue
             $allFiles = @($resolvedFile)
 
-            # in single-file mode, force a useful default output: line content with truncation.
-            # caller can still override with -OutputMode counts|files|matches.
+            # default single-file output to truncated line content unless overridden
             if (-not $PSBoundParameters.ContainsKey('OutputMode')) {
                 $OutputMode         = 'singlefile'
                 $IncludeLineContent = $true
@@ -240,9 +233,7 @@ function Find-DowserString {
 
         # ==================================================================
         # PHASE 1/3 - DIRECTORY ENUMERATION
-        # streaming stack-walk via [System.IO.Directory]::EnumerateDirectories.
-        # progress fires immediately; excluded folders pruned at branch level
-        # so we never descend into .git/node_modules/bin/obj subtrees.
+        # prune excluded folders at branch level so we never descend their subtrees
         # ==================================================================
 
         $excludeSet = New-Object 'System.Collections.Generic.HashSet[string]'([System.StringComparer]::OrdinalIgnoreCase)
@@ -288,7 +279,6 @@ function Find-DowserString {
         Write-Information ("[Find-DowserString] Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds) -InformationAction Continue
         Write-Verbose "Found $($scanTargets.Count) directories to scan"
 
-        # each worker gets a chunk of dirs; scans them non-recursively; returns file paths
         $gatherScriptBlock = {
             param($DirChunk, $Extensions, $MaxFileSizeBytes, $ExcludeExtensions, $ProgressQueue)
 
@@ -344,16 +334,13 @@ function Find-DowserString {
 
         # ==================================================================
         # PHASE 3/3 - STRING SEARCHING
-        # each worker gets a chunk of file paths; returns match objects.
-        # aho-corasick is used for multi-pattern literal; regex/manual otherwise.
+        # aho for multi-pattern literal, regex or manual otherwise
         # ==================================================================
 
         $searchScriptBlock = {
             param($FilePaths, $Patterns, $UseRegex, $CaseSensitive, $UseAho, $AhoCode, $IncludeLineContent, $ProgressQueue)
 
-            # compile Aho-Corasick in this runspace if needed
-            # main thread already compiled it into the shared AppDomain, but a safety-net compile
-            # here covers the edge case where the worker spun up before that completed
+            # safety-net compile for workers that raced the main-thread compile
             if ($UseAho -and $AhoCode) {
                 try   { $null = [FastSearch.AhoCorasick] }
                 catch { Add-Type -TypeDefinition $AhoCode -ErrorAction SilentlyContinue }
@@ -371,7 +358,6 @@ function Find-DowserString {
                     $lines = $content -split '\r?\n'
 
                     if ($UseAho) {
-                        # build a lowercased pattern array and lowercased lines when case-insensitive
                         $searchPats = if ($CaseSensitive) {
                             [string[]]$Patterns
                         } else {
@@ -399,7 +385,6 @@ function Find-DowserString {
                         }
                     }
                     else {
-                        # single-pattern literal or regex — line by line
                         for ($i = 0; $i -lt $lines.Count; $i++) {
                             $line = $lines[$i]
 
@@ -430,14 +415,14 @@ function Find-DowserString {
                                         $row | Add-Member -NotePropertyName Line -NotePropertyValue $line
                                     }
                                     [void]$results.Add($row)
-                                    break  # first matching pattern wins per line — consistent with aho path
+                                    break  # first matching pattern wins, same as aho path
                                 }
                             }
                         }
                     }
                 }
                 catch {
-                    # Report unreadable files so callers know search was incomplete.
+                    # emit a row so callers know the search skipped a file
                     $results.Add([pscustomobject]@{
                         FilePath   = $FilePath
                         LineNumber = 0
@@ -481,10 +466,7 @@ function Find-DowserString {
         if ($results.Count -gt 0) {
             switch ($OutputMode) {
                 'singlefile' {
-                    # default output when -Path is a single file. show a window of context
-                    # AROUND each match (40 chars before, the match itself, 40 chars after)
-                    # rather than the whole line — long minified HTML/JSON lines otherwise drown
-                    # the actual hit. capped at 25 sample matches.
+                    # window the context around each hit so long minified lines don't drown it
                     $totalMatches = [int]($results | Measure-Object -Property Count -Sum).Sum
                     $uniqueLines  = @($results | Select-Object -ExpandProperty LineNumber -Unique).Count
                     $sorted       = $results | Sort-Object LineNumber
@@ -493,7 +475,7 @@ function Find-DowserString {
                     $remaining    = [Math]::Max(0, @($sorted).Count - $sampleCap)
                     $patList      = (@($results | Select-Object -ExpandProperty Pattern -Unique) -join ', ')
                     $filePath     = @($results)[0].FilePath
-                    $window       = 40  # chars of context on each side of the hit
+                    $window       = 40
 
                     Write-Output $filePath
                     Write-Output ("  Pattern(s) : {0}" -f $patList)
@@ -511,8 +493,7 @@ function Find-DowserString {
                         }
 
                         if ($idx -lt 0) {
-                            # pattern wasn't a literal hit on this line (regex / aho with mapped pattern).
-                            # fall back to a head-truncation.
+                            # no literal hit on regex or mapped-aho lines, head-truncate instead
                             $snippet = ($line -replace '\s+', ' ').Trim()
                             if ($snippet.Length -gt ($window * 2 + 20)) {
                                 $snippet = $snippet.Substring(0, $window * 2 + 17) + '...'
@@ -535,9 +516,6 @@ function Find-DowserString {
                     }
                 }
                 'grouped' {
-                    # group by parent directory; list files under each dir header.
-                    # text-emitting mode (Write-Output strings) for clean console reading.
-                    # use -OutputMode counts for the legacy object-emitting variant if you need to pipe downstream.
                     $perFile = $results | Group-Object FilePath | ForEach-Object {
                         $total    = [int]($_.Group | Measure-Object -Property Count -Sum).Sum
                         $lineNums = @($_.Group | Select-Object -ExpandProperty LineNumber -Unique | Sort-Object)
@@ -562,7 +540,6 @@ function Find-DowserString {
                         $matchWord  = if ($dirMatches -eq 1) { 'match' } else { 'matches' }
                         Write-Output ("{0}  ({1} {2}, {3} {4})" -f $g.Name, $fileCount, $fileWord, $dirMatches, $matchWord)
 
-                        # left-pad filenames to the widest in this group, clamped 30..80 chars
                         $maxLen = ($g.Group | ForEach-Object { $_.FileName.Length } | Measure-Object -Maximum).Maximum
                         $padTo  = [Math]::Min(80, [Math]::Max(30, $maxLen))
                         $fmt    = "    {0,-$padTo}  [{1,4}]  {2}"
