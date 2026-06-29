@@ -9,7 +9,9 @@ $scriptBlock = {
     foreach ($item in $chunk) {
         Start-Sleep -Milliseconds 50
         $res += ($item * $multiplier)
-        if ($progressQueue) { [void]$progressQueue.Enqueue(1) }
+        if ($progressQueue) {
+            [void]$progressQueue.Enqueue(1) 
+        }
     }
     return $res
 }
@@ -21,6 +23,7 @@ if ($results.Count -eq 25) {
     Write-Information "Test Passed! Got 25 results." -InformationAction Continue
     $sum = ($results | Measure-Object -Sum).Sum
     Write-Information "Sum is $sum (Expected 3250)" -InformationAction Continue
-} else {
+}
+else {
     Write-Warning "Test Failed! Got $($results.Count) results."
 }

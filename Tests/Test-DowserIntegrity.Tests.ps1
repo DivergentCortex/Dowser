@@ -33,11 +33,11 @@ BeforeAll {
     New-Item -ItemType Directory -Path $script:WorkDir -Force | Out-Null
 
     # Fixtures
-    $script:EmptyFile   = Join-Path $script:WorkDir 'empty.bin'
-    $script:CleanText   = Join-Path $script:WorkDir 'clean.txt'
-    $script:CorruptExe  = Join-Path $script:WorkDir 'broken.exe'
-    $script:ThumbsDb    = Join-Path $script:WorkDir 'Thumbs.db'
-    $script:OfficeLock  = Join-Path $script:WorkDir '~$document.docx'
+    $script:EmptyFile = Join-Path $script:WorkDir 'empty.bin'
+    $script:CleanText = Join-Path $script:WorkDir 'clean.txt'
+    $script:CorruptExe = Join-Path $script:WorkDir 'broken.exe'
+    $script:ThumbsDb = Join-Path $script:WorkDir 'Thumbs.db'
+    $script:OfficeLock = Join-Path $script:WorkDir '~$document.docx'
 
     # Create them
     New-Item -ItemType File -Path $script:EmptyFile -Force | Out-Null
@@ -71,7 +71,7 @@ Describe 'Test-DowserIntegrity - contract' {
 
     It 'has the expected aliases' {
         (Get-Alias dintegrity -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
-        (Get-Alias dinteg     -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
+        (Get-Alias dinteg -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
     }
 
     It 'summary mode emits exactly one summary object' {

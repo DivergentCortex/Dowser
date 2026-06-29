@@ -36,7 +36,8 @@ Describe 'Dowser Cross-Platform Support' {
                 # On Windows: ConvertTo-DowserIco should NOT emit platform warning
                 # Verify the platform variable resolves to boolean in module context
                 $IsWindows | Should -BeOfType [bool]
-            } else {
+            }
+            else {
                 # On Linux/macOS: variable is $false
                 $IsWindows | Should -Be $false
             }

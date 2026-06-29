@@ -147,7 +147,8 @@ Describe 'Dowser Linux behavior fixes' {
             $script:linkMade = $true
             try {
                 $null = New-Item -ItemType SymbolicLink -Path (Join-Path $script:mapRoot 'link') -Target $mapSub -ErrorAction Stop
-            } catch {
+            }
+            catch {
                 $script:linkMade = $false
             }
         }
