@@ -306,25 +306,19 @@ function Write-Log {
         }
     
         try {
-            # Get caller information more reliably
-            # First, get the call stack
             $callStack = Get-PSCallStack
         
-            # Default values if we can't determine them
             $Source = "Unknown"
             $callerFunctionName = "Unknown"
             $lineNumber = "?"
         
-            # If we have a call stack with at least 2 entries (current function and caller)
             if ($null -ne $callStack -and $callStack.Count -gt 1) {
                 $callerInfo = $callStack[1]
             
-                # Get the source file location
                 if ($callerInfo.Location) {
                     $Source = $callerInfo.Location
                 }
             
-                # Get line number for console output
                 if ($callerInfo.ScriptLineNumber) {
                     $lineNumber = $callerInfo.ScriptLineNumber
                 }
@@ -335,11 +329,6 @@ function Write-Log {
                     }
                 }
             }
-            # Component resolution priority:
-            # 1. Explicitly provided Component parameter
-            # 2. Caller function name from call stack (prioritized over Script:Component)
-            # 3. Script:Component if defined in the calling script
-            # 4. "Unknown" as last resort
             if ([string]::IsNullOrEmpty($Component)) {
                 if ($callerFunctionName -ne "Unknown" -and $callerFunctionName -notlike "*.ps1") {
                     $Component = $callerFunctionName
@@ -355,14 +344,11 @@ function Write-Log {
                 }
             }
         
-            # Final check - make sure Component isn't empty
             if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {
-                # One last attempt - try to get it from MyInvocation of the caller
                 if ($callStack.Count -gt 1 -and $null -ne $callStack[1].InvocationInfo -and $null -ne $callStack[1].InvocationInfo.MyCommand) {
                     $Component = $callStack[1].InvocationInfo.MyCommand.Name
                 }
             
-                # If still empty, use a default
                 if ([string]::IsNullOrEmpty($Component)) {
                     $Component = "Unknown"
                 }
@@ -410,7 +396,6 @@ function Write-Log {
                 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
             }
 
-            # Check if console output is enabled for this severity
             $shouldWriteConsole = switch ($Severity) {
                 'Verbose' {
                     $verboseToConsole 
@@ -423,15 +408,12 @@ function Write-Log {
                 }
             }
 
-            # Write to console if enabled
             if ($WriteBackToHost -and $shouldWriteConsole) {
-                # Truncate component name for display if too long
                 $displayComponent = $Component
                 if ($displayComponent.Length -gt 12) {
                     $displayComponent = $displayComponent.Substring(0, 10) + ".."
                 }
 
-                # Define severity label and color mappings
                 $severityConfig = @{
                     'Error'   = @{ Label = ' ERROR '; LabelColor = 'Red'; MessageColor = 'Red' }
                     'Warning' = @{ Label = ' WARNING '; LabelColor = 'Yellow'; MessageColor = 'Yellow' }
@@ -441,10 +423,8 @@ function Write-Log {
                     'Debug'   = @{ Label = ' DEBUG '; LabelColor = 'Magenta'; MessageColor = 'Magenta' }
                 }
 
-                # Get configuration for current severity
                 $config = $severityConfig[$Severity]
 
-                # Determine final message color (use -Color parameter if specified, otherwise default)
                 $finalMessageColor = if ($PSBoundParameters.ContainsKey('Color')) {
                     $Color
                 }
@@ -452,7 +432,6 @@ function Write-Log {
                     $config.MessageColor
                 }
 
-                # Write formatted output: [ SEVERITY ] [Component..] [LineNum]: Message
                 Write-Host "[" -NoNewline -ForegroundColor Gray
                 Write-Host $config.Label -NoNewline -ForegroundColor $config.LabelColor
                 Write-Host "] [" -NoNewline -ForegroundColor Gray
@@ -464,7 +443,6 @@ function Write-Log {
                 Write-Host "$Message" -ForegroundColor $finalMessageColor
             }
 
-            # Check if logfile output is enabled for this severity
             $shouldWriteLogfile = switch ($Severity) {
                 'Verbose' {
                     $verboseToLogfile 
@@ -532,7 +510,6 @@ function Write-Log {
                 }
             }
 
-            # Write to logfile if enabled
             if ($shouldWriteLogfile) {
                 $retryCount = 0
                 $writeSucceeded = $false
@@ -594,7 +571,6 @@ function Write-Log {
             }
         }
         finally {
-            # Return to original location if possible (SCCM drive may have disconnected)
             if ($isSCCMDrive) {
                 try {
                     Set-Location $originalLocation -ErrorAction SilentlyContinue 
