@@ -922,7 +922,7 @@ function Initialize-Log {
     [OutputType([void])]
     param (
         [Parameter(Mandatory = $false)]
-        [string]$LogFilePath,
+        [string]$LogFilePath = (Get-Variable -Name LogFilePath -ErrorAction SilentlyContinue).Value,
 
         [Parameter(Mandatory = $false)]
         [string]$ScriptName,
