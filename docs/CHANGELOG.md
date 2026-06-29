@@ -2,6 +2,18 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.035] - 2026-06-29
+### fix(Get-DowserTemplate): Fix phantom process block so the function actually runs on Windows
+
+What changed:
+- Wrapped the platform guard in a begin block and moved the $unsupported flag check into the process block
+- process { } was previously free-floating code after a bare if, so PowerShell parsed it as a call to a nonexistent process command (AST confirmed ProcessBlock present: False), meaning the COM body never ran and the function threw on Windows
+- After the fix the AST reports ProcessBlock present: True with no parse errors; pipeline input declared by the param now binds correctly
+
+Why:
+- The function was broken on its target platform: free statements before a process block turn the block into a phantom command call, so the Shell.Application query never executed and Windows callers hit a process-not-recognized error
+
+
 ## [2026.06.29.034] - 2026-06-29
 ### docs(comments): De-slop inline comments across module scripts, comments-only pass
 
