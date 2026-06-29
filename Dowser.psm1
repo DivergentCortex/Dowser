@@ -28,6 +28,16 @@ if (-not (Get-Variable -Name 'IsWindows' -ErrorAction SilentlyContinue)) {
     $IsMacOS   = $false
 }
 
+# Write-Log FATAL-throws when $LogFilePath is empty. Set a module-root default
+# here so every dot-sourced function logs with no per-function setup. A caller
+# can still override by setting $LogFilePath before import or passing -Logfile.
+$script:DowserRoot = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($LogFilePath)) {
+    $LogDir = Join-Path $PSScriptRoot 'logs'
+    if (-not (Test-Path $LogDir)) { New-Item -Path $LogDir -ItemType Directory -Force | Out-Null }
+    $LogFilePath = Join-Path $LogDir ("Dowser_{0}.log" -f (Get-Date -Format 'yyyyMMdd'))
+}
+
 $Public  = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Public') '*.ps1') -ErrorAction SilentlyContinue)
 $Private = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Private') '*.ps1') -ErrorAction SilentlyContinue)
 
