@@ -42,35 +42,35 @@ Get-DowserReport -Path ./src -ExportCsv ./report.csv
 
 27 exported functions. 26 live one-per-file in `Public/`; the 27th, `Compare-DowserReport`, is dot-sourced from `Public/Get-DowserReport.ps1` and exported by name. Each carries one or more short aliases for interactive use.
 
-| Function | Alias | Purpose |
-|----------|-------|---------|
-| ConvertTo-DowserBase64 | db64 | Convert images to/from Base64 strings |
-| ConvertTo-DowserExe | dexe | Generate a C# EXE wrapper for a PS script (Windows) |
-| ConvertTo-DowserIco | dico | Create .ico files from images (Windows) |
-| Expand-DowserExe | dexpand, dextract | Extract files from extractable EXE archives via 7-Zip |
-| Find-DowserDependency | ddep | Scan PS scripts for function calls and dot-source deps |
-| Find-DowserDuplicate | ddupe | Detect duplicate files by name, size, or chunked hash |
-| Find-DowserFile | dfile, dfind | Multi-threaded file search by attributes, size, date |
-| Find-DowserModified | dmod | Find files modified on a specific date |
-| Find-DowserOrphan | dorphan | Find unreferenced files in a project directory |
-| Find-DowserRecentLog | dlog | Return the most recent log file from a directory |
-| Find-DowserScript | dscript | Search directory trees for script files by type |
-| Find-DowserString | dstr, dgrep | Multi-pattern text search with Aho-Corasick matching |
-| Get-DowserInfo | dinfo | Report module version and latest changelog entry |
-| Get-DowserMap | dmap | Visual directory tree with optional size/PS1 annotations |
-| Get-DowserOwnership | down | File ownership and Shell.Application metadata |
-| Get-DowserProperty | dprop | Deep single-file inspector (VersionInfo, PE, hashes) |
-| Get-DowserReport | dreport | File metrics report with parallel processing and export |
-| Get-DowserTemplate | dtemplate | Windows Explorer folder template configs (Windows) |
-| Get-DowserTopology | dtree, dtopo, pstree, shtree | Visual tree for any PSProvider path |
-| Invoke-DowserFastSearch | dfast | Parallel single-pattern text search |
-| Invoke-DowserNumericSort | dsort, dnsort | Natural numeric sort (Item-2 before Item-10) |
-| Measure-DowserDirectory | dsize | Directory size and file count summary |
-| Measure-DowserDiskUsage | ddu | WinDirStat-style recursive disk-usage report with HTML treemap |
-| New-DowserHiddenFolder | dhide | Hide a directory: NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS |
-| Test-DowserExtractable | dtest, dtestexe | Classify EXEs as extractable vs decompile-required |
-| Test-DowserIntegrity | dintegrity, dinteg | Layered corruption and hygiene detection |
-| Compare-DowserReport | dcompare | Diff two Get-DowserReport snapshots (NEW/CHANGED/REMOVED/UNCHANGED) |
+| Function                 | Alias                        | Purpose                                                                            |
+| ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------- |
+| ConvertTo-DowserBase64   | db64                         | Convert images to/from Base64 strings                                              |
+| ConvertTo-DowserExe      | dexe                         | Generate a C# EXE wrapper for a PS script (Windows)                                |
+| ConvertTo-DowserIco      | dico                         | Create .ico files from images (Windows)                                            |
+| Expand-DowserExe         | dexpand, dextract            | Extract files from extractable EXE archives via 7-Zip                              |
+| Find-DowserDependency    | ddep                         | Scan PS scripts for function calls and dot-source deps                             |
+| Find-DowserDuplicate     | ddupe                        | Detect duplicate files by name, size, or chunked hash                              |
+| Find-DowserFile          | dfile, dfind                 | Multi-threaded file search by attributes, size, date                               |
+| Find-DowserModified      | dmod                         | Find files modified on a specific date                                             |
+| Find-DowserOrphan        | dorphan                      | Find unreferenced files in a project directory                                     |
+| Find-DowserRecentLog     | dlog                         | Return the most recent log file from a directory                                   |
+| Find-DowserScript        | dscript                      | Search directory trees for script files by type                                    |
+| Find-DowserString        | dstr, dgrep                  | Multi-pattern text search with Aho-Corasick matching                               |
+| Get-DowserInfo           | dinfo                        | Report module version and latest changelog entry                                   |
+| Get-DowserMap            | dmap                         | Visual directory tree with optional size/PS1 annotations                           |
+| Get-DowserOwnership      | down                         | File ownership and Shell.Application metadata                                      |
+| Get-DowserProperty       | dprop                        | Deep single-file inspector (VersionInfo, PE, hashes)                               |
+| Get-DowserReport         | dreport                      | File metrics report with parallel processing and export                            |
+| Get-DowserTemplate       | dtemplate                    | Windows Explorer folder template configs (Windows)                                 |
+| Get-DowserTopology       | dtree, dtopo, pstree, shtree | Visual tree for any PSProvider path                                                |
+| Invoke-DowserFastSearch  | dfast                        | Parallel single-pattern text search                                                |
+| Invoke-DowserNumericSort | dsort, dnsort                | Natural numeric sort (Item-2 before Item-10)                                       |
+| Measure-DowserDirectory  | dsize                        | Directory size and file count summary                                              |
+| Measure-DowserDiskUsage  | ddu                          | WinDirStat-style recursive disk-usage report with HTML treemap                     |
+| New-DowserHiddenFolder   | dhide                        | Hide a directory: NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS |
+| Test-DowserExtractable   | dtest, dtestexe              | Classify EXEs as extractable vs decompile-required                                 |
+| Test-DowserIntegrity     | dintegrity, dinteg           | Layered corruption and hygiene detection                                           |
+| Compare-DowserReport     | dcompare                     | Diff two Get-DowserReport snapshots (NEW/CHANGED/REMOVED/UNCHANGED)                |
 
 `Compare-DowserReport` ships inside `Public/Get-DowserReport.ps1` and diffs two `Get-DowserReport` snapshots. Because it shares a file with `Get-DowserReport` it has no Public/ basename of its own, so the loader exports it by name (`Export-ModuleMember` adds it explicitly) and the manifest's `FunctionsToExport` lists it. It is a normal exported public function.
 
