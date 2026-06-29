@@ -35,13 +35,17 @@ function Get-DowserTemplate {
         [string]$Path = $PWD
     )
 
-    # needs shell.application com, IsWindows null on 5.1 means windows
-    if ($IsWindows -eq $false) {
-        Write-Warning "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform."
-        return $null
+    begin {
+        # needs shell.application com, IsWindows null on 5.1 means windows
+        $unsupported = $IsWindows -eq $false
+        if ($unsupported) {
+            Write-Warning "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform."
+        }
     }
 
     process {
+        if ($unsupported) { return }
+
         if (-not (Test-Path $Path)) {
             Write-Warning "Path not found: $Path"
             return
