@@ -38,13 +38,21 @@ function ConvertTo-DowserExe {
         [string]$ScriptPath
     )
 
+    Write-Log "Starting ConvertTo-DowserExe"
+
     # eq false not -not, $IsWindows is null on 5.1
     if ($IsWindows -eq $false) {
-        Write-Warning "ConvertTo-DowserExe produces Windows PE executables and requires Windows. Not available on this platform."
+        Write-Log "ConvertTo-DowserExe requires Windows. Not available on this platform." -Severity Warning
         return $null
     }
 
-    $scriptContent = Get-Content -Path $ScriptPath -Raw
+    try {
+        $scriptContent = Get-Content -Path $ScriptPath -Raw -ErrorAction Stop
+    }
+    catch {
+        Write-Log "ConvertTo-DowserExe failed reading script '$ScriptPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        return $null
+    }
 
     $codeTemplate = @"
 using System;
@@ -92,12 +100,21 @@ namespace PowerShellWrapper
     $outputFile = [System.IO.Path]::GetFileNameWithoutExtension($ScriptPath) + ".exe"
     # Add-Type -OutputType was removed in PS 6+
     if ($PSVersionTable.PSVersion.Major -lt 6) {
-        Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
+        Write-Log "Compiling '$ScriptPath' to '$outputFile'."
+        try {
+            Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication -ErrorAction Stop
+            Write-Log "Compiled '$outputFile' successfully."
+        }
+        catch {
+            Write-Log "ConvertTo-DowserExe failed compiling '$outputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        }
     }
     else {
-        Write-Warning "ConvertTo-DowserExe requires Windows PowerShell 5.1 (Add-Type -OutputType was removed in PowerShell 6+). Run this under powershell.exe."
+        Write-Log "ConvertTo-DowserExe requires Windows PowerShell 5.1 (Add-Type -OutputType removed in PS 6+). Run under powershell.exe." -Severity Warning
         return $null
     }
+
+    Write-Log "Ending ConvertTo-DowserExe"
 }
 
 function ConvertTo-DowserExeConfuserEx {
@@ -141,13 +158,21 @@ function ConvertTo-DowserExeConfuserEx {
         [string]$ConfuserExPath
     )
 
+    Write-Log "Starting ConvertTo-DowserExeConfuserEx"
+
     # eq false not -not, $IsWindows is null on 5.1
     if ($IsWindows -eq $false) {
-        Write-Warning "ConvertTo-DowserExeConfuserEx produces Windows PE executables and requires Windows. Not available on this platform."
+        Write-Log "ConvertTo-DowserExeConfuserEx requires Windows. Not available on this platform." -Severity Warning
         return $null
     }
 
-    $scriptContent = Get-Content -Path $ScriptPath -Raw
+    try {
+        $scriptContent = Get-Content -Path $ScriptPath -Raw -ErrorAction Stop
+    }
+    catch {
+        Write-Log "ConvertTo-DowserExeConfuserEx failed reading script '$ScriptPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        return $null
+    }
 
     $codeTemplate = @"
 using System;
@@ -195,12 +220,35 @@ namespace PowerShellWrapper
     $outputFile = [System.IO.Path]::GetFileNameWithoutExtension($ScriptPath) + ".exe"
     # Add-Type -OutputType was removed in PS 6+
     if ($PSVersionTable.PSVersion.Major -ge 6) {
-        Write-Warning "ConvertTo-DowserExeConfuserEx requires Windows PowerShell 5.1 (Add-Type -OutputType was removed in PowerShell 6+). Run this under powershell.exe."
+        Write-Log "ConvertTo-DowserExeConfuserEx requires Windows PowerShell 5.1 (Add-Type -OutputType removed in PS 6+). Run under powershell.exe." -Severity Warning
         return $null
     }
-    Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication
 
-    $confuserExPath = Join-Path -Path $ConfuserExPath -ChildPath "Confuser.CLI.exe"
+    Write-Log "Compiling '$ScriptPath' to '$outputFile'."
+    try {
+        Add-Type -TypeDefinition $codeTemplate -Language CSharp -OutputAssembly $outputFile -OutputType ConsoleApplication -ErrorAction Stop
+        Write-Log "Compiled '$outputFile' successfully."
+    }
+    catch {
+        Write-Log "ConvertTo-DowserExeConfuserEx failed compiling '$outputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        return $null
+    }
+
+    $confuserCliExe = Join-Path -Path $ConfuserExPath -ChildPath "Confuser.CLI.exe"
     $confuserExConfig = Join-Path -Path $ConfuserExPath -ChildPath "ConfuserEx.crproj"
-    & $confuserExPath -n $outputFile -o $outputFile --project $confuserExConfig
+    Write-Log "Running ConfuserEx on '$outputFile'."
+    try {
+        & $confuserCliExe -n $outputFile -o $outputFile --project $confuserExConfig
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ConvertTo-DowserExeConfuserEx: ConfuserEx exited with code $LASTEXITCODE for '$outputFile'." -Severity Warning
+        }
+        else {
+            Write-Log "ConfuserEx obfuscation complete for '$outputFile'."
+        }
+    }
+    catch {
+        Write-Log "ConvertTo-DowserExeConfuserEx failed running ConfuserEx on '$outputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+    }
+
+    Write-Log "Ending ConvertTo-DowserExeConfuserEx"
 }

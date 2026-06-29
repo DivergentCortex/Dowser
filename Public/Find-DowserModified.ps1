@@ -58,19 +58,20 @@ function Find-DowserModified {
     )
 
     process {
+        Write-Log "Starting Find-DowserModified"
         foreach ($rootPath in $Path) {
             if (-not (Test-Path $rootPath)) {
-                Write-Warning "Path not found: $rootPath"
+                Write-Log "Find-DowserModified path not found: '$rootPath'" -Severity Warning
                 continue
             }
 
-            Write-Verbose "Searching '$rootPath' for files modified on $($Date.ToString('yyyy-MM-dd'))..."
+            Write-Log "Searching '$rootPath' for files modified on $($Date.ToString('yyyy-MM-dd'))..."
 
             try {
                 $files = Get-ChildItem -Path $rootPath -Recurse:$Recurse -File -ErrorAction SilentlyContinue |
                     Where-Object { $_.LastWriteTime.Date -eq $Date.Date }
 
-                Write-Verbose "Found $(@($files).Count) files modified on $($Date.ToString('yyyy-MM-dd'))"
+                Write-Log "Found $(@($files).Count) files modified on $($Date.ToString('yyyy-MM-dd'))"
 
                 foreach ($file in $files) {
                     [PSCustomObject]@{
@@ -81,8 +82,9 @@ function Find-DowserModified {
                 }
             }
             catch {
-                Write-Warning "Error scanning '$rootPath': $_"
+                Write-Log "Find-DowserModified failed scanning '$rootPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             }
         }
+        Write-Log "Ending Find-DowserModified"
     }
 }

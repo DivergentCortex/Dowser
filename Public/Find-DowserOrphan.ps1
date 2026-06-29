@@ -61,10 +61,19 @@ function Find-DowserOrphan {
         )
     )
 
-    $SearchPath = Resolve-Path $SearchPath
-    Write-Verbose "Scanning for orphan files in: $SearchPath"
+    Write-Log "Starting Find-DowserOrphan"
 
-    Write-Verbose "Inventorying files..."
+    try {
+        $SearchPath = Resolve-Path $SearchPath -ErrorAction Stop
+    }
+    catch {
+        Write-Log "Find-DowserOrphan failed resolving path '$SearchPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        return
+    }
+
+    Write-Log "Scanning for orphan files in: $SearchPath"
+
+    Write-Log "Inventorying files..."
     $allFiles = Get-ChildItem -Path $SearchPath -Recurse -File | Where-Object {
         $path = $_.FullName
         $exclude = $false
@@ -78,7 +87,7 @@ function Find-DowserOrphan {
     }
 
     $fileCount = $allFiles.Count
-    Write-Verbose "Found $fileCount files."
+    Write-Log "Found $fileCount files."
 
     $tokenMap = @{}
 
@@ -89,7 +98,7 @@ function Find-DowserOrphan {
     $scannerCount = $scannerFiles.Count
     $processed = 0
 
-    Write-Verbose "Analyzing content of $scannerCount text files..."
+    Write-Log "Analyzing content of $scannerCount text files..."
 
     foreach ($file in $scannerFiles) {
         $processed++
@@ -113,7 +122,7 @@ function Find-DowserOrphan {
             }
         }
         catch {
-            Write-Warning "Could not read $($file.FullName)"
+            Write-Log "Find-DowserOrphan failed reading '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
         }
     }
     Write-Progress -Activity "Indexing Content" -Completed
@@ -121,7 +130,7 @@ function Find-DowserOrphan {
     $orphans = @()
     $referenced = @()
 
-    Write-Verbose "Checking for references..."
+    Write-Log "Checking for references..."
 
     foreach ($file in $allFiles) {
         $name = $file.Name
@@ -146,17 +155,14 @@ function Find-DowserOrphan {
         }
     }
 
-    Write-Verbose "`nAnalysis Complete."
-    Write-Verbose "Total Files: $fileCount"
-    Write-Verbose "Referenced:  $($referenced.Count)"
-    Write-Verbose "Orphans:     $($orphans.Count)"
+    Write-Log "Analysis Complete. Total: $fileCount | Referenced: $($referenced.Count) | Orphans: $($orphans.Count)"
 
     if ($orphans.Count -gt 0) {
-        Write-Verbose "`nPotential Orphan Files (No external references found):"
-        # preview to verbose so the return stays clean fileinfo objects
-        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Verbose
+        # preview summary to log so the return stays clean fileinfo objects
+        $orphans | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize | Out-String | Write-Log
     }
 
+    Write-Log "Ending Find-DowserOrphan"
     return $orphans
 }
 

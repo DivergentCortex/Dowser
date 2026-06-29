@@ -92,18 +92,19 @@ function Invoke-DowserFastSearch {
 
     begin {
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-        Write-Verbose "Invoke-DowserFastSearch: starting - pattern '$SearchString', threads $Threads"
+        Write-Log "Starting Invoke-DowserFastSearch"
+        Write-Log "Invoke-DowserFastSearch: pattern '$SearchString', threads $Threads"
     }
 
     process {
         $files = Get-ChildItem -Path $Path -Recurse -Include $Include -Exclude $Exclude -File
 
         if ($null -eq $files) {
-            Write-Warning "No files found matching the specified criteria under '$Path'."
+            Write-Log "Invoke-DowserFastSearch: no files found matching the specified criteria under '$Path'" -Severity Warning
             return
         }
 
-        Write-Verbose "Found $($files.Count) file(s) to search."
+        Write-Log "Invoke-DowserFastSearch: found $($files.Count) file(s) to search"
 
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, $Threads)
         $runspacePool.Open()
@@ -177,11 +178,17 @@ function Invoke-DowserFastSearch {
             Write-Progress -Activity "Searching files" -Status "Completed $completed of $totalFiles" -PercentComplete (($completed / $totalFiles) * 100)
         }
 
-        $runspacePool.Close()
-        $runspacePool.Dispose()
+        try {
+            $runspacePool.Close()
+            $runspacePool.Dispose()
+        }
+        catch {
+            Write-Log "Invoke-DowserFastSearch failed disposing runspace pool: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        }
 
         $stopwatch.Stop()
-        Write-Verbose "Search complete: $($results.Count) match(es) across $totalFiles file(s) in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s"
+        Write-Log "Invoke-DowserFastSearch: search complete - $($results.Count) match(es) across $totalFiles file(s) in $([math]::Round($stopwatch.Elapsed.TotalSeconds, 2))s"
+        Write-Log "Ending Invoke-DowserFastSearch"
 
         $results
     }

@@ -70,16 +70,18 @@ function ConvertTo-DowserIco {
         $MaxSize = 0
     )
 
+    Write-Log "Starting ConvertTo-DowserIco"
+
     # eq false not -not, $IsWindows is null on 5.1
     if ($IsWindows -eq $false) {
-        Write-Warning "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform."
+        Write-Log "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform." -Severity Warning
         return $null
     }
 
     Add-Type -AssemblyName System.Drawing
 
     if (-not (Test-Path $InputFilePath)) {
-        Write-Error "Input file '$InputFilePath' does not exist."
+        Write-Log "ConvertTo-DowserIco: input file '$InputFilePath' does not exist." -Severity Error
         return $false
     }
 
@@ -89,13 +91,14 @@ function ConvertTo-DowserIco {
     $tempFile = $null
     if ($InputFilePath -like '\\*') {
         $tempFile = Join-Path $env:TEMP "$([System.IO.Path]::GetRandomFileName())"
-        Write-Verbose "UNC path detected. Copying to temp: $tempFile"
+        Write-Log "UNC path detected. Copying to temp: '$tempFile'."
         try {
-            Copy-Item -Path $InputFilePath -Destination $tempFile -Force
+            Copy-Item -Path $InputFilePath -Destination $tempFile -Force -ErrorAction Stop
             $InputFilePath = $tempFile
-            Write-Verbose "  + File copied successfully"
-        } catch {
-            Write-Error "Failed to copy UNC file to temp: $_"
+            Write-Log "UNC file staged to temp successfully."
+        }
+        catch {
+            Write-Log "ConvertTo-DowserIco failed copying UNC file '$InputFilePath' to temp: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             return $false
         }
     }
@@ -118,8 +121,9 @@ function ConvertTo-DowserIco {
         $fileBytes = [System.IO.File]::ReadAllBytes($InputFilePath)
         $ms = New-Object System.IO.MemoryStream(, $fileBytes)
         $bitmap = [System.Drawing.Bitmap]::FromStream($ms)
-    } catch {
-        Write-Error "Failed to load image '$InputFilePath': $_"
+    }
+    catch {
+        Write-Log "ConvertTo-DowserIco failed loading image '$InputFilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         return $false
     }
 
@@ -132,15 +136,15 @@ function ConvertTo-DowserIco {
     $validSizes = @(16,32,48,64,128,256,512)
     $sizes = $IcoSizes | ForEach-Object {
         $n = [int]$_
-        if ($n -in $validSizes) { $n } else { 
-            Write-Warning "Size $n not in valid set (16,32,48,64,128,256,512), skipping"
-            $null 
+        if ($n -in $validSizes) { $n } else {
+            Write-Log "ConvertTo-DowserIco: size $n not in valid set (16,32,48,64,128,256,512), skipping." -Severity Warning
+            $null
         }
     } | Where-Object { $_ -ne $null } | Select-Object -Unique | Sort-Object
-    
+
     if ($sizes.Count -eq 0) {
         $sizes = @(512)
-        Write-Warning "No valid sizes specified, using default: 512px"
+        Write-Log "ConvertTo-DowserIco: no valid sizes specified, using default: 512px." -Severity Warning
     }
     $images = @()
     try {
@@ -213,18 +217,21 @@ function ConvertTo-DowserIco {
         $bw.Close()
         $fs.Close()
 
-        Write-Output "Wrote icon: $OutputFile"
+        Write-Log "Wrote icon: '$OutputFile'."
+        Write-Log "Ending ConvertTo-DowserIco"
         return $true
-    } catch {
-        Write-Error "Failed to create/save icon: $_"
+    }
+    catch {
+        Write-Log "ConvertTo-DowserIco failed creating icon '$OutputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         return $false
-    } finally {
+    }
+    finally {
         if ($fs) { $fs.Dispose() }
         if ($ms) { $ms.Dispose() }
         if ($bitmap) { $bitmap.Dispose() }
         if ($tempFile -and (Test-Path $tempFile)) {
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            Write-Verbose "  + Temp file cleaned up"
+            Write-Log "Temp file cleaned up."
         }
     }
 }

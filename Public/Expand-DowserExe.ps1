@@ -93,32 +93,33 @@ function Expand-DowserExe {
     )
 
     begin {
+        Write-Log "Starting Expand-DowserExe"
         if (-not (Test-Path -LiteralPath $SevenZipPath)) {
-            Write-Error "7-Zip not found at '$SevenZipPath'. Install 7-Zip or specify -SevenZipPath."
+            Write-Log "Expand-DowserExe: 7-Zip not found at '$SevenZipPath'. Install 7-Zip or specify -SevenZipPath." -Severity Error
             return
         }
-        Write-Verbose "Using 7-Zip: $SevenZipPath"
+        Write-Log "Using 7-Zip: '$SevenZipPath'."
     }
 
     process {
         foreach ($inputPath in $Path) {
             if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) {
-                Write-Warning "File not found: $inputPath"
+                Write-Log "Expand-DowserExe: file not found: '$inputPath'." -Severity Warning
                 continue
             }
 
             $file = Get-Item -LiteralPath $inputPath -ErrorAction SilentlyContinue
             if (-not $file) {
-                Write-Warning "Cannot access: $inputPath"
+                Write-Log "Expand-DowserExe: cannot access: '$inputPath'." -Severity Warning
                 continue
             }
 
-            Write-Verbose "Checking: $($file.FullName)"
+            Write-Log "Checking extractability: '$($file.FullName)'."
 
             $testResult = Test-DowserExtractable -Path $file.FullName -SevenZipPath $SevenZipPath
 
             if (-not $testResult.Extractable) {
-                Write-Warning "$($file.Name): Not extractable ($($testResult.Classification)). $($testResult.Details)"
+                Write-Log "Expand-DowserExe: '$($file.Name)' is not extractable ($($testResult.Classification)). $($testResult.Details)" -Severity Warning
                 if ($PassThru) {
                     [PSCustomObject]@{
                         Path           = $file.FullName
@@ -142,32 +143,38 @@ function Expand-DowserExe {
             }
 
             if ((Test-Path -LiteralPath $dest) -and -not $Force) {
-                Write-Warning "Destination already exists: $dest. Use -Force to overwrite."
+                Write-Log "Expand-DowserExe: destination already exists: '$dest'. Use -Force to overwrite." -Severity Warning
                 continue
             }
 
             if ($PSCmdlet.ShouldProcess($file.FullName, "Extract to '$dest'")) {
                 if (-not (Test-Path -LiteralPath $dest)) {
                     New-Item -ItemType Directory -Path $dest -Force | Out-Null
-                    Write-Verbose "Created destination: $dest"
+                    Write-Log "Created destination directory: '$dest'."
                 }
 
-                Write-Verbose "Extracting $($file.Name) -> $dest"
+                Write-Log "Extracting '$($file.Name)' to '$dest'."
                 $7zArgs = @('x', $file.FullName, "-o$dest", '-y')
                 if ($Force) {
-                    $7zArgs += '-aoa' 
+                    $7zArgs += '-aoa'
                 }  # overwrite all
 
-                $output = & $SevenZipPath @7zArgs 2>&1 | Out-String
-                $exitCode = $LASTEXITCODE
+                try {
+                    $output = & $SevenZipPath @7zArgs 2>&1 | Out-String
+                    $exitCode = $LASTEXITCODE
+                }
+                catch {
+                    Write-Log "Expand-DowserExe failed invoking 7-Zip for '$($file.Name)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                    continue
+                }
 
                 $success = ($exitCode -eq 0)
                 if ($success) {
                     $extractedCount = (Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue).Count
-                    Write-Verbose "Extraction complete: $extractedCount files extracted to $dest"
+                    Write-Log "Extraction complete: $extractedCount file(s) extracted to '$dest'."
                 }
                 else {
-                    Write-Warning "7-Zip returned exit code $exitCode for $($file.Name)"
+                    Write-Log "Expand-DowserExe: 7-Zip returned exit code $exitCode for '$($file.Name)'." -Severity Warning
                 }
 
                 $extractResult = [PSCustomObject]@{
@@ -177,17 +184,17 @@ function Expand-DowserExe {
                     ExitCode       = $exitCode
                     Classification = $testResult.Classification
                     FileCount      = if ($success) {
-                        $extractedCount 
+                        $extractedCount
                     }
                     else {
-                        0 
+                        0
                     }
                     ArchiveType    = $testResult.ArchiveType
                     Details        = if ($success) {
-                        "Extracted to $dest" 
+                        "Extracted to $dest"
                     }
                     else {
-                        "7-Zip exit code: $exitCode" 
+                        "7-Zip exit code: $exitCode"
                     }
                 }
 
@@ -195,9 +202,13 @@ function Expand-DowserExe {
                     $extractResult
                 }
                 else {
-                    Write-Verbose "$($file.Name): $($extractResult.Details)"
+                    Write-Log "$($file.Name): $($extractResult.Details)."
                 }
             }
         }
+    }
+
+    end {
+        Write-Log "Ending Expand-DowserExe"
     }
 }

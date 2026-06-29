@@ -51,6 +51,8 @@ function Get-DowserOwnership {
         [string]$Extension = "*"
     )
 
+    Write-Log "Starting Get-DowserOwnership"
+
     function Get-FileInformation {
         [CmdletBinding()]
         param([string] $File)
@@ -95,7 +97,7 @@ function Get-DowserOwnership {
                         }
                     }
                     else {
-                        Write-Warning "Get-FileMetaData - Doesn't exists. Skipping $F."
+                        Write-Log "Get-FileMetaData - path does not exist, skipping: $F" -Severity Warning
                         continue
                     }
                 }
@@ -106,7 +108,7 @@ function Get-DowserOwnership {
                     $FileInformation = $F
                 }
                 else {
-                    Write-Warning "Get-FileMetaData - Only files are supported. Skipping $F."
+                    Write-Log "Get-FileMetaData - only files are supported, skipping: $F" -Severity Warning
                     continue
                 }
 
@@ -205,7 +207,18 @@ function Get-DowserOwnership {
         }
     }
 
-    $DirectoryFiles = Get-ChildItem $Directory -Recurse -Force
+    Write-Log "Get-DowserOwnership scanning '$Directory' for extension '$Extension'"
+    try {
+        $DirectoryFiles = Get-ChildItem $Directory -Recurse -Force -ErrorAction Stop
+        Write-Log "Get-DowserOwnership scan complete: $(@($DirectoryFiles).Count) items found"
+    }
+    catch {
+        Write-Log "Get-DowserOwnership failed scanning '$Directory': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        Write-Log "Ending Get-DowserOwnership"
+        return
+    }
+
     $List = $DirectoryFiles | Where-Object { $_.extension -like $Extension }
     $List.FullName | Get-FileMetaData
+    Write-Log "Ending Get-DowserOwnership"
 }

@@ -71,12 +71,12 @@ function Get-DowserProperty {
     )
 
     begin {
-        Write-Verbose "Starting file analysis"
+        Write-Log "Starting Get-DowserProperty"
     }
 
     process {
         if (-not (Test-Path -LiteralPath $FilePath)) {
-            Write-Error "Path not found: $FilePath"
+            Write-Log "Get-DowserProperty path not found: '$FilePath'" -Severity Error
             return
         }
 
@@ -84,7 +84,7 @@ function Get-DowserProperty {
             $FileItem = Get-Item -LiteralPath $FilePath -ErrorAction Stop
         }
         catch {
-            Write-Error "Unable to access file: $FilePath. $($_.Exception.Message)"
+            Write-Log "Get-DowserProperty failed accessing '$FilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             return
         }
 
@@ -378,7 +378,7 @@ function Get-DowserProperty {
             }
         }
         catch {
-            Write-Error "Error analyzing file: $($_.Exception.Message)"
+            Write-Log "Get-DowserProperty failed analyzing '$FilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         }
 
         Write-Verbose "File analysis complete"
@@ -386,6 +386,6 @@ function Get-DowserProperty {
     }
 
     end {
-        Write-Verbose "Function execution completed"
+        Write-Log "Ending Get-DowserProperty"
     }
 }

@@ -163,6 +163,10 @@ function Get-DowserMap {
         [hashtable]$PsCountCache
     )
 
+    if ($CurrentDepth -eq 0) {
+        Write-Log "Starting Get-DowserMap"
+    }
+
     if (-not $PSBoundParameters.ContainsKey('ShowFullPathTree')) {
         $ShowFullPathTree = $true 
     }
@@ -171,7 +175,7 @@ function Get-DowserMap {
         $AsMarkdown = $true 
     }
     if ($AsHtml -and $AsMarkdown) {
-        Write-Warning 'Cannot use -AsHtml and -AsMarkdown together. Pick one.'
+        Write-Log "Get-DowserMap called with both -AsHtml and -AsMarkdown; these are mutually exclusive" -Severity Warning
         return
     }
 
@@ -440,7 +444,7 @@ function Get-DowserMap {
 
     # --- Parallel Pre-scan Phase ---
     if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($effectiveIncludePatterns -or $IncludeExtensions -or $IncludeFolders)) {
-        Write-Verbose "Starting parallel pre-scan of '$Path' to populate caches..."
+        Write-Log "Get-DowserMap starting parallel pre-scan of '$Path' to populate caches"
 
         $preScanScript = {
             param($targetPath, $effectiveIncludePatterns, $normInclude, $normExclude, $excludeExactFiles, $excludeWildFiles, $excludeExact, $excludeWild, $excludePaths, $includeExactNames, $includeWildcardNames, $includeExactPaths, $includeWildcardPaths, $IncludeHidden, $MaxDepth, $FollowReparse, $FoldersOnly)
@@ -573,7 +577,7 @@ function Get-DowserMap {
         }
         $pool.Close()
         $pool.Dispose()
-        Write-Verbose "Pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
+        Write-Log "Get-DowserMap pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
     }
 
     # --- Filter helper functions ---
@@ -1049,7 +1053,7 @@ function Get-DowserMap {
                     $finalLines | Out-File -FilePath $OutputFile -Encoding UTF8
                 }
                 catch {
-                    Write-Verbose "Failed to write output file: $_" 
+                    Write-Log "Get-DowserMap failed writing output file '$OutputFile': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 }
             }
             if ($markdownTarget) {
@@ -1088,9 +1092,12 @@ function Get-DowserMap {
                     $mdLines | Set-Content -Path $markdownTarget -Encoding UTF8
                 }
                 catch {
-                    Write-Verbose "Failed to write markdown file: $_" 
+                    Write-Log "Get-DowserMap failed writing markdown file '$markdownTarget': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 }
             }
+        }
+        if ($CurrentDepth -eq 0) {
+            Write-Log "Ending Get-DowserMap"
         }
         return $finalLines
     }

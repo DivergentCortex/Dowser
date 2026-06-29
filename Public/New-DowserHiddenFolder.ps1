@@ -57,22 +57,33 @@ function New-DowserHiddenFolder {
         [switch]$AttributesOnly
     )
 
+    begin {
+        Write-Log "Starting New-DowserHiddenFolder"
+    }
+
     process {
         $alreadyExists = Test-Path -LiteralPath $Path
 
         if ($AttributesOnly -and -not $alreadyExists) {
-            Write-Error "-AttributesOnly specified but '$Path' does not exist."
+            Write-Log "New-DowserHiddenFolder -AttributesOnly specified but '$Path' does not exist." -Severity Error
             return
         }
 
         if (-not $alreadyExists -and -not $AttributesOnly) {
             if ($PSCmdlet.ShouldProcess($Path, 'New-Item -ItemType Directory')) {
-                $null = New-Item -ItemType Directory -Path $Path -ErrorAction Stop
-                Write-Verbose "Created directory: $Path"
+                try {
+                    Write-Log "New-DowserHiddenFolder creating directory '$Path'"
+                    $null = New-Item -ItemType Directory -Path $Path -ErrorAction Stop
+                    Write-Log "New-DowserHiddenFolder created directory '$Path'"
+                }
+                catch {
+                    Write-Log "New-DowserHiddenFolder failed creating directory '$Path': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                    return
+                }
             }
         }
         elseif ($alreadyExists -and -not $Force -and -not $AttributesOnly) {
-            Write-Warning "Folder already exists: $Path (use -Force to suppress this warning)"
+            Write-Log "New-DowserHiddenFolder folder already exists: '$Path' (use -Force to suppress this warning)" -Severity Warning
         }
 
         if (Test-Path -LiteralPath $Path) {
@@ -82,7 +93,7 @@ function New-DowserHiddenFolder {
                 # IsWindows null on 5.1, so -ne false means windows
                 if ($IsWindows -ne $false) {
                     $folder.Attributes = [System.IO.FileAttributes]'Hidden,System,Directory'
-                    Write-Verbose "Applied Hidden+System attributes to: $Path"
+                    Write-Log "New-DowserHiddenFolder applied Hidden+System attributes to '$Path'"
 
                     [PSCustomObject]@{
                         Path       = $folder.FullName
@@ -92,12 +103,12 @@ function New-DowserHiddenFolder {
                 else {
                     # no ntfs attrs here, hiding means a leading dot
                     # AttributesOnly must not rename out from under the caller, so warn instead
-                    Write-Verbose 'NTFS Hidden/System attributes are Windows-only; on this platform a folder is hidden by a leading dot in its name.'
+                    Write-Log "New-DowserHiddenFolder: NTFS Hidden/System attributes are Windows-only; on this platform a folder is hidden by a leading dot in its name."
                     $leafName = $folder.Name
 
                     if ($AttributesOnly) {
                         if (-not $leafName.StartsWith('.')) {
-                            Write-Warning "Cannot apply NTFS Hidden/System attributes on this platform, and -AttributesOnly forbids renaming '$Path' to a dot-prefixed name. The folder is NOT hidden."
+                            Write-Log "New-DowserHiddenFolder cannot apply NTFS Hidden/System attributes on this platform, and -AttributesOnly forbids renaming '$Path' to a dot-prefixed name. The folder is NOT hidden." -Severity Warning
                         }
                     }
                     elseif (-not $leafName.StartsWith('.')) {
@@ -105,12 +116,12 @@ function New-DowserHiddenFolder {
                         $parent = Split-Path -Path $folder.FullName -Parent
                         $dottedPath = Join-Path $parent $dottedName
                         if (Test-Path -LiteralPath $dottedPath) {
-                            Write-Warning "Cannot dot-prefix '$Path' for hiding: '$dottedPath' already exists. The folder is NOT hidden."
+                            Write-Log "New-DowserHiddenFolder cannot dot-prefix '$Path' for hiding: '$dottedPath' already exists. The folder is NOT hidden." -Severity Warning
                         }
                         else {
                             Rename-Item -LiteralPath $folder.FullName -NewName $dottedName -ErrorAction Stop
                             $folder = Get-Item -LiteralPath $dottedPath -Force -ErrorAction Stop
-                            Write-Verbose "Renamed to dot-prefixed (hidden on this platform): $dottedPath"
+                            Write-Log "New-DowserHiddenFolder renamed to dot-prefixed (hidden on this platform): '$dottedPath'"
                         }
                     }
 
@@ -124,5 +135,9 @@ function New-DowserHiddenFolder {
                 }
             }
         }
+    }
+
+    end {
+        Write-Log "Ending New-DowserHiddenFolder"
     }
 }

@@ -120,11 +120,11 @@ function Find-DowserDependency {
 
     $results = @()
 
-    Write-Verbose "`nScanning for script dependencies..."
-    Write-Verbose "Search Patterns: $($patterns -join ', ')"
+    Write-Log "Starting Find-DowserDependency"
+    Write-Log "Search Patterns: $($patterns -join ', ')"
 
     foreach ($path in $searchPaths) {
-        Write-Verbose "`nScanning path: $path"
+        Write-Log "Scanning path: $path"
         
         $files = Get-ChildItem -Path $path -Recurse -Filter "*.ps1" -ErrorAction SilentlyContinue | 
             Where-Object { 
@@ -174,7 +174,7 @@ function Find-DowserDependency {
                 }
             }
             catch {
-                Write-Warning "Error processing $($file.FullName): $_"
+                Write-Log "Find-DowserDependency failed reading '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             }
         }
     }
@@ -182,36 +182,37 @@ function Find-DowserDependency {
     Write-Progress -Activity "Scanning Files" -Completed
 
     if ($results.Count -eq 0) {
-        Write-Verbose "`nNo dependencies found."
+        Write-Log "No dependencies found."
+        Write-Log "Ending Find-DowserDependency"
         return
     }
 
-    Write-Verbose "`nFound $($results.Count) dependencies across $($results.SourceFile | Select-Object -Unique | Measure-Object).Count files"
+    Write-Log "Found $($results.Count) dependencies across $(@($results.SourceFile | Select-Object -Unique).Count) files"
 
     $groupedResults = $results | Group-Object SourceFile
 
     foreach ($group in $groupedResults) {
-        Write-Verbose "`nFile: $($group.Name)"
-        Write-Verbose "Last Modified: $($group.Group[0].LastModified)"
-        Write-Verbose "Size: $($group.Group[0].FileSize)"
-        Write-Verbose "Dependencies found: $($group.Count)"
+        Write-Log "File: $($group.Name) | Modified: $($group.Group[0].LastModified) | Size: $($group.Group[0].FileSize) | Dependencies: $($group.Count)" -Severity Verbose
         
         foreach ($result in $group.Group) {
-            Write-Verbose "`nLine $($result.LineNumber): $($result.MatchedLine)"
-            if ($result.Context) {
-                Write-Verbose "Context:"
-                Write-Verbose $result.Context
-            }
+            Write-Log "Line $($result.LineNumber): $($result.MatchedLine)" -Severity Verbose
         }
     }
 
     if ($ExportResults) {
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $exportPath = Join-Path $PWD "DependencyScan_$timestamp.csv"
-        $results | Export-Csv -Path $exportPath -NoTypeInformation
-        Write-Verbose "`nResults exported to: $exportPath"
+        try {
+            Write-Log "Exporting results to CSV: $exportPath"
+            $results | Export-Csv -Path $exportPath -NoTypeInformation -ErrorAction Stop
+            Write-Log "Exported $($results.Count) rows to: $exportPath"
+        }
+        catch {
+            Write-Log "Find-DowserDependency failed exporting CSV '$exportPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        }
     }
 
+    Write-Log "Ending Find-DowserDependency"
     return $results
 }
 

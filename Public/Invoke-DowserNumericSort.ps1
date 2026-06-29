@@ -93,6 +93,7 @@ function Invoke-DowserNumericSort {
 
     begin {
         $inputArray = @()
+        Write-Log "Starting Invoke-DowserNumericSort"
     }
 
     process {
@@ -101,7 +102,7 @@ function Invoke-DowserNumericSort {
 
     end {
         if (-not $inputArray) {
-            Write-Error "No input data provided - nothing to sort."
+            Write-Log "Invoke-DowserNumericSort: no input data provided - nothing to sort" -Severity Error
             return
         }
 
@@ -137,9 +138,10 @@ function Invoke-DowserNumericSort {
             }
 
             $sortedArray
+            Write-Log "Ending Invoke-DowserNumericSort"
         }
         catch {
-            Write-Error "Invoke-DowserNumericSort failed: $($_.Exception.Message)"
+            Write-Log "Invoke-DowserNumericSort failed sorting input: $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         }
     }
 }

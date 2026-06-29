@@ -73,14 +73,18 @@ function Find-DowserRecentLog {
         [bool]$Recurse = $true
     )
 
+    begin {
+        Write-Log "Starting Find-DowserRecentLog"
+    }
+
     process {
         foreach ($rootPath in $Path) {
             if (-not (Test-Path $rootPath)) {
-                Write-Warning "Path not found: $rootPath"
+                Write-Log "Find-DowserRecentLog: path not found: '$rootPath'" -Severity Warning
                 continue
             }
 
-            Write-Verbose "Searching '$rootPath' for '$FileName'..."
+            Write-Log "Searching '$rootPath' for '$FileName'..."
 
             try {
                 $searchParams = @{
@@ -93,10 +97,10 @@ function Find-DowserRecentLog {
 
                 $found = @(Get-ChildItem @searchParams | Sort-Object LastWriteTime -Descending)
 
-                Write-Verbose "Found $($found.Count) copy/copies of '$FileName' in '$rootPath'"
+                Write-Log "Found $($found.Count) copy/copies of '$FileName' in '$rootPath'"
 
                 if ($found.Count -eq 0) {
-                    Write-Verbose "No copies of '$FileName' found under '$rootPath'."
+                    Write-Log "No copies of '$FileName' found under '$rootPath'" -Severity Warning
                     return
                 }
 
@@ -111,7 +115,7 @@ function Find-DowserRecentLog {
                 }
                 else {
                     $newest = $found | Select-Object -First 1
-                    Write-Verbose "Most recent: $($newest.FullName) @ $($newest.LastWriteTime)"
+                    Write-Log "Most recent: $($newest.FullName) @ $($newest.LastWriteTime)"
                     [PSCustomObject]@{
                         FullName      = $newest.FullName
                         LastWriteTime = $newest.LastWriteTime
@@ -120,8 +124,12 @@ function Find-DowserRecentLog {
                 }
             }
             catch {
-                Write-Warning "Error searching '$rootPath': $_"
+                Write-Log "Find-DowserRecentLog failed searching '$rootPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             }
         }
+    }
+
+    end {
+        Write-Log "Ending Find-DowserRecentLog"
     }
 }

@@ -87,6 +87,7 @@ function Measure-DowserDiskUsage {
     )
 
     begin {
+        Write-Log "Starting Measure-DowserDiskUsage"
         # parse once so process can filter cheaply
         $minBytes = $null
         if ($PSBoundParameters.ContainsKey('MinSize') -and $MinSize) {
@@ -98,13 +99,14 @@ function Measure-DowserDiskUsage {
         foreach ($rootPath in $Path) {
             $resolvedRoot = (Resolve-Path -LiteralPath $rootPath -ErrorAction SilentlyContinue).Path
             if (-not $resolvedRoot) {
-                Write-Warning "Cannot resolve path: $rootPath"
+                Write-Log "Measure-DowserDiskUsage cannot resolve path: '$rootPath'" -Severity Warning
                 continue
             }
             if (-not (Test-Path -LiteralPath $resolvedRoot -PathType Container)) {
-                Write-Warning "Not a directory: $resolvedRoot"
+                Write-Log "Measure-DowserDiskUsage path is not a directory: '$resolvedRoot'" -Severity Warning
                 continue
             }
+            Write-Log "Measure-DowserDiskUsage scanning '$resolvedRoot'"
 
             Write-Progress -Activity 'Measure-DowserDiskUsage' `
                 -Status "Enumerating files under $resolvedRoot" -PercentComplete 0
@@ -135,7 +137,7 @@ function Measure-DowserDiskUsage {
                 $queue.Enqueue([System.IO.DirectoryInfo]::new($resolvedRoot))
             }
             catch {
-                Write-Warning "Cannot open root $resolvedRoot : $($_.Exception.Message)"
+                Write-Log "Measure-DowserDiskUsage failed opening root '$resolvedRoot': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
                 continue
             }
 
@@ -349,6 +351,7 @@ function Measure-DowserDiskUsage {
             }
 
             $sep = '-' * 70
+            Write-Log "Measure-DowserDiskUsage scan complete: '$resolvedRoot' total $( Format-DowserSize -DataValue $totalBytes ) ($totalCount files)"
             Write-Verbose $sep
             Write-Verbose "Disk Usage Report: $resolvedRoot"
             Write-Verbose ("Total: {0}  ({1} files)" -f (Format-DowserSize -DataValue $totalBytes), $totalCount)
@@ -389,6 +392,7 @@ function Measure-DowserDiskUsage {
 
             if ($ExportHtml) {
                 try {
+                    Write-Log "Measure-DowserDiskUsage writing HTML report to '$ExportHtml'"
                     $htmlContent = _Build-DduHtml `
                         -SummaryObject $summaryObject `
                         -DirObjects $dirObjects `
@@ -400,16 +404,17 @@ function Measure-DowserDiskUsage {
                         -DirSizes $dirSizes `
                         -DirComparer $dirComparer
                     $htmlContent | Out-File -FilePath $ExportHtml -Encoding UTF8 -ErrorAction Stop
-                    Write-Verbose "HTML report written to: $ExportHtml"
+                    Write-Log "Measure-DowserDiskUsage HTML report written to '$ExportHtml'"
                 }
                 catch {
-                    Write-Warning "Failed to write HTML to $ExportHtml : $($_.Exception.Message)"
+                    Write-Log "Measure-DowserDiskUsage failed writing HTML to '$ExportHtml': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
                 }
             }
         }
     }
 
     end {
+        Write-Log "Ending Measure-DowserDiskUsage"
     }
 }
 

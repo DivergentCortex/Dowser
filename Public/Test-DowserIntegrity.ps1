@@ -188,12 +188,13 @@ function Test-DowserIntegrity {
             '.cfg', '.conf', '.properties'
         )
 
+        Write-Log "Starting Test-DowserIntegrity"
         $sevenZipAvailable = (-not $SkipSevenZip) -and (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)
         if ($sevenZipAvailable) {
-            Write-Verbose "7-Zip found at $SevenZipPath"
+            Write-Log "Test-DowserIntegrity 7-Zip found at '$SevenZipPath'"
         }
         else {
-            Write-Verbose '7-Zip not available. Native-only validation for archives.'
+            Write-Log "Test-DowserIntegrity 7-Zip not available; native-only validation for archives."
         }
 
         $expandExe = if ($IsWindows -eq $false) {
@@ -232,7 +233,7 @@ function Test-DowserIntegrity {
                     $baseline[$row.RelativePath.ToUpperInvariant()] = $row
                 }
             }
-            Write-Verbose "Loaded baseline: $($baseline.Count) entries from $BaselineCsv"
+            Write-Log "Test-DowserIntegrity loaded baseline: $($baseline.Count) entries from '$BaselineCsv'"
             # baseline compare needs hashes
             $ComputeHash = $true
         }
@@ -658,17 +659,17 @@ function Test-DowserIntegrity {
                 }
                 $files = @(Get-ChildItem @gciParams)
                 if ($files.Count -eq 0) {
-                    Write-Warning "No files matching '$Filter' found in: $inputPath"
+                    Write-Log "Test-DowserIntegrity no files matching '$Filter' found in '$inputPath'" -Severity Warning
                     continue
                 }
-                Write-Verbose "Found $($files.Count) file(s) in: $inputPath"
+                Write-Log "Test-DowserIntegrity found $($files.Count) file(s) in '$inputPath'"
             }
             elseif (Test-Path -LiteralPath $inputPath -PathType Leaf) {
                 $files = @(Get-Item -LiteralPath $inputPath -ErrorAction SilentlyContinue)
                 $rootPath = $files[0].DirectoryName
             }
             else {
-                Write-Warning "Path not found: $inputPath"
+                Write-Log "Test-DowserIntegrity path not found: '$inputPath'" -Severity Warning
                 continue
             }
 
@@ -942,6 +943,7 @@ function Test-DowserIntegrity {
                         $result.SHA256 = $h.Hash
                     }
                     catch {
+                        Write-Log "Test-DowserIntegrity failed hashing '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
                         [void]$result.Issues.Add("Hash failed: $($_.Exception.Message)")
                         if ($result.Status -in @('OK', 'Unverified')) {
                             $result.Status = 'Error'
@@ -1008,9 +1010,11 @@ function Test-DowserIntegrity {
     end {
         # publish detail to the global even in detailed mode
         $global:DowserIntegrityDetails = $allResults.ToArray()
+        Write-Log "Test-DowserIntegrity processed $($allResults.Count) file(s)"
 
         if ($Detailed) {
             # per-file objects already streamed in process
+            Write-Log "Ending Test-DowserIntegrity"
             return
         }
 
@@ -1048,5 +1052,6 @@ function Test-DowserIntegrity {
             TopSccmRisks  = $topSccmRisks
             DetailsGlobal = '$global:DowserIntegrityDetails'
         }
+        Write-Log "Ending Test-DowserIntegrity"
     }
 }

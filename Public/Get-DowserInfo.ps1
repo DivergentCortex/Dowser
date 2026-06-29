@@ -30,6 +30,8 @@ function Get-DowserInfo {
     [CmdletBinding()]
     param()
 
+    Write-Log "Starting Get-DowserInfo"
+
     $moduleRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
     $manifestPath = Join-Path $moduleRoot 'Dowser.psd1'
     $changelogPath = Join-Path (Join-Path $moduleRoot 'docs') 'CHANGELOG.md'
@@ -58,7 +60,7 @@ function Get-DowserInfo {
             $manifestVersion = $manifest.ModuleVersion
         }
         catch {
-            Write-Log -Severity Warning -Message "Manifest read failed: $($_.Exception.Message)"
+            Write-Log "Get-DowserInfo failed reading manifest '$manifestPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
         }
     }
 
@@ -69,6 +71,7 @@ function Get-DowserInfo {
         0 
     }
 
+    Write-Log "Ending Get-DowserInfo"
     [pscustomobject]@{
         Module                 = 'Dowser'
         ModuleVersion          = $manifestVersion

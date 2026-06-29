@@ -73,19 +73,23 @@ function Find-DowserScript {
         [bool]$Recurse = $true
     )
 
+    begin {
+        Write-Log "Starting Find-DowserScript"
+    }
+
     process {
         foreach ($rootPath in $Path) {
             if (-not (Test-Path $rootPath)) {
-                Write-Warning "Path not found: $rootPath"
+                Write-Log "Find-DowserScript: path not found: '$rootPath'" -Severity Warning
                 continue
             }
 
-            Write-Verbose "Scanning '$rootPath' for script files..."
+            Write-Log "Scanning '$rootPath' for script files..."
 
             $cutoff = $null
             if ($ModifiedWithin -and $ModifiedWithin -gt 0) {
                 $cutoff = (Get-Date).AddDays(-$ModifiedWithin)
-                Write-Verbose "Recency filter: modified within $ModifiedWithin days (after $($cutoff.ToString('yyyy-MM-dd')))"
+                Write-Log "Recency filter: modified within $ModifiedWithin days (after $($cutoff.ToString('yyyy-MM-dd')))"
             }
 
             try {
@@ -129,11 +133,15 @@ function Find-DowserScript {
                 }
             }
             catch {
-                Write-Warning "Error scanning '$rootPath': $_"
+                Write-Log "Find-DowserScript failed scanning '$rootPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             }
             finally {
                 Write-Progress -Activity "Find-DowserScript" -Status "Done" -Completed
             }
         }
+    }
+
+    end {
+        Write-Log "Ending Find-DowserScript"
     }
 }

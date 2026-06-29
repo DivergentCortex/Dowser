@@ -91,7 +91,7 @@ function Find-DowserFile {
 
     begin {
         $script:startTime = Get-Date
-        Write-Verbose "Starting Find-DowserFile at $script:startTime"
+        Write-Log "Starting Find-DowserFile"
         
         $minBytes = $null
         if (-not [string]::IsNullOrWhiteSpace($MinSize)) {
@@ -105,14 +105,14 @@ function Find-DowserFile {
         # bare strings get wrapped, already-wildcarded left alone
         if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
             $Pattern = "*$Pattern*"
-            Write-Verbose "Pattern auto-wrapped to: $Pattern"
+            Write-Log "Pattern auto-wrapped to: $Pattern"
         }
     }
 
     process {
         foreach ($p in $Path) {
             if (-not (Test-Path $p)) {
-                Write-Warning "Path not found: $p"
+                Write-Log "Find-DowserFile path not found: '$p'" -Severity Warning
                 continue
             }
             $p = (Resolve-Path $p).Path
@@ -215,7 +215,7 @@ function Find-DowserFile {
 
             $allPaths = $filesFound.ToArray() | Select-Object -Unique
             $count = @($allPaths).Count
-            Write-Verbose "Found $count files matching basic criteria."
+            Write-Log "Found $count files matching basic criteria."
             
             if ($count -gt 0) {
                 Write-Progress -Activity "Find-DowserFile" -Status "Retrieving file objects..." -PercentComplete -1
@@ -248,6 +248,6 @@ function Find-DowserFile {
     }
     end {
         $duration = New-TimeSpan -Start $script:startTime -End (Get-Date)
-        Write-Verbose "Find-DowserFile completed in $($duration.TotalSeconds) seconds."
+        Write-Log "Ending Find-DowserFile (completed in $($duration.TotalSeconds) seconds)"
     }
 }

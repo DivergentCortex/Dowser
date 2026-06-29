@@ -219,7 +219,8 @@ function Find-DowserString {
             }
         }
 
-        Write-Verbose "Find-DowserString: '$Path' patterns=[$($Patterns -join ', ')] mode=$SearchMode useAho=$UseAho outputMode=$OutputMode threads=$ComputedMaxThreads"
+        Write-Log "Starting Find-DowserString"
+        Write-Log "Find-DowserString: '$Path' patterns=[$($Patterns -join ', ')] mode=$SearchMode useAho=$UseAho outputMode=$OutputMode threads=$ComputedMaxThreads"
 
         # lives in function scope so end{} can still see it
         $allResults = [System.Collections.ArrayList]::new()
@@ -232,7 +233,7 @@ function Find-DowserString {
             $Path = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
         }
         catch {
-            Write-Error "Cannot resolve path '$Path': $_"
+            Write-Log "Find-DowserString failed resolving path '$Path': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
             return
         }
 
@@ -280,7 +281,7 @@ function Find-DowserString {
             $scanTargets = [System.Collections.ArrayList]::new()
             [void]$scanTargets.Add($Path)
 
-            Write-Information "[Find-DowserString] Phase 1/3: Enumerating directories under '$Path'" -InformationAction Continue
+            Write-Log "Find-DowserString Phase 1/3: Enumerating directories under '$Path'"
             Write-Progress -Activity 'Find-DowserString' -Status 'Phase 1/3: Enumerating directories...' -PercentComplete 0
             $phase1Start = Get-Date
 
@@ -312,13 +313,13 @@ function Find-DowserString {
                     }
                     catch {
                         # access denied / reparse points / vanished dirs - skip silently
+                        Write-Log "Find-DowserString skipped inaccessible directory '$current': $($_.Exception.Message)" -Severity Verbose
                     }
                 }
             }
 
             $phase1Duration = (Get-Date) - $phase1Start
-            Write-Information ("[Find-DowserString] Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds) -InformationAction Continue
-            Write-Verbose "Found $($scanTargets.Count) directories to scan"
+            Write-Log ("Find-DowserString Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds)
 
             $gatherScriptBlock = {
                 param($DirChunk, $Extensions, $MaxFileSizeBytes, $ExcludeExtensions, $ProgressQueue)
@@ -362,7 +363,7 @@ function Find-DowserString {
                 return $found.ToArray()
             }
 
-            Write-Information ("[Find-DowserString] Phase 2/3: Gathering files in {0:N0} directories" -f $scanTargets.Count) -InformationAction Continue
+            Write-Log ("Find-DowserString Phase 2/3: Gathering files in {0:N0} directories" -f $scanTargets.Count)
             $phase2Start = Get-Date
 
             $gatherResults = $scanTargets.ToArray() | Invoke-DowserRunspacePool `
@@ -375,13 +376,12 @@ function Find-DowserString {
 
             $allFiles = @($gatherResults | Select-Object -Unique)
             $phase2Duration = (Get-Date) - $phase2Start
-            Write-Information ("[Find-DowserString] Phase 2/3: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds) -InformationAction Continue
-            Write-Verbose "Found $($allFiles.Count) files to search"
+            Write-Log ("Find-DowserString Phase 2/3: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds)
 
         }  # end else (directory mode)
 
         if ($allFiles.Count -eq 0) {
-            Write-Verbose "No files matched extension/size filters in '$Path'"
+            Write-Log "Find-DowserString: no files matched extension/size filters in '$Path'" -Severity Warning
             return
         }
 
@@ -520,7 +520,7 @@ function Find-DowserString {
             return $results.ToArray()
         }
 
-        Write-Information ("[Find-DowserString] Phase 3/3: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count) -InformationAction Continue
+        Write-Log ("Find-DowserString Phase 3/3: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count)
         $phase3Start = Get-Date
 
         $searchResults = $allFiles | Invoke-DowserRunspacePool `
@@ -540,8 +540,7 @@ function Find-DowserString {
         }
 
         $phase3Duration = (Get-Date) - $phase3Start
-        Write-Information ("[Find-DowserString] Phase 3/3: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds) -InformationAction Continue
-        Write-Verbose "Phase 3/3 complete: $($allResults.Count) match rows from $($allFiles.Count) files"
+        Write-Log ("Find-DowserString Phase 3/3: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds)
     }
 
     end {
@@ -674,7 +673,7 @@ function Find-DowserString {
                     $totalFiles = @($perFile).Count
                     $totalMatches = [int]($perFile | Measure-Object -Property MatchCount -Sum).Sum
                     $totalDirs = @($byDir).Count
-                    Write-Verbose "Total: $totalMatches matches across $totalFiles files in $totalDirs directories"
+                    Write-Log "Find-DowserString: $totalMatches matches across $totalFiles files in $totalDirs directories"
                 }
                 'counts' {
                     $grouped = $results | Group-Object FilePath | ForEach-Object {
@@ -687,11 +686,11 @@ function Find-DowserString {
                         }
                     }
                     $grouped | Sort-Object FilePath | Write-Output
-                    Write-Verbose "Total: $($results.Count) matches across $(@($grouped).Count) files"
+                    Write-Log "Find-DowserString: $($results.Count) matches across $(@($grouped).Count) files"
                 }
                 'files' {
                     $results | Select-Object -ExpandProperty FilePath -Unique | Sort-Object | Write-Output
-                    Write-Verbose "Total: $(@($results | Select-Object -ExpandProperty FilePath -Unique).Count) files with matches"
+                    Write-Log "Find-DowserString: $(@($results | Select-Object -ExpandProperty FilePath -Unique).Count) files with matches"
                 }
                 'matches' {
                     if ($IncludeLineContent) {
@@ -717,7 +716,7 @@ function Find-DowserString {
                     else {
                         $results | Sort-Object FilePath, LineNumber | Write-Output
                     }
-                    Write-Verbose "Total: $($results.Count) matches"
+                    Write-Log "Find-DowserString: $($results.Count) matches"
                 }
             }
         }
@@ -726,6 +725,7 @@ function Find-DowserString {
         }
 
         $duration = New-TimeSpan -Start $startTime -End (Get-Date)
-        Write-Verbose "Find-DowserString completed in $([Math]::Round($duration.TotalSeconds, 2))s"
+        Write-Log "Find-DowserString completed in $([Math]::Round($duration.TotalSeconds, 2))s"
+        Write-Log "Ending Find-DowserString"
     }
 }

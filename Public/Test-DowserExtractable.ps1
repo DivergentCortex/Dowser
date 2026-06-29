@@ -102,14 +102,15 @@ function Test-DowserExtractable {
     )
 
     begin {
+        Write-Log "Starting Test-DowserExtractable"
         $has7Zip = $false
         if (-not $SkipSevenZip) {
             $has7Zip = Test-Path -LiteralPath $SevenZipPath
             if ($has7Zip) {
-                Write-Verbose "7-Zip found at: $SevenZipPath" 
+                Write-Log "7-Zip found at: '$SevenZipPath'."
             }
             else {
-                Write-Verbose "7-Zip not found at $SevenZipPath - static analysis only" 
+                Write-Log "7-Zip not found at '$SevenZipPath' - static analysis only."
             }
         }
 
@@ -267,21 +268,21 @@ function Test-DowserExtractable {
                 }
                 $exeFiles = @(Get-ChildItem @gciParams)
                 if ($exeFiles.Count -eq 0) {
-                    Write-Warning "No files matching '$Filter' found in: $inputPath"
+                    Write-Log "Test-DowserExtractable: no files matching '$Filter' found in: '$inputPath'." -Severity Warning
                     continue
                 }
-                Write-Verbose "Found $($exeFiles.Count) file(s) in: $inputPath"
+                Write-Log "Found $($exeFiles.Count) file(s) in: '$inputPath'."
             }
             elseif (Test-Path -LiteralPath $inputPath -PathType Leaf) {
                 $exeFiles = @(Get-Item -LiteralPath $inputPath -ErrorAction SilentlyContinue)
             }
             else {
-                Write-Warning "Path not found: $inputPath"
+                Write-Log "Test-DowserExtractable: path not found: '$inputPath'." -Severity Warning
                 continue
             }
 
             foreach ($file in $exeFiles) {
-                Write-Verbose "Analyzing: $($file.FullName)"
+                Write-Log "Analyzing: '$($file.FullName)'."
 
                 $result = [PSCustomObject]@{
                     Path            = $file.FullName
@@ -311,7 +312,7 @@ function Test-DowserExtractable {
                 $fullRead = $false
                 try {
                     if ($file.Length -gt $maxReadSize) {
-                        Write-Verbose "  Large file ($($result.Size)) - reading headers + overlay regions only"
+                        Write-Log "Large file ($($result.Size)) - reading headers and overlay regions only."
                     }
                     else {
                         $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
@@ -319,7 +320,7 @@ function Test-DowserExtractable {
                     }
                 }
                 catch {
-                    Write-Warning "Cannot read file: $($file.FullName) - $($_.Exception.Message)"
+                    Write-Log "Test-DowserExtractable failed reading '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                     $result.Details = "File read error: $($_.Exception.Message)"
                     $result
                     continue
@@ -335,7 +336,7 @@ function Test-DowserExtractable {
                         $headerStream.Close()
                     }
                     catch {
-                        Write-Warning "Cannot read headers: $($file.FullName)"
+                        Write-Log "Test-DowserExtractable failed reading headers for '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                         $result.Details = "Header read error"
                         $result
                         continue
@@ -402,7 +403,7 @@ function Test-DowserExtractable {
                             if ($comRVA -gt 0 -and $comSize -ge 72) {
                                 $result.IsNET = $true
                                 $result.Detections.Add('.NET assembly: COM_DESCRIPTOR non-zero [HIGH_CONFIDENCE]')
-                                Write-Verbose '  .NET assembly detected (COM_DESCRIPTOR)'
+                                Write-Log ".NET assembly detected (COM_DESCRIPTOR): '$($file.Name)'."
                             }
                         }
                     }
@@ -435,7 +436,7 @@ function Test-DowserExtractable {
                     if ($sectionNameList -contains $secFp.Key) {
                         $sfVal = $secFp.Value
                         $result.Detections.Add("$($sfVal.Framework): '$($secFp.Key)' section [HIGH_CONFIDENCE]")
-                        Write-Verbose "  Section match: $($secFp.Key) -> $($sfVal.Framework)"
+                        Write-Log "Section match: '$($secFp.Key)' -> $($sfVal.Framework) in '$($file.Name)'."
                         if (-not $result.InstallerType) {
                             $result.InstallerType = $sfVal.Framework
                             $result.Extractable = $sfVal.Extractable
@@ -462,7 +463,7 @@ function Test-DowserExtractable {
                 }
                 if (($hasUPX0 -and $hasUPX1) -or $hasUPXMagic) {
                     $result.Detections.Add('UPX packed: section names and/or UPX! overlay [HIGH_CONFIDENCE]')
-                    Write-Verbose '  UPX packed binary detected'
+                    Write-Log "UPX packed binary detected: '$($file.Name)'."
                     if (-not $result.InstallerType) {
                         $result.InstallerType = 'UPX_Packed'
                         $result.Extractable = $false
@@ -500,7 +501,7 @@ function Test-DowserExtractable {
                     foreach ($ovSig in $overlaySignatures) {
                         if (Test-ByteMatch $bytes $overlayOffset $ovSig.Bytes) {
                             $result.Detections.Add("$($ovSig.Name)_SFX: signature at overlay offset $overlayOffset [HIGH_CONFIDENCE]")
-                            Write-Verbose "  Overlay match: $($ovSig.Name) at offset $overlayOffset"
+                            Write-Log "Overlay match: $($ovSig.Name) at offset $overlayOffset in '$($file.Name)'."
                             $result.ArchiveType = $ovSig.Name
                             $result.Extractable = $ovSig.Extractable
                             $result.Classification = 'Extractable'
@@ -515,7 +516,7 @@ function Test-DowserExtractable {
                         $ovStr = [System.Text.Encoding]::ASCII.GetString($bytes, $overlayOffset, [Math]::Min(50, $ovAvailable))
                         if ($ovStr -match 'Inno Setup Setup Data') {
                             $result.Detections.Add('InnoSetup: overlay magic string [HIGH_CONFIDENCE]')
-                            Write-Verbose '  Inno Setup overlay data found'
+                            Write-Log "Inno Setup overlay data found in '$($file.Name)'."
                             $result.ArchiveType = 'Inno'
                             $result.InstallerType = 'InnoSetup'
                             $result.Extractable = $true
@@ -535,7 +536,7 @@ function Test-DowserExtractable {
                                     $commentLen = [BitConverter]::ToUInt16($bytes, $i + 20)
                                     if (($i + 22 + $commentLen) -eq $bytes.Length) {
                                         $result.Detections.Add("ZIP_SFX: validated EOCD at offset $i [HIGH_CONFIDENCE]")
-                                        Write-Verbose "  ZIP EOCD found at offset $i (commentLen=$commentLen)"
+                                        Write-Log "ZIP EOCD found at offset $i (commentLen=$commentLen) in '$($file.Name)'."
                                         $result.ArchiveType = 'ZIP'
                                         $result.Extractable = $true
                                         $result.Classification = 'Extractable'
@@ -553,7 +554,7 @@ function Test-DowserExtractable {
                     $pyiOffset = Find-BytePattern $bytes $pyiStart ($bytes.Length - 1) $pyiMagic
                     if ($pyiOffset -ge 0) {
                         $result.Detections.Add("PyInstaller: MEI PKG trailer at offset $pyiOffset [HIGH_CONFIDENCE]")
-                        Write-Verbose "  PyInstaller PKG magic at offset $pyiOffset"
+                        Write-Log "PyInstaller PKG magic at offset $pyiOffset in '$($file.Name)'."
                         if (-not $result.InstallerType -or $result.InstallerType -eq 'DotNet_Unknown') {
                             $result.InstallerType = 'PyInstaller'
                             $result.Extractable = $false
@@ -567,7 +568,7 @@ function Test-DowserExtractable {
                     $auOffset = Find-BytePattern $bytes $overlayOffset ([Math]::Min($overlayOffset + 1048576, $bytes.Length - 1)) $autoItMagic
                     if ($auOffset -ge 0) {
                         $result.Detections.Add("AutoIt: AU3!EA06 signature at offset $auOffset [HIGH_CONFIDENCE]")
-                        Write-Verbose "  AutoIt compiled script marker at offset $auOffset"
+                        Write-Log "AutoIt compiled script marker at offset $auOffset in '$($file.Name)'."
                         if (-not $result.InstallerType) {
                             $result.InstallerType = 'AutoIt'
                             $result.Extractable = $false
@@ -620,7 +621,7 @@ function Test-DowserExtractable {
                             foreach ($pattern in $fw.Value.Patterns) {
                                 if ($allVersionText.IndexOf($pattern, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                                     $result.Detections.Add("$($fw.Key): VersionInfo match '$pattern' [HIGH_CONFIDENCE]")
-                                    Write-Verbose "  VersionInfo: $($fw.Key) ('$pattern')"
+                                    Write-Log "VersionInfo match: $($fw.Key) ('$pattern') in '$($file.Name)'."
                                     if (-not $result.InstallerType) {
                                         $result.InstallerType = $fw.Key
                                         $result.Extractable = $fw.Value.Extractable
@@ -645,7 +646,7 @@ function Test-DowserExtractable {
                     }
                 }
                 catch {
-                    Write-Verbose "VersionInfo read error for $($file.Name): $($_.Exception.Message)"
+                    Write-Log "Test-DowserExtractable failed reading VersionInfo for '$($file.Name)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 }
 
                 # =============================================================
@@ -750,7 +751,7 @@ function Test-DowserExtractable {
                         $zip.Dispose()
                         if ($entryCount -gt 0) {
                             $result.Detections.Add("ZIP: System.IO.Compression found $entryCount entries [HIGH_CONFIDENCE]")
-                            Write-Verbose "  Native ZIP detection: $entryCount entries"
+                            Write-Log "Native ZIP detection: $entryCount entries in '$($file.Name)'."
                             $result.ArchiveType = 'ZIP'
                             $result.Extractable = $true
                             $result.Classification = 'Extractable'
@@ -761,7 +762,7 @@ function Test-DowserExtractable {
                         }
                     }
                     catch {
-                        # not a zip, expected
+                        Write-Log "Native ZIP probe: '$($file.Name)' is not a ZIP archive ($($_.Exception.GetType().Name))."
                     }
                 }
 
@@ -770,7 +771,7 @@ function Test-DowserExtractable {
                         $expandOutput = & $expandExe '-D' $file.FullName 2>&1 | Out-String
                         if ($LASTEXITCODE -eq 0 -and $expandOutput -match '\S') {
                             $result.Detections.Add('CAB: expand.exe -D succeeded [HIGH_CONFIDENCE]')
-                            Write-Verbose '  Native CAB detection via expand.exe'
+                            Write-Log "Native CAB detection via expand.exe: '$($file.Name)'."
                             $result.ArchiveType = 'CAB'
                             $result.Extractable = $true
                             $result.Classification = 'Extractable'
@@ -780,7 +781,7 @@ function Test-DowserExtractable {
                         }
                     }
                     catch {
-                        # not a cab, expected
+                        Write-Log "Native CAB probe: '$($file.Name)' is not a CAB archive ($($_.Exception.GetType().Name))."
                     }
                 }
 
@@ -871,7 +872,7 @@ function Test-DowserExtractable {
                             }
                             $result.Details = "7-Zip: $($realFiles.Count) extractable files (Type: $($foundTypes -join ', '))"
                             $result.Detections.Add("7-Zip: Type=$($foundTypes -join ','), $($realFiles.Count) real files [HIGH_CONFIDENCE]")
-                            Write-Verbose "  7-Zip: EXTRACTABLE - $($realFiles.Count) files, Type=$($foundTypes -join ', ')"
+                            Write-Log "7-Zip: EXTRACTABLE - $($realFiles.Count) file(s), Type=$($foundTypes -join ', ') in '$($file.Name)'."
                         }
                         elseif ($peSections.Count -gt 0 -and $realFiles.Count -eq 0) {
                             $hasRsrc = [bool]($peSections | Where-Object { $_ -match '\.rsrc' })
@@ -892,7 +893,7 @@ function Test-DowserExtractable {
                             $shortList = ($peSections | Select-Object -First 3) -join ', '
                             $result.Details = "7-Zip: PE sections only ($($peSections.Count) entries: $shortList$(if ($peSections.Count -gt 3) { '...' }))"
                             $result.Detections.Add("7-Zip: Type=$($foundTypes -join ','), PE sections only [HIGH_CONFIDENCE]")
-                            Write-Verbose '  7-Zip: NOT EXTRACTABLE - PE sections only'
+                            Write-Log "7-Zip: not extractable - PE sections only in '$($file.Name)'."
                         }
                         elseif ($foundTypes.Count -gt 0) {
                             if ($result.Classification -eq 'Unknown') {
@@ -905,7 +906,7 @@ function Test-DowserExtractable {
                         }
                     }
                     catch {
-                        Write-Verbose "7-Zip error for $($file.Name): $($_.Exception.Message)"
+                        Write-Log "Test-DowserExtractable failed running 7-Zip on '$($file.Name)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                     }
                 }
 
@@ -941,5 +942,9 @@ function Test-DowserExtractable {
                 $result
             }
         }
+    }
+
+    end {
+        Write-Log "Ending Test-DowserExtractable"
     }
 }

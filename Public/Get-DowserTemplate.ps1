@@ -48,10 +48,11 @@ function Get-DowserTemplate {
     )
 
     begin {
+        Write-Log "Starting Get-DowserTemplate"
         # needs shell.application com, IsWindows null on 5.1 means windows
         $unsupported = $IsWindows -eq $false
         if ($unsupported) {
-            Write-Warning "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform."
+            Write-Log "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform." -Severity Warning
         }
     }
 
@@ -59,18 +60,20 @@ function Get-DowserTemplate {
         if ($unsupported) { return }
 
         if (-not (Test-Path $Path)) {
-            Write-Warning "Path not found: $Path"
+            Write-Log "Get-DowserTemplate path not found: '$Path'" -Severity Warning
             return
         }
 
         $resolvedPath = (Resolve-Path $Path).ProviderPath
 
+        $shell = $null
         try {
+            Write-Log "Get-DowserTemplate querying Shell.Application for '$resolvedPath'"
             $shell = New-Object -ComObject Shell.Application
             $folder = $shell.Namespace($resolvedPath)
 
             if (-not $folder) {
-                Write-Warning "Shell.Application could not open: $resolvedPath"
+                Write-Log "Get-DowserTemplate Shell.Application could not open namespace: '$resolvedPath'" -Severity Warning
                 return
             }
 
@@ -90,6 +93,7 @@ function Get-DowserTemplate {
                 }
             }
             Write-Progress -Activity "Get-DowserTemplate" -Completed
+            Write-Log "Get-DowserTemplate found $($columns.Count) column(s) for '$resolvedPath'"
 
             [PSCustomObject]@{
                 Path     = $resolvedPath
@@ -98,7 +102,16 @@ function Get-DowserTemplate {
             }
         }
         catch {
-            Write-Warning "Error querying folder template for '$Path': $_"
+            Write-Log "Get-DowserTemplate failed querying Shell.Application for '$resolvedPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         }
+        finally {
+            if ($null -ne $shell) {
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+            }
+        }
+    }
+
+    end {
+        Write-Log "Ending Get-DowserTemplate"
     }
 }

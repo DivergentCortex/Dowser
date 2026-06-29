@@ -127,7 +127,7 @@ function Get-DowserTopology {
     }
 
     begin {
-        Write-Verbose "Starting $($MyInvocation.MyCommand)"
+        Write-Log "Starting Get-DowserTopology"
         if (-not $Path -and $PSCmdlet.ParameterSetName -eq "Path") {
             $Path = Get-Location
         }
@@ -140,7 +140,7 @@ function Get-DowserTopology {
                 $script:child = ($global:PSAnsiFileMap).where({ $_.description -eq 'ChildContainer' }).Ansi
             }
             else {
-                Write-Warning "Get-DowserTopology -InColor requires PowerShell 7+ (PSAnsiFileMap). Rendering without color."
+                Write-Log "Get-DowserTopology -InColor requires PowerShell 7+ (PSAnsiFileMap). Rendering without color." -Severity Warning
             }
         }
 
@@ -350,18 +350,16 @@ function Get-DowserTopology {
     }
 
     process {
-        Write-Verbose "Detected parameter set $($PSCmdlet.ParameterSetName)"
+        Write-Log "Get-DowserTopology detected parameter set '$($PSCmdlet.ParameterSetName)'"
         if ($PSCmdlet.ParameterSetName -eq "Path") {
             $resolvedPaths = @($Path | Resolve-Path | ForEach-Object { $_.Path })
         }
         else {
             $resolvedPaths = @($LiteralPath)
         }
-        Write-Verbose "Using these PSBoundParameters"
-        $PSBoundParameters | Out-String | Write-Verbose
 
         foreach ($rPath in $resolvedPaths) {
-            Write-Verbose "Processing $rPath"
+            Write-Log "Get-DowserTopology rendering '$rPath'"
             $showParams = @{
                 Path  = $rPath
                 Color = $colorize
@@ -372,6 +370,6 @@ function Get-DowserTopology {
     }
 
     end {
-        Write-Verbose "Ending $($MyInvocation.MyCommand)"
+        Write-Log "Ending Get-DowserTopology"
     }
 }

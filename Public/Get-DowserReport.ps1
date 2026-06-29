@@ -143,14 +143,14 @@ function Get-DowserReport {
             Write-Verbose "Pattern auto-wrapped to: $Pattern"
         }
 
-        Write-Verbose "Get-DowserReport starting at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') PST"
-        Write-Verbose "Threads: $ThreadCount | Depth: $Depth | UseRunspaces: $UseRunspaces"
+        Write-Log "Starting Get-DowserReport"
+        Write-Log "Get-DowserReport params: Threads=$ThreadCount Depth=$Depth UseRunspaces=$UseRunspaces"
     }
 
     process {
         foreach ($p in $Path) {
             if (-not (Test-Path $p)) {
-                Write-Warning "Path not found: $p"
+                Write-Log "Get-DowserReport path not found: '$p'" -Severity Warning
                 continue
             }
 
@@ -351,7 +351,7 @@ function Get-DowserReport {
             Write-Verbose "Found $fileCount files matching criteria"
 
             if ($fileCount -eq 0) {
-                Write-Warning "No files found in $resolvedPath matching criteria"
+                Write-Log "Get-DowserReport no files found in '$resolvedPath' matching criteria" -Severity Warning
                 continue
             }
 
@@ -532,7 +532,8 @@ function Get-DowserReport {
 
     end {
         if (@($script:allResults).Count -eq 0) {
-            Write-Warning "No files were analyzed"
+            Write-Log "Get-DowserReport no files were analyzed" -Severity Warning
+            Write-Log "Ending Get-DowserReport"
             return
         }
 
@@ -668,16 +669,18 @@ function Get-DowserReport {
         Write-Verbose ""
 
         if ($ExportCsv) {
+            Write-Log "Get-DowserReport exporting CSV to '$ExportCsv'"
             try {
                 $sortedResults | Export-Csv -Path $ExportCsv -NoTypeInformation -ErrorAction Stop
-                Write-Verbose "CSV exported to: $ExportCsv"
+                Write-Log "Get-DowserReport CSV exported to '$ExportCsv'"
             }
             catch {
-                Write-Warning "Failed to export CSV: $_"
+                Write-Log "Get-DowserReport failed exporting CSV to '$ExportCsv': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
             }
         }
 
         if ($ExportHtml) {
+            Write-Log "Get-DowserReport exporting HTML report to '$ExportHtml'"
             try {
                 $htmlHead = @"
 <style>
@@ -733,12 +736,13 @@ function Get-DowserReport {
 </html>
 "@
                 $fullHtml | Out-File -FilePath $ExportHtml -Encoding UTF8 -ErrorAction Stop
-                Write-Verbose "HTML report exported to: $ExportHtml"
+                Write-Log "Get-DowserReport HTML report exported to '$ExportHtml'"
             }
             catch {
-                Write-Warning "Failed to export HTML: $_"
+                Write-Log "Get-DowserReport failed exporting HTML to '$ExportHtml': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
             }
         }
+        Write-Log "Ending Get-DowserReport"
     }
 }
 
@@ -788,6 +792,7 @@ function Compare-DowserReport {
     )
 
     begin {
+        Write-Log "Starting Compare-DowserReport"
         $results = [System.Collections.ArrayList]::new()
 
         function Format-Delta {
@@ -982,6 +987,7 @@ function Compare-DowserReport {
             }
         }
 
+        Write-Log "Ending Compare-DowserReport"
         Write-Verbose ""
         Write-Verbose "--- Compare-DowserReport Summary ---"
         Write-Verbose ("  {0,-18}: {1}" -f "New Files", $newCount)

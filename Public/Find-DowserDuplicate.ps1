@@ -105,11 +105,14 @@ function Find-DowserDuplicate {
         [int]$ChunkSequenceLength = 3
     )
 
+    Write-Log "Starting Find-DowserDuplicate"
+
     if (-not (Test-Path -Path $Path)) {
+        Write-Log "Find-DowserDuplicate path not found: '$Path'" -Severity Error
         throw "Path '$Path' not found."
     }
 
-    Write-Verbose "Scanning '$Path'..."
+    Write-Log "Scanning '$Path'..."
 
     $files = Get-ChildItem -Path $Path -File -Recurse |
         Where-Object {
@@ -127,11 +130,12 @@ function Find-DowserDuplicate {
         }
 
     if (-not $files) {
-        Write-Verbose "No files matched the filters."
+        Write-Log "No files matched the filters."
+        Write-Log "Ending Find-DowserDuplicate"
         return
     }
 
-    Write-Verbose "Found $(@($files).Count) files. Analyzing..."
+    Write-Log "Found $(@($files).Count) files. Analyzing..."
 
     function Get-NormalizedStem {
         param([string]$FileName)
@@ -262,7 +266,7 @@ function Find-DowserDuplicate {
                 $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm $HashAlgorithm -ErrorAction Stop).Hash
             }
             catch {
-                Write-Verbose "Skipping unreadable file: $($file.FullName)"
+                Write-Log "Find-DowserDuplicate failed hashing '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 continue
             }
             if (-not $hash) {
@@ -300,7 +304,7 @@ function Find-DowserDuplicate {
                 $chunks = Get-ChunkHashes -File $file -Size $ChunkSize -Overlap $ChunkOverlap -Algorithm $HashAlgorithm
             }
             catch {
-                Write-Verbose "Skipping unreadable file: $($file.FullName)"
+                Write-Log "Find-DowserDuplicate failed chunking '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 continue
             }
             foreach ($entry in $chunks) {
@@ -345,21 +349,31 @@ function Find-DowserDuplicate {
             $toDelete = $fileList | Select-Object -Skip 1
 
             if ($ReviewBeforeDelete) {
-                Write-Verbose ""
-                Write-Verbose "Duplicate set [$($set.Mode)]: $($set.MatchKey)"
-                Write-Verbose "Keeping: $($keep.Path)"
+                Write-Log "Duplicate set [$($set.Mode)]: $($set.MatchKey) | Keeping: $($keep.Path)"
                 foreach ($file in $toDelete) {
                     $response = Read-Host "  Delete $($file.Path)? (y/N)"
                     if ($response -match '^[yY]$') {
-                        Remove-Item -Path $file.Path -Force
-                        Write-Verbose "  Deleted $($file.Path)"
+                        try {
+                            Write-Log "Deleting duplicate '$($file.Path)'"
+                            Remove-Item -Path $file.Path -Force -ErrorAction Stop
+                            Write-Log "Deleted '$($file.Path)'"
+                        }
+                        catch {
+                            Write-Log "Find-DowserDuplicate failed deleting '$($file.Path)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                        }
                     }
                 }
             }
             elseif ($AutoRemove) {
                 foreach ($file in $toDelete) {
-                    Remove-Item -Path $file.Path -Force
-                    Write-Verbose "Deleted $($file.Path)"
+                    try {
+                        Write-Log "AutoRemove deleting '$($file.Path)'"
+                        Remove-Item -Path $file.Path -Force -ErrorAction Stop
+                        Write-Log "Deleted '$($file.Path)'"
+                    }
+                    catch {
+                        Write-Log "Find-DowserDuplicate failed deleting '$($file.Path)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                    }
                 }
             }
         }
@@ -380,12 +394,19 @@ function Find-DowserDuplicate {
                 }
             }
         }
-        $exportRows | Export-Csv -Path $ReportPath -NoTypeInformation
-        Write-Verbose "Report saved to $ReportPath"
+        try {
+            Write-Log "Exporting report to: $ReportPath"
+            $exportRows | Export-Csv -Path $ReportPath -NoTypeInformation -ErrorAction Stop
+            Write-Log "Report saved to $ReportPath"
+        }
+        catch {
+            Write-Log "Find-DowserDuplicate failed exporting report '$ReportPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        }
     }
 
     if ($dupSets.Count -eq 0) {
-        Write-Verbose "No duplicates found."
+        Write-Log "No duplicates found."
+        Write-Log "Ending Find-DowserDuplicate"
         return
     }
 
@@ -399,8 +420,7 @@ function Find-DowserDuplicate {
         }
     } | Sort-Object Mode
 
-    Write-Verbose ""
-    $modeSummary | Format-Table -AutoSize | Out-String | Write-Verbose
+    $modeSummary | Format-Table -AutoSize | Out-String | Write-Log
     # emit to pipeline so callers can capture
     Write-Output $modeSummary
 
@@ -418,12 +438,11 @@ function Find-DowserDuplicate {
         }
     }
 
-    Write-Verbose "Top duplicate sets (by count):"
-    $topSets | Format-Table -AutoSize | Out-String | Write-Verbose
+    Write-Log "Top duplicate sets (by count):"
+    $topSets | Format-Table -AutoSize | Out-String | Write-Log
     Write-Output $topSets
 
-    Write-Verbose "--- $($dupSets.Count) duplicate set(s) found across $(@($files).Count) files scanned ---"
-    Write-Verbose 'Full details: $global:dupObjects'
-    Write-Verbose 'Drill-down:   $global:dupObjects | Where-Object Mode -eq "Name" | Select-Object -ExpandProperty Files'
+    Write-Log "$($dupSets.Count) duplicate set(s) found across $(@($files).Count) files scanned"
+    Write-Log "Ending Find-DowserDuplicate"
 }
 

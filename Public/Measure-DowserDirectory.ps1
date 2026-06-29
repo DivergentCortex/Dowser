@@ -64,23 +64,39 @@ function Measure-DowserDirectory {
         [string[]]$Path = "."
     )
 
+    begin {
+        Write-Log "Starting Measure-DowserDirectory"
+    }
+
     process {
         foreach ($rootPath in $Path) {
-            Write-Verbose "Scanning subdirectories under: $rootPath"
+            Write-Log "Measure-DowserDirectory scanning subdirectories under '$rootPath'"
 
-            $directoryItems = Get-ChildItem $rootPath -ErrorAction SilentlyContinue |
-                Where-Object { $_.PSIsContainer } |
-                Sort-Object
+            $directoryItems = $null
+            try {
+                $directoryItems = @(Get-ChildItem $rootPath -ErrorAction Stop |
+                    Where-Object { $_.PSIsContainer } |
+                    Sort-Object)
+            }
+            catch {
+                Write-Log "Measure-DowserDirectory failed enumerating '$rootPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                continue
+            }
 
             foreach ($dir in $directoryItems) {
-                Write-Verbose "|-=-=-=-=-=-=-|-=-=-=-=-=-=-|"
                 Write-Verbose "Searching $($dir.FullName)"
 
-                # immediate children only, matches original fcount
-                $fcount = (Get-ChildItem (Join-Path $rootPath $dir.Name) -ErrorAction SilentlyContinue | Measure-Object).Count
-
-                $subFolderItems = Get-ChildItem $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue |
-                    Where-Object { -not $_.PSIsContainer }
+                $subFolderItems = $null
+                try {
+                    # immediate children only, matches original fcount
+                    $fcount = (Get-ChildItem (Join-Path $rootPath $dir.Name) -ErrorAction Stop | Measure-Object).Count
+                    $subFolderItems = @(Get-ChildItem $dir.FullName -Recurse -Force -ErrorAction Stop |
+                        Where-Object { -not $_.PSIsContainer })
+                }
+                catch {
+                    Write-Log "Measure-DowserDirectory failed scanning '$($dir.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+                    continue
+                }
 
                 $totalSize = ($subFolderItems | Measure-Object -Property Length -Sum).Sum
                 $largestItem = $subFolderItems | Sort-Object Length | Select-Object -Last 1
@@ -106,8 +122,11 @@ function Measure-DowserDirectory {
                 }
 
                 Write-Verbose "Complete $($dir.FullName)"
-                Write-Verbose "|-=-=-=-=-=-=-|-=-=-=-=-=-=-|"
             }
         }
+    }
+
+    end {
+        Write-Log "Ending Measure-DowserDirectory"
     }
 }
