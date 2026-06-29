@@ -3,11 +3,24 @@ function Find-DowserModified {
     .SYNOPSIS
         Find files modified on a specific calendar date.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        Alias:  dmod
+        Source: Find-FilesModifiedOn.ps1 (hardcoded D:\ path and date default)
+        Fixed:  added -Path parameter; default date changed to (Get-Date).Date.
+
     .DESCRIPTION
         Returns files whose LastWriteTime falls on the specified date (day-level match).
         The default date is today. Use -Date to target a specific day.
 
-        Replaces Find-FilesModifiedOn.ps1 — that had a hardcoded D:\ path and a
+        Replaces Find-FilesModifiedOn.ps1, which had a hardcoded D:\ path and a
         hardcoded default date of 2025-01-14. Both are gone.
 
     .PARAMETER Path
@@ -28,10 +41,9 @@ function Find-DowserModified {
     .EXAMPLE
         'D:\Scripts','C:\Tools' | Find-DowserModified -Date (Get-Date).AddDays(-7)
 
-    .NOTES
-        Alias: dmod
-        Source: Find-FilesModifiedOn.ps1 (standalone scripts — hardcoded D:\ + date default)
-        Fixed: added -Path parameter; changed default date from hardcoded to (Get-Date).Date.
+    .OUTPUTS
+        PSCustomObject
+        Properties: FullName, LastWriteTime, Size.
     #>
     [CmdletBinding()]
     param (

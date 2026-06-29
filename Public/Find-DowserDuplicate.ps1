@@ -3,6 +3,17 @@ function Find-DowserDuplicate {
     .SYNOPSIS
         Finds duplicate files in a directory using multiple detection strategies.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        Date Created:   2026-02-28
+
     .DESCRIPTION
         Scans a directory recursively and detects duplicate files using one or more
         modes: Name (exact filename), PartialName (normalized stem matching),
@@ -46,28 +57,23 @@ function Find-DowserDuplicate {
         Number of sequential chunks to match. Default 3.
 
     .EXAMPLE
-        Find-FileDuplicates -Path "D:\Documents"
+        Find-DowserDuplicate -Path "D:\Documents"
 
         Scans D:\Documents with all modes. Shows compact summary, details in $global:dupObjects.
 
     .EXAMPLE
-        Find-FileDuplicates -Path "D:\Scripts" -Mode Name,PartialName
+        Find-DowserDuplicate -Path "D:\Scripts" -Mode Name,PartialName
 
         Finds files with identical or similar names.
 
     .EXAMPLE
-        Find-FileDuplicates -Path "D:\Backup" -Mode Content -MinSize 1MB
+        Find-DowserDuplicate -Path "D:\Backup" -Mode Content -MinSize 1MB
         $global:dupObjects | Where-Object Count -gt 3
 
         Finds content-identical files over 1MB, then filters the stored results.
 
     .OUTPUTS
         PSCustomObject summary table to console. Full details in $global:dupObjects.
-
-    .NOTES
-        Author:         Curtis Leggett
-        Date Created:   2026-02-28
-        Version:        2026.03.01.001
     #>
     [CmdletBinding()]
     param(

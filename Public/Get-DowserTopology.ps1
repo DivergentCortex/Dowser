@@ -1,41 +1,64 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Renders a provider-agnostic tree view of any PS provider path.
-.DESCRIPTION
-    Displays a visual tree of containers and optionally items for any PSProvider
-    (FileSystem, Registry, Cert:, etc.). Supports colorized output via ANSI escape
-    codes when running on a FileSystem path with InColor/-ansi switch.
-.PARAMETER Path
-    One or more paths to render. Accepts pipeline input. Defaults to current location.
-.PARAMETER LiteralPath
-    Literal path(s) -- no wildcard expansion.
-.PARAMETER Depth
-    How many levels to display. Default is [int]::MaxValue (full depth).
-.PARAMETER IndentSize
-    Characters per indent level. Default 3.
-.PARAMETER ShowItem
-    Include non-container items (files) in the tree output.
-.PARAMETER ShowProperty
-    Display item properties inline. Use * for all, or a comma-separated list.
-.PARAMETER InColor
-    (Dynamic -- FileSystem only) Colorize output using PSAnsiFileMap ANSI codes.
-.EXAMPLE
-    Get-DowserTopology -Path D:\Projects -Depth 3
-.EXAMPLE
-    Get-DowserTopology -Path HKLM:\SOFTWARE -ShowItem
-.EXAMPLE
-    Get-DowserTopology D:\Scripts -InColor -ShowItem
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Ported from: Get-TreeTopology.ps1 (standalone scripts)
-    Aliases preserved: pstree, shtree
-#>
 
 # depth check must come first or recursion runs away
 # InColor needs the DynamicParam block, do not remove it
 
 function Get-DowserTopology {
+    <#
+    .SYNOPSIS
+        Renders a provider-agnostic tree view of any PS provider path.
+
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Ported from: Get-TreeTopology.ps1 (standalone scripts)
+        Aliases preserved: pstree, shtree
+
+    .DESCRIPTION
+        Displays a visual tree of containers and optionally items for any PSProvider
+        (FileSystem, Registry, Cert:, etc.). Supports colorized output via ANSI escape
+        codes when running on a FileSystem path with the InColor (alias -ansi) switch.
+
+    .PARAMETER Path
+        One or more paths to render. Accepts pipeline input. Defaults to current location.
+
+    .PARAMETER LiteralPath
+        Literal path(s), with no wildcard expansion.
+
+    .PARAMETER Depth
+        How many levels to display. Default is [int]::MaxValue (full depth).
+
+    .PARAMETER IndentSize
+        Characters per indent level. Default 3.
+
+    .PARAMETER ShowItem
+        Include non-container items (files) in the tree output.
+
+    .PARAMETER ShowProperty
+        Display item properties inline. Use * for all, or a comma-separated list.
+
+    .PARAMETER InColor
+        Dynamic, FileSystem only. Colorize output using PSAnsiFileMap ANSI codes.
+
+    .EXAMPLE
+        Get-DowserTopology -Path D:\Projects -Depth 3
+
+    .EXAMPLE
+        Get-DowserTopology -Path HKLM:\SOFTWARE -ShowItem
+
+    .EXAMPLE
+        Get-DowserTopology D:\Scripts -InColor -ShowItem
+
+    .OUTPUTS
+        String. Tree lines written to the output stream, one per container or item.
+    #>
 
     [CmdletBinding(DefaultParameterSetName = "Path")]
     [Alias("pstree", "shtree")]

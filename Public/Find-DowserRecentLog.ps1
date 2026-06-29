@@ -3,19 +3,32 @@ function Find-DowserRecentLog {
     .SYNOPSIS
         Find the most recently modified copy of a named file across one or more search paths.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: dlog
+        Source: Find-MostRecentLog.ps1 (standalone scripts), a bare script, no params, hardcoded.
+
     .DESCRIPTION
-        Useful for locating the canonical / newest copy of a shared helper (e.g. Write-Log.ps1)
+        Useful for locating the canonical or newest copy of a shared helper (e.g. Write-Log.ps1)
         when multiple copies exist across a drive. Returns the newest match by default; use -All
         to get all copies ranked by LastWriteTime descending.
 
-        Replaces Find-MostRecentLog.ps1 — that was a bare script hardcoded to hunt for
+        Replaces Find-MostRecentLog.ps1, which was a bare script hardcoded to hunt for
         Write-Log_Ps20.ps1 on D:. This version is fully parameterized.
 
     .PARAMETER FileName
         The file name (or wildcard pattern) to search for. Example: 'Write-Log.ps1', '*.config'.
 
     .PARAMETER Path
-        Root path(s) to search. Defaults to current directory.
+        Root path(s) to search. Defaults to current directory. Accepts pipeline input.
 
     .PARAMETER All
         Return all found copies ranked by LastWriteTime descending, not just the newest.
@@ -26,16 +39,25 @@ function Find-DowserRecentLog {
     .EXAMPLE
         Find-DowserRecentLog -FileName 'Write-Log.ps1' -Path D:\
 
+        Returns the newest copy of Write-Log.ps1 found anywhere under D:.
+
     .EXAMPLE
         Find-DowserRecentLog -FileName '*.config' -All -Verbose
+
+        Returns every .config file under the current directory, newest first.
 
     .EXAMPLE
         'D:\Repos','C:\Scripts' | Find-DowserRecentLog -FileName 'Write-Log.ps1'
 
-    .NOTES
-        Alias: dlog
-        Source: Find-MostRecentLog.ps1 (standalone scripts) — bare script, no params, hardcoded.
-        Full function rewrite. Logic preserved: find, sort newest-first, emit PSCustomObject.
+        Pipes two root paths in and searches both for Write-Log.ps1.
+
+    .INPUTS
+        System.String
+        Root path strings can be piped to this function.
+
+    .OUTPUTS
+        PSCustomObject
+        Properties: FullName, LastWriteTime, Length.
     #>
     [CmdletBinding()]
     param (

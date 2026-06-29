@@ -1,36 +1,110 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Visual tree renderer for directory structures with optional size and file count annotations.
-.DESCRIPTION
-    Renders a directory tree using Unicode or ASCII box-drawing characters. Supports HTML and
-    Markdown output, full-path trunk display, filtering by extension/pattern/folder, parallel
-    pre-scan for large trees, WSL/Linux path display mode.
-
-    Optionally annotates each folder with its total size (-IncludeSize) and/or .ps1 file count
-    (-IncludePsCount), inlined directly into the tree branches.
-.PARAMETER Path
-    Root directory to render.
-.PARAMETER IncludeSize
-    Append total folder size (e.g., [1.2 GB]) to each folder in the tree.
-.PARAMETER IncludePsCount
-    Append .ps1 file count (e.g., [14 .ps1]) to each folder in the tree.
-.PARAMETER MaxDepth
-    Maximum depth to traverse. Default: 3.
-.EXAMPLE
-    Get-DowserMap -Path D:\Projects -MaxDepth 2 -IncludeSize
-.EXAMPLE
-    Get-DowserMap -Path D:\Scripts -IncludePsCount -FoldersOnly
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Ported from: Get-DirectoryMap.ps1 (standalone scripts)
-    Absorbs data features from: Get-FolderTree.ps1, Get-DirectoryTreeOutputAndFileCount.ps1
-#>
 
 # visual tree builder. self-recursive. dont reorder the filter logic unless you enjoy broken connectors.
-# size and .ps1 count annotations bolt onto the folder line — computed lazily per folder.
+# size and .ps1 count annotations bolt onto the folder line, computed lazily per folder.
 
 function Get-DowserMap {
+    <#
+    .SYNOPSIS
+        Visual tree renderer for directory structures with optional size and file count annotations.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Ported from: Get-DirectoryMap.ps1 (standalone scripts)
+        Absorbs data features from: Get-FolderTree.ps1, Get-DirectoryTreeOutputAndFileCount.ps1
+    .DESCRIPTION
+        Renders a directory tree using Unicode or ASCII box-drawing characters. Supports HTML and
+        Markdown output, full-path trunk display, filtering by extension/pattern/folder, parallel
+        pre-scan for large trees, WSL/Linux path display mode.
+
+        Optionally annotates each folder with its total size (-IncludeSize) and/or .ps1 file count
+        (-IncludePsCount), inlined directly into the tree branches.
+    .PARAMETER Path
+        Root directory to render. Accepts pipeline input by value and by property name (FullName).
+    .PARAMETER IncludeSize
+        Append total folder size (e.g., [1.2 GB]) to each folder in the tree.
+    .PARAMETER IncludePsCount
+        Append .ps1 file count (e.g., [14 .ps1]) to each folder in the tree.
+    .PARAMETER IncludeFilePatterns
+        File name patterns to include. Bare strings are wrapped as wildcards.
+    .PARAMETER IncludeExtensions
+        Extension filters to include (e.g., .ps1, .txt).
+    .PARAMETER ExcludeExtensions
+        Extension filters to exclude, added on top of the default exclude set.
+    .PARAMETER ExcludeFolders
+        Folder names or wildcards to exclude, added on top of the default exclude set.
+    .PARAMETER ExcludeFiles
+        File names or wildcards to exclude, added on top of the default exclude set.
+    .PARAMETER IncludeFolders
+        Folder names, wildcards, or paths to restrict the tree to.
+    .PARAMETER ExcludePathPatterns
+        Path patterns to exclude by full or relative path match.
+    .PARAMETER NoDefaultExcludes
+        Bypass the built-in default exclude lists for folders, files, and extensions.
+    .PARAMETER FoldersOnly
+        Render folders only, omitting files unless a file filter is active.
+    .PARAMETER MaxDepth
+        Maximum depth to traverse. Default: 3.
+    .PARAMETER ShowFullPathTree
+        Render the root path as a trunk of segment nodes. Defaults to on.
+    .PARAMETER LinuxPaths
+        Display paths in /mnt-style WSL form instead of Windows form.
+    .PARAMETER Ascii
+        Use ASCII box-drawing characters instead of Unicode.
+    .PARAMETER AsHtml
+        Emit HTML-escaped tree output. Cannot be combined with -AsMarkdown.
+    .PARAMETER AsMarkdown
+        Emit Markdown output wrapped in a fenced code block.
+    .PARAMETER IncludeHidden
+        Include hidden items in the tree.
+    .PARAMETER FollowReparse
+        Follow reparse points (symlinks/junctions) instead of listing them as links.
+    .PARAMETER UseRunspaces
+        Enable the parallel pre-scan phase for filtered large trees. Default is $true.
+    .PARAMETER MaxThreads
+        Maximum threads for the pre-scan runspace pool. Defaults to processor count minus one.
+    .PARAMETER OutputFile
+        Path to write the rendered tree as a text file. Auto-enables HTML for .htm/.html targets.
+    .PARAMETER MarkdownFile
+        Path to write a Markdown document. Implies -AsMarkdown.
+    .PARAMETER EmitSummary
+        Append a folder/file/skip/symlink summary to the output.
+    .PARAMETER Indent
+        Internal recursion state. Not for direct use.
+    .PARAMETER CurrentDepth
+        Internal recursion state. Not for direct use.
+    .PARAMETER MatchCache
+        Internal recursion cache. Not for direct use.
+    .PARAMETER IncludeFolderCache
+        Internal recursion cache. Not for direct use.
+    .PARAMETER TraversalState
+        Internal recursion counters. Not for direct use.
+    .PARAMETER SizeCache
+        Internal recursion cache for folder sizes. Not for direct use.
+    .PARAMETER PsCountCache
+        Internal recursion cache for .ps1 counts. Not for direct use.
+    .EXAMPLE
+        Get-DowserMap -Path D:\Projects -MaxDepth 2 -IncludeSize
+
+        Renders a two-level tree of D:\Projects with each folder annotated by total size.
+    .EXAMPLE
+        Get-DowserMap -Path D:\Scripts -IncludePsCount -FoldersOnly
+
+        Renders a folders-only tree of D:\Scripts with .ps1 counts on each folder.
+    .INPUTS
+        System.String
+        You can pipe a root path to this function.
+    .OUTPUTS
+        System.String
+        One string per rendered tree line.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]

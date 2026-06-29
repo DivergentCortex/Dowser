@@ -1,10 +1,24 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    WinDirStat-style recursive disk-usage report for a directory tree.
+function Measure-DowserDiskUsage {
+    <#
+    .SYNOPSIS
+        WinDirStat-style recursive disk-usage report for a directory tree.
 
-.DESCRIPTION
-    Scans a directory tree recursively and produces three ranked sections:
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: ddu
+        Related: Measure-DowserDirectory (immediate-subdir sizing, no recursion, no ranking)
+
+    .DESCRIPTION
+        Scans a directory tree recursively and produces three ranked sections:
     biggest directories (by rollup size), biggest individual files, and
     file counts/sizes grouped by extension. Each section is emitted as
     structured PSCustomObjects to the pipeline and rendered as formatted
@@ -54,11 +68,9 @@
 .EXAMPLE
     Get-Item D:\Work | Measure-DowserDiskUsage -ExcludePath '.git','node_modules'
 
-.NOTES
-    Alias: ddu
-    Related: Measure-DowserDirectory (immediate-subdir sizing, no recursion, no ranking)
+.OUTPUTS
+    PSCustomObject ranked entries for biggest directories, biggest files, and per-extension totals.
 #>
-function Measure-DowserDiskUsage {
     [CmdletBinding()]
     param (
         [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]

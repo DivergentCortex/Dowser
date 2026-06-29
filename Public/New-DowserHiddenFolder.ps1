@@ -3,6 +3,19 @@ function New-DowserHiddenFolder {
     .SYNOPSIS
         Create a new folder and mark it Hidden+System, or apply those attributes to an existing folder.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Source: create-hiddenfolder (standalone scripts, was hardcoded to an internal project path)
+        Rewritten to accept -Path parameter; no hardcoded paths.
+
     .DESCRIPTION
         Creates a hidden/system folder that won't appear in normal directory listings.
         Useful for storing module-private data, config caches, or temporary work dirs
@@ -18,7 +31,7 @@ function New-DowserHiddenFolder {
         Suppress warning when folder already exists; just apply attributes and continue.
 
     .PARAMETER AttributesOnly
-        Skip folder creation entirely -- only apply Hidden+System to an existing folder.
+        Skip folder creation entirely; only apply Hidden+System to an existing folder.
         Errors if the path doesn't exist.
 
     .EXAMPLE
@@ -30,9 +43,8 @@ function New-DowserHiddenFolder {
     .EXAMPLE
         New-DowserHiddenFolder -Path 'D:\Existing\.config' -AttributesOnly
 
-    .NOTES
-        Source: create-hiddenfolder (standalone scripts -- was hardcoded to an internal project path)
-        Rewritten to accept -Path parameter; no hardcoded paths.
+    .OUTPUTS
+        PSCustomObject with Path and Attributes when run on Windows; nothing on non-Windows platforms.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param (

@@ -1,29 +1,48 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Gets file ownership and extended metadata for files in a directory.
-.DESCRIPTION
-    Scans a directory for files matching an extension filter and returns metadata
-    including name, full path, size (human-readable via Format-DowserSize), read-only
-    status, last-write time, and all Shell.Application extended properties.
-.PARAMETER Directory
-    Target directory to scan.
-.PARAMETER Extension
-    Extension filter (wildcard). Default is "*" (all files).
-.EXAMPLE
-    Get-DowserOwnership -Directory "D:\Projects" -Extension "*.ps1"
-.EXAMPLE
-    Get-DowserOwnership -Directory "C:\Logs"
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Ported from: Get-FileOwnership.ps1 (standalone scripts)
-    Uses: Private\Format-DowserSize for human-readable sizes
-#>
 
 # ownership + shell metadata reader. scans dir, pipes file paths to Get-FileMetaData.
 # Format-DowserSize replaces the old inline Get-FileSize inner function.
 
 function Get-DowserOwnership {
+    <#
+    .SYNOPSIS
+        Gets file ownership and extended metadata for files in a directory.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Ported from: Get-FileOwnership.ps1 (standalone scripts)
+        Uses: Private\Format-DowserSize for human-readable sizes
+    .DESCRIPTION
+        Scans a directory for files matching an extension filter and returns metadata
+        including name, full path, size (human-readable via Format-DowserSize), read-only
+        status, last-write time, and all Shell.Application extended properties.
+    .PARAMETER Directory
+        Target directory to scan. Accepts pipeline input by value and by property name
+        (Path, FullName). Defaults to the current location.
+    .PARAMETER Extension
+        Extension filter (wildcard). Default is "*" (all files).
+    .EXAMPLE
+        Get-DowserOwnership -Directory "D:\Projects" -Extension "*.ps1"
+
+        Returns ownership and extended metadata for every .ps1 file under D:\Projects.
+    .EXAMPLE
+        Get-DowserOwnership -Directory "C:\Logs"
+
+        Returns metadata for every file under C:\Logs.
+    .INPUTS
+        System.String
+        You can pipe a directory path to this function.
+    .OUTPUTS
+        PSCustomObject
+        One object per file carrying ownership and extended metadata.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
@@ -46,7 +65,7 @@ function Get-DowserOwnership {
     function Get-FileMetaData {
         <#
         .SYNOPSIS
-        Gets metadata information from a file -- similar to what Explorer shows.
+        Gets metadata information from a file, similar to what Explorer shows.
         .PARAMETER File
         FileName or FileObject
         .PARAMETER HashAlgorithm

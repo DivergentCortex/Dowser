@@ -1,32 +1,77 @@
 function ConvertTo-DowserBase64 {
     <#
 .SYNOPSIS
-    Converts images to Base64 strings and vice-versa using pure PowerShell.
+    Encodes an image file to a Base64 string, or decodes a Base64 string back to an image file.
+
+.NOTES
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    -  Author:        Curtis Leggett                                  -
+    =  Copyright:     2026 Divergent Cortex                           =
+    -  Organization:  Divergent Cortex                                -
+    =  Version:       See docs/CHANGELOG.md                           =
+    =-=-                       =-=-=-=-=-=-=-=                     -=-=
+    -  it is not water they seek, but the truth beneath the trees     -
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 .DESCRIPTION
-    This script converts image files (JPG, PNG, GIF, etc.) into Base64 strings.
-    It can also decode Base64 strings back into image files.
-    
-    Features:
-    - Pure PowerShell/.NET implementation (No Python dependency).
-    - Clipboard support.
-    - Data URI header generation.
-    - Decoding support.
+    In encode mode (default) the function reads an image file as bytes and returns
+    its Base64 representation. With -IncludeHeader the result is prefixed with a
+    'data:<mime>;base64,' data URI header, where the MIME type is inferred from the
+    file extension (png, jpg, jpeg, gif, svg, webp; anything else falls back to
+    application/octet-stream). The result is written to -OutputFile when supplied,
+    copied to the clipboard when -CopyToClipboard is set, and otherwise emitted to
+    the pipeline. When the clipboard is requested but unavailable (headless or
+    non-Windows session) the function warns and falls back to emitting the string.
 
-.PARAMETER ImagePath
-    Path to the input image file (encoding) or text file/string (decoding).
+    In decode mode (-Decode) the input is read either from a file (when -Path
+    resolves to one) or treated as a literal Base64 string. Any leading
+    'data:...;base64,' header is stripped before decoding, and the decoded bytes are
+    written to -OutputFile, which is required for decoding. The implementation is
+    pure PowerShell and .NET, with no external dependencies.
+
+.PARAMETER Path
+    Path to the input image file when encoding, or a path to a text file (or a
+    literal Base64 string) when decoding. Accepts pipeline input and carries the
+    aliases ImagePath and FullName.
 
 .PARAMETER OutputFile
-    Path to save the result.
+    Path to write the result to. Optional when encoding (the string is emitted to
+    the pipeline if omitted). Required when decoding.
 
 .PARAMETER Decode
-    Switch to decode Base64 back to an image.
+    Switch that decodes a Base64 string back into a binary file instead of encoding.
 
 .PARAMETER IncludeHeader
-    Adds 'data:image/<type>;base64,' header.
+    Switch that prefixes the encoded output with a 'data:<mime>;base64,' data URI
+    header. Encode mode only.
 
 .PARAMETER CopyToClipboard
-    Copies result to clipboard (text for encode, not supported for decode output).
+    Switch that copies the encoded string to the clipboard. Falls back to the
+    pipeline when the clipboard is unavailable. Encode mode only.
+
+.EXAMPLE
+    ConvertTo-DowserBase64 -Path 'C:\images\logo.png' -IncludeHeader
+
+    Encodes logo.png and emits a data URI string to the pipeline.
+
+.EXAMPLE
+    ConvertTo-DowserBase64 -Path 'C:\images\logo.png' -OutputFile 'C:\images\logo.b64.txt'
+
+    Encodes logo.png and writes the Base64 text to logo.b64.txt.
+
+.EXAMPLE
+    ConvertTo-DowserBase64 -Path 'C:\images\logo.b64.txt' -Decode -OutputFile 'C:\images\logo.png'
+
+    Reads a Base64 text file and decodes it back to a binary PNG.
+
+.INPUTS
+    System.String
+    You can pipe a file path to this function.
+
+.OUTPUTS
+    System.String
+    When encoding without an output file, the Base64 (or data URI) string is
+    emitted to the pipeline. Decode mode writes a file and returns nothing.
 #>
 
     [CmdletBinding()]

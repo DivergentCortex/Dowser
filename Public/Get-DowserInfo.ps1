@@ -2,11 +2,30 @@ function Get-DowserInfo {
     <#
     .SYNOPSIS
         Report Dowser module identity: module version (manifest) and latest changelog entry.
-
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
         Module version is SemVer-style and lives in Dowser.psd1 (ModuleVersion).
         Per-script / per-feature history lives in docs/CHANGELOG.md and uses
         YYYY.MM.DD.XXX entries. Both are surfaced here. They are independent.
+    .EXAMPLE
+        Get-DowserInfo
+
+        Returns a single object carrying the manifest ModuleVersion alongside the
+        latest changelog version, date, and title, plus module root and public
+        function count.
+    .OUTPUTS
+        PSCustomObject
+        Properties: Module, ModuleVersion, LatestChangelogVersion,
+        LatestChangelogDate, LatestChangelogTitle, ModuleRoot, PublicFunctions,
+        ChangelogPath.
     #>
     [CmdletBinding()]
     param()

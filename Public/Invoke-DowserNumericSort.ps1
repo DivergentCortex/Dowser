@@ -1,50 +1,74 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Sorts strings or objects with embedded numbers in natural (human) order.
 
-.DESCRIPTION
-    Standard Sort-Object sorts "Item-10" before "Item-2" because it compares
-    character codes, not numeric values. Invoke-DowserNumericSort pads all
-    numeric segments before sorting so natural order is preserved:
-    Item-1, Item-2 ... Item-9, Item-10.
-
-    Delegates key generation to Get-DowserSortKey (Private\).
-
-.PARAMETER InputObject
-    Objects to sort. Accepts pipeline input. Required.
-
-.PARAMETER Property
-    Property name(s) to sort by. If omitted, sorts the object's string value directly.
-
-.PARAMETER Descending
-    Sort in descending order.
-
-.PARAMETER CaseSensitive
-    Case-sensitive sort comparison.
-
-.PARAMETER Unique
-    Return only unique results.
-
-.PARAMETER Top
-    Return only the top N results after sorting.
-
-.EXAMPLE
-    'Item-10','Item-2','Item-1' | Invoke-DowserNumericSort
-
-.EXAMPLE
-    Get-ChildItem | Invoke-DowserNumericSort -Property Name
-
-.EXAMPLE
-    $data | Invoke-DowserNumericSort -Property Version -Descending -Top 5
-
-.NOTES
-    Alias: dsort, dnsort
-    Source: Invoke-NumericalSorting.ps1 (standalone scripts) - Sort-Numerical function
-    Private helper: Get-DowserSortKey (extracted from source Get-SortKey)
-    Related: Find-DowserFile, Find-DowserDuplicate
-#>
 function Invoke-DowserNumericSort {
+    <#
+    .SYNOPSIS
+        Sorts strings or objects with embedded numbers in natural (human) order.
+
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: dsort, dnsort
+        Source: Invoke-NumericalSorting.ps1 (standalone scripts), Sort-Numerical function
+        Private helper: Get-DowserSortKey (extracted from source Get-SortKey)
+        Related: Find-DowserFile, Find-DowserDuplicate
+
+    .DESCRIPTION
+        Standard Sort-Object sorts "Item-10" before "Item-2" because it compares
+        character codes, not numeric values. Invoke-DowserNumericSort pads all
+        numeric segments before sorting so natural order is preserved:
+        Item-1, Item-2 ... Item-9, Item-10.
+
+        Delegates key generation to Get-DowserSortKey (Private\).
+
+    .PARAMETER InputObject
+        Objects to sort. Accepts pipeline input. Required.
+
+    .PARAMETER Property
+        Property name(s) to sort by. If omitted, sorts the object's string value directly.
+
+    .PARAMETER Descending
+        Sort in descending order.
+
+    .PARAMETER CaseSensitive
+        Case-sensitive sort comparison.
+
+    .PARAMETER Unique
+        Return only unique results.
+
+    .PARAMETER Top
+        Return only the top N results after sorting.
+
+    .EXAMPLE
+        'Item-10','Item-2','Item-1' | Invoke-DowserNumericSort
+
+        Returns Item-1, Item-2, Item-10 in natural numeric order.
+
+    .EXAMPLE
+        Get-ChildItem | Invoke-DowserNumericSort -Property Name
+
+        Sorts directory entries by Name in natural order.
+
+    .EXAMPLE
+        $data | Invoke-DowserNumericSort -Property Version -Descending -Top 5
+
+        Returns the five highest Version values in descending natural order.
+
+    .INPUTS
+        System.Object
+        Objects to sort can be piped to this function.
+
+    .OUTPUTS
+        System.Object
+        The input objects re-emitted in natural sort order.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]

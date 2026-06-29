@@ -3,6 +3,16 @@ function Find-DowserFile {
     .SYNOPSIS
         A high-performance file searching tool.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
     .DESCRIPTION
         Searches for files by name, wildcards, size, and dates.
         Uses Runspaces for high-performance parallel processing.
@@ -37,6 +47,25 @@ function Find-DowserFile {
 
     .PARAMETER ThreadCount
         Number of threads to use. Defaults to processor count.
+
+    .EXAMPLE
+        Find-DowserFile -Path "D:\Repos" -Pattern "*.ps1"
+
+        Recursively finds all PowerShell scripts under D:\Repos using runspaces.
+
+    .EXAMPLE
+        Find-DowserFile -Path "D:\Logs" -Pattern "error" -ModifiedAfter (Get-Date).AddDays(-1) -MinSize 1MB
+
+        Finds files whose name contains "error", modified in the last day, at least 1MB.
+
+    .EXAMPLE
+        'C:\Tools','D:\Scripts' | Find-DowserFile -Pattern "*.exe" -StopOnFirstMatch
+
+        Pipes two roots in and returns the first matching executable found.
+
+    .OUTPUTS
+        PSCustomObject
+        Properties: FullName, Name, Directory, Size, LastWriteTime, CreationTime.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param (

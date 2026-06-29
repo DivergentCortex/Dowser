@@ -3,6 +3,16 @@ function Find-DowserOrphan {
     .SYNOPSIS
         Scans a directory to identify files that are not referenced by any other text-based files in the directory.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
     .DESCRIPTION
         This function performs the following steps:
         1. Recursively finds all files in the specified SearchPath.
@@ -23,12 +33,18 @@ function Find-DowserOrphan {
         Defaults to common code and config formats.
 
     .EXAMPLE
-        Find-OrphanFiles -SearchPath "C:\MyProject"
+        Find-DowserOrphan -SearchPath "C:\MyProject"
+
         Finds all orphan files in C:\MyProject.
 
     .EXAMPLE
-        Find-OrphanFiles -SearchPath . -ExcludePaths "TestResults","Build"
+        Find-DowserOrphan -SearchPath . -ExcludePaths "TestResults","Build"
+
         Scans current directory excluding specific folders.
+
+    .OUTPUTS
+        System.IO.FileInfo
+        Returns the FileInfo objects that have no external references.
     #>
     [CmdletBinding()]
     param(

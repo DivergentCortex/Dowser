@@ -1,15 +1,66 @@
 function Find-DowserDependency {
-    # Example usage:
     <#
-    # Search for specific functions
-    Find-ScriptDependencies -FunctionNames @("Start-FastGroupPing", "Write-Log") -IncludeContent
+    .SYNOPSIS
+        Scans PowerShell files for dependency references and function definitions.
 
-    # Search all dependencies in multiple paths
-    Find-ScriptDependencies -SearchPath `$PWD -AdditionalPaths @("\\Server\Share\Scripts") -ExportResults
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-    # Quick search in current directory
-    Find-ScriptDependencies -SearchPath $PWD -IncludeContent
-#>
+    .DESCRIPTION
+        Recursively scans .ps1 files under one or more search paths and reports
+        dependency references: dot-sourced scripts, function definitions, and
+        Import-Module calls. When specific function names are supplied, scans for
+        those names instead of the default reference patterns. System and package
+        directories are excluded by default. Results can include surrounding
+        context lines and be exported to CSV.
+
+    .PARAMETER SearchPath
+        Primary directory to scan recursively. Defaults to the current location.
+
+    .PARAMETER AdditionalPaths
+        Extra directories to scan alongside SearchPath.
+
+    .PARAMETER FunctionNames
+        Specific function names to search for. When supplied, these replace the
+        default reference patterns.
+
+    .PARAMETER ExcludePaths
+        Path fragments to exclude from the scan. Defaults to platform-appropriate
+        system and package directories when not supplied.
+
+    .PARAMETER IncludeContent
+        Attach two lines of surrounding context to each match.
+
+    .PARAMETER ExportResults
+        Export the full result set to a timestamped CSV in the current directory.
+
+    .EXAMPLE
+        Find-DowserDependency -SearchPath $PWD -IncludeContent
+
+        Scans the current directory for dependency references with context lines.
+
+    .EXAMPLE
+        Find-DowserDependency -FunctionNames @("Start-FastGroupPing", "Write-Log") -IncludeContent
+
+        Scans for references to the named functions across the current location.
+
+    .EXAMPLE
+        Find-DowserDependency -SearchPath $PWD -AdditionalPaths @("\\Server\Share\Scripts") -ExportResults
+
+        Scans the current location and a share, then exports the results to CSV.
+
+    .OUTPUTS
+        PSCustomObject
+        Properties: SourceFile, LineNumber, Pattern, MatchedLine, LastModified,
+        FileSize, and Context when IncludeContent is set.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]

@@ -1,38 +1,59 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Gets detailed file metadata from any file including executables, DLLs, and other types.
-.DESCRIPTION
-    Extracts all possible metadata, version information, extended properties, and file
-    attributes from a given file using multiple methods: .NET classes, COM objects, and
-    PowerShell cmdlets. Handles executables (PE header, .NET assembly info), regular files,
-    and optionally directories.
-.PARAMETER FilePath
-    Path to the file to analyze. Accepts pipeline input by value and by property name (FullName).
-.PARAMETER IncludeEmptyProperties
-    Include properties that exist but have empty values.
-.PARAMETER IncludeSignature
-    Include digital signature information (slower).
-.PARAMETER IncludeDirectories
-    When a directory path is provided (e.g., piping Get-ChildItem results), include it
-    instead of skipping. File-only metadata (hashes, version info, signatures, PE/assembly
-    parsing) will be skipped for directories.
-.EXAMPLE
-    Get-DowserProperty -FilePath "C:\Windows\System32\notepad.exe"
-.EXAMPLE
-    Get-DowserProperty -FilePath "C:\Windows\System32\java.exe" -IncludeSignature -IncludeEmptyProperties
-.EXAMPLE
-    Get-ChildItem D:\Scripts -Filter *.ps1 | Get-DowserProperty
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Ported from: Get-FilePropertyDetails.ps1 (standalone scripts)
-    Uses: Private\Format-DowserSize for human-readable file sizes
-#>
 
 # deep file inspector. shell COM, VersionInfo, PE header, .NET assembly, optional signature.
-# shell COM is slow on UNC -- that's expected. IncludeSignature adds another 0.5-2s per file.
+# shell COM is slow on UNC, thats expected. IncludeSignature adds another 0.5-2s per file.
 
 function Get-DowserProperty {
+    <#
+    .SYNOPSIS
+        Gets detailed file metadata from any file including executables, DLLs, and other types.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Ported from: Get-FilePropertyDetails.ps1 (standalone scripts)
+        Uses: Private\Format-DowserSize for human-readable file sizes
+    .DESCRIPTION
+        Extracts all possible metadata, version information, extended properties, and file
+        attributes from a given file using multiple methods: .NET classes, COM objects, and
+        PowerShell cmdlets. Handles executables (PE header, .NET assembly info), regular files,
+        and optionally directories.
+    .PARAMETER FilePath
+        Path to the file to analyze. Accepts pipeline input by value and by property name
+        (FullName, Path).
+    .PARAMETER IncludeEmptyProperties
+        Include properties that exist but have empty values.
+    .PARAMETER IncludeSignature
+        Include digital signature information (slower).
+    .PARAMETER IncludeDirectories
+        When a directory path is provided (e.g., piping Get-ChildItem results), include it
+        instead of skipping. File-only metadata (hashes, version info, signatures, PE/assembly
+        parsing) will be skipped for directories.
+    .EXAMPLE
+        Get-DowserProperty -FilePath "C:\Windows\System32\notepad.exe"
+
+        Returns full metadata for notepad.exe.
+    .EXAMPLE
+        Get-DowserProperty -FilePath "C:\Windows\System32\java.exe" -IncludeSignature -IncludeEmptyProperties
+
+        Returns metadata including signature details and empty-valued properties.
+    .EXAMPLE
+        Get-ChildItem D:\Scripts -Filter *.ps1 | Get-DowserProperty
+
+        Pipes every .ps1 file in D:\Scripts through the inspector.
+    .INPUTS
+        System.String
+        You can pipe a file path to this function.
+    .OUTPUTS
+        PSCustomObject
+        One object per file carrying metadata, version, extended, and attribute properties.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]

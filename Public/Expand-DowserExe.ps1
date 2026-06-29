@@ -3,6 +3,19 @@
 .SYNOPSIS
     Extracts files from extractable EXE archives using 7-Zip.
 
+.NOTES
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    -  Author:        Curtis Leggett                                  -
+    =  Copyright:     2026 Divergent Cortex                           =
+    -  Organization:  Divergent Cortex                                -
+    =  Version:       See docs/CHANGELOG.md                           =
+    =-=-                       =-=-=-=-=-=-=-=                     -=-=
+    -  it is not water they seek, but the truth beneath the trees     -
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    Alias: dexpand, dextract
+    Related: Test-DowserExtractable (detection without extraction)
+    Requires: 7-Zip (mandatory for extraction)
+
 .DESCRIPTION
     Runs Test-DowserExtractable first to verify the EXE contains extractable
     payloads, then uses 7-Zip to extract the contents to a destination folder.
@@ -43,11 +56,15 @@
 .EXAMPLE
     Expand-DowserExe -Path "\\server\share\installer.exe" -Force
 
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Alias: dexpand, dextract
-    Related: Test-DowserExtractable (detection without extraction)
-    Requires: 7-Zip (mandatory for extraction)
+.INPUTS
+    System.String
+    You can pipe EXE paths, or objects with a Path property, to this function.
+
+.OUTPUTS
+    PSCustomObject
+    With -PassThru (or for non-extractable inputs), an object with Path,
+    Destination, Success, ExitCode, Classification, FileCount, ArchiveType,
+    and Details properties.
 #>
 
 # extract payload from SFX/installer EXEs. runs Test-DowserExtractable first,

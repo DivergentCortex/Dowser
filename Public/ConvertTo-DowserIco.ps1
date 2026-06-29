@@ -1,4 +1,60 @@
 function ConvertTo-DowserIco {
+    <#
+    .SYNOPSIS
+        Converts an image file into a multi-resolution Windows ICO file.
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    .DESCRIPTION
+        Loads a source image through System.Drawing (GDI+) and writes a Windows ICO
+        file containing one PNG-compressed entry per requested size. UNC source paths
+        are staged to a temp file first because GDI+ reads them unreliably, and the
+        image is read into memory before decoding for the same reason. Each entry is
+        rendered at 32bpp ARGB with high-quality bicubic resampling, and the ICONDIR
+        and directory entries are written manually, using a width/height byte of 0 for
+        sizes of 256 or larger as the ICO format requires.
+
+        Requested sizes are validated against 16, 32, 48, 64, 128, 256, and 512;
+        invalid sizes are warned about and skipped, and when none remain the function
+        falls back to 512. The output path defaults to the source name with a .ico
+        extension in the source directory when -OutputFile is not given, and any
+        missing output directory is created.
+
+        Requires Windows because it depends on System.Drawing and GDI+; on other
+        platforms it warns and returns $null.
+    .PARAMETER InputFilePath
+        Path to the source image to convert. UNC paths are supported and staged to
+        temp before decoding.
+    .PARAMETER OutputFile
+        Path to write the .ico to. Defaults to the source file name with a .ico
+        extension in the source directory.
+    .PARAMETER IcoSizes
+        One or more square pixel sizes to include in the icon. Valid values are 16,
+        32, 48, 64, 128, 256, and 512. Defaults to 256. Aliases: IconSize, Size, Sizes.
+    .PARAMETER MaxSize
+        Accepted for interface compatibility. The current implementation does not act
+        on this value. Defaults to 0.
+    .EXAMPLE
+        ConvertTo-DowserIco -InputFilePath 'C:\art\logo.png' -IcoSizes 16,32,48,256
+
+        Writes logo.ico next to logo.png with four embedded resolutions.
+    .EXAMPLE
+        ConvertTo-DowserIco -InputFilePath '\\server\share\logo.jpg' -OutputFile 'C:\out\logo.ico'
+
+        Stages the UNC source to temp, then writes a 256px icon to C:\out\logo.ico.
+    .OUTPUTS
+        System.String
+        A 'Wrote icon: <path>' status line on success.
+
+        System.Boolean
+        $true on success, $false on failure (missing input, load error, write error).
+    #>
     param(
         [Parameter(Mandatory=$true)]
         [string]$InputFilePath,

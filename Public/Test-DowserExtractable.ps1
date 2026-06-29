@@ -3,6 +3,19 @@
 .SYNOPSIS
     Tests whether an executable can be simply extracted using archive tools.
 
+.NOTES
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    -  Author:        Curtis Leggett                                  -
+    =  Copyright:     2026 Divergent Cortex                           =
+    -  Organization:  Divergent Cortex                                -
+    =  Version:       See docs/CHANGELOG.md                           =
+    =-=-                       =-=-=-=-=-=-=-=                     -=-=
+    -  it is not water they seek, but the truth beneath the trees     -
+    =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    Alias: dtest, dtestexe
+    Related: Expand-DowserExe, Get-DowserProperty
+    Source: docs/exe-static-classification-reference.md
+
 .DESCRIPTION
     Analyzes EXE files to determine if they contain extractable archive payloads
     (ZIP, 7z, CAB, RAR, NSIS, Inno Setup, etc.) or if they are compiled binaries
@@ -53,11 +66,15 @@
 .EXAMPLE
     Test-DowserExtractable -Path "\\server\share\installer.exe"
 
-.NOTES
-    Author: Curtis Leggett / Divergent Cortex
-    Alias: dtest, dtestexe
-    Related: Expand-DowserExe, Get-DowserProperty
-    Source: docs/exe-static-classification-reference.md
+.INPUTS
+    System.String
+    You can pipe EXE paths, directory paths, or objects with a Path property.
+
+.OUTPUTS
+    PSCustomObject
+    One object per analyzed file, carrying Path, Name, Size, IsPE, IsNET,
+    Extractable, Classification, InstallerType, ArchiveType, DetectionMethod,
+    Confidence, FileCount, Details, and the raw Detections list.
 #>
 
 # EXE extractability probe. multi-tier static analysis + optional 7-Zip oracle.

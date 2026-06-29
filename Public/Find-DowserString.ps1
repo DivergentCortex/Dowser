@@ -1,79 +1,101 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Searches for one or more text patterns across files in a directory.
-
-.DESCRIPTION
-    Multi-threaded string search using Invoke-DowserRunspacePool for parallel file gathering
-    and parallel search. Aho-Corasick is used automatically for multi-pattern literal searches
-    (SearchMode auto or aho). Single patterns or regex fall back to per-line scan.
-
-    File gathering and string searching are both parallelized via directory partitioning
-    and chunked file processing — same strategy as the original Find-StringInFiles.
-
-.PARAMETER Path
-    Directory to search. Defaults to current directory.
-
-.PARAMETER Patterns
-    One or more text patterns to search for. Required.
-
-.PARAMETER Extensions
-    File glob patterns to include. Default is all files.
-
-.PARAMETER MaxThreads
-    Max worker runspaces. Defaults to CPU count minus 1.
-
-.PARAMETER MaxFileSizeMB
-    Skip files over this size. Default 10 MB.
-
-.PARAMETER UseRegex
-    Treat Patterns as regex. Default is literal string matching.
-
-.PARAMETER CaseSensitive
-    Case-sensitive matching. Default is case-insensitive.
-
-.PARAMETER Recurse
-    Recurse subdirectories. Default $true.
-
-.PARAMETER ExcludeFolders
-    Folder names to skip. Default: .git, node_modules, bin, obj.
-
-.PARAMETER ExcludeExtensions
-    File extensions to skip (e.g. '.log', '.dll').
-
-.PARAMETER ContextLines
-    Lines of context around each match. Default 0. Requires IncludeLineContent.
-
-.PARAMETER SearchMode
-    auto  - picks aho for multi-pattern literal, manual for single
-    aho   - force Aho-Corasick
-    manual - literal IndexOf loop
-    select - not implemented (kept for compat)
-
-.PARAMETER OutputMode
-    grouped - directory header, files indented underneath with match count + line numbers (default).
-              text output, optimized for console readability.
-    counts  - one PSCustomObject per file with FilePath/MatchCount/LineNumbers. legacy default;
-              use this when you need to pipe results downstream.
-    files   - just file paths.
-    matches - one row per match; include line text with IncludeLineContent.
-
-.PARAMETER IncludeLineContent
-    Include the matching line text in results. Implicitly sets OutputMode to matches.
-
-.EXAMPLE
-    Find-DowserString -Path . -Patterns 'TODO','FIXME' -Extensions '*.ps1' -Verbose
-
-.EXAMPLE
-    Find-DowserString -Path D:\repos -Patterns 'Write-Host' -Extensions '*.ps1' -OutputMode files
-
-.NOTES
-    Ported from standalone scripts\find-stringinfiles.ps1
-    Threading via Invoke-DowserRunspacePool (Private helper)
-    Aho-Corasick compiled inline (C# Add-Type) — shared across runspaces via AppDomain
-#>
 
 function Find-DowserString {
+    <#
+    .SYNOPSIS
+        Searches for one or more text patterns across files in a directory.
+
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Source: standalone scripts\find-stringinfiles.ps1
+        Threading via Invoke-DowserRunspacePool (Private helper)
+        Aho-Corasick compiled inline (C# Add-Type), shared across runspaces via AppDomain
+
+    .DESCRIPTION
+        Multi-threaded string search using Invoke-DowserRunspacePool for parallel file gathering
+        and parallel search. Aho-Corasick is used automatically for multi-pattern literal searches
+        (SearchMode auto or aho). Single patterns or regex fall back to per-line scan.
+
+        File gathering and string searching are both parallelized via directory partitioning
+        and chunked file processing, the same strategy as the original Find-StringInFiles.
+
+    .PARAMETER Path
+        Directory to search. Defaults to current directory. Accepts pipeline input.
+
+    .PARAMETER Patterns
+        One or more text patterns to search for. Required.
+
+    .PARAMETER Extensions
+        File glob patterns to include. Default is all files.
+
+    .PARAMETER MaxThreads
+        Max worker runspaces. Defaults to CPU count minus 1.
+
+    .PARAMETER MaxFileSizeMB
+        Skip files over this size. Default 10 MB.
+
+    .PARAMETER UseRegex
+        Treat Patterns as regex. Default is literal string matching.
+
+    .PARAMETER CaseSensitive
+        Case-sensitive matching. Default is case-insensitive.
+
+    .PARAMETER Recurse
+        Recurse subdirectories. Default $true.
+
+    .PARAMETER ExcludeFolders
+        Folder names to skip. Default: .git, node_modules, bin, obj.
+
+    .PARAMETER ExcludeExtensions
+        File extensions to skip (e.g. '.log', '.dll').
+
+    .PARAMETER ContextLines
+        Lines of context around each match. Default 0. Requires IncludeLineContent.
+
+    .PARAMETER SearchMode
+        auto   - picks aho for multi-pattern literal, manual for single
+        aho    - force Aho-Corasick
+        manual - literal IndexOf loop
+        select - not implemented (kept for compat)
+
+    .PARAMETER OutputMode
+        grouped - directory header, files indented underneath with match count and line numbers (default).
+                  text output, optimized for console readability.
+        counts  - one PSCustomObject per file with FilePath, MatchCount, LineNumbers. legacy default;
+                  use this when you need to pipe results downstream.
+        files   - just file paths.
+        matches - one row per match; include line text with IncludeLineContent.
+
+    .PARAMETER IncludeLineContent
+        Include the matching line text in results. Implicitly sets OutputMode to matches.
+
+    .EXAMPLE
+        Find-DowserString -Path . -Patterns 'TODO','FIXME' -Extensions '*.ps1' -Verbose
+
+        Searches every .ps1 file under the current directory for TODO or FIXME.
+
+    .EXAMPLE
+        Find-DowserString -Path D:\repos -Patterns 'Write-Host' -Extensions '*.ps1' -OutputMode files
+
+        Lists just the file paths under D:\repos that contain Write-Host.
+
+    .INPUTS
+        System.String
+        A directory path can be piped to this function.
+
+    .OUTPUTS
+        System.Object
+        Shape depends on OutputMode: PSCustomObject rows (counts, matches), file path
+        strings (files), or formatted console text (grouped, singlefile).
+    #>
     [CmdletBinding()]
     [OutputType([psobject])]
     param(

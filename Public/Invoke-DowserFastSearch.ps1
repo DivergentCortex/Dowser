@@ -1,49 +1,73 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Parallel text search across files using a RunspacePool.
 
-.DESCRIPTION
-    Invoke-DowserFastSearch searches for a single string across all files under
-    a given path. Uses a RunspacePool for concurrent file scanning. Returns
-    per-file match objects with file name, extension, matching line numbers,
-    and full path.
-
-    For multi-pattern or regex-based searching, use Find-DowserString instead.
-
-.PARAMETER Path
-    Root directory to search. Accepts pipeline input.
-
-.PARAMETER SearchString
-    The text string to search for. Aliased as -Pattern.
-
-.PARAMETER Threads
-    Number of concurrent worker runspaces. Default: 10.
-
-.PARAMETER Include
-    File type filter(s), e.g. '*.txt', '*.log'. Default: '*.*' (all files).
-
-.PARAMETER Exclude
-    File type exclusion filter(s).
-
-.PARAMETER CaseSensitive
-    Perform a case-sensitive search.
-
-.EXAMPLE
-    Invoke-DowserFastSearch -Path C:\Logs -SearchString 'ERROR'
-
-.EXAMPLE
-    Invoke-DowserFastSearch -Path . -Pattern 'timeout' -Include '*.log' -CaseSensitive
-
-.EXAMPLE
-    'C:\App\Logs','C:\App\Config' | Invoke-DowserFastSearch -SearchString 'ConnStr'
-
-.NOTES
-    Alias: dfast
-    Source: Invoke-FastTextSearch.ps1 (standalone scripts)
-    Related: Find-DowserString (multi-pattern, Aho-Corasick, multiple output modes)
-#>
 function Invoke-DowserFastSearch {
+    <#
+    .SYNOPSIS
+        Parallel text search across files using a RunspacePool.
+
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: dfast
+        Source: Invoke-FastTextSearch.ps1 (standalone scripts)
+        Related: Find-DowserString (multi-pattern, Aho-Corasick, multiple output modes)
+
+    .DESCRIPTION
+        Invoke-DowserFastSearch searches for a single string across all files under
+        a given path. Uses a RunspacePool for concurrent file scanning. Returns
+        per-file match objects with file name, extension, matching line numbers,
+        and full path.
+
+        For multi-pattern or regex-based searching, use Find-DowserString instead.
+
+    .PARAMETER Path
+        Root directory to search. Accepts pipeline input.
+
+    .PARAMETER SearchString
+        The text string to search for. Aliased as -Pattern.
+
+    .PARAMETER Threads
+        Number of concurrent worker runspaces. Default: 10.
+
+    .PARAMETER Include
+        File type filter(s), e.g. '*.txt', '*.log'. Default: '*.*' (all files).
+
+    .PARAMETER Exclude
+        File type exclusion filter(s).
+
+    .PARAMETER CaseSensitive
+        Perform a case-sensitive search.
+
+    .EXAMPLE
+        Invoke-DowserFastSearch -Path C:\Logs -SearchString 'ERROR'
+
+        Searches every file under C:\Logs for the literal string ERROR.
+
+    .EXAMPLE
+        Invoke-DowserFastSearch -Path . -Pattern 'timeout' -Include '*.log' -CaseSensitive
+
+        Case-sensitive search for 'timeout' across .log files under the current directory.
+
+    .EXAMPLE
+        'C:\App\Logs','C:\App\Config' | Invoke-DowserFastSearch -SearchString 'ConnStr'
+
+        Pipes two paths in and searches both for ConnStr.
+
+    .INPUTS
+        System.String
+        A directory path can be piped to this function.
+
+    .OUTPUTS
+        PSCustomObject
+        Properties: FileName, FileType, LineNumbers, FullPath.
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]

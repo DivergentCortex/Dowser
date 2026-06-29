@@ -3,6 +3,21 @@ function Get-DowserTemplate {
     .SYNOPSIS
         Retrieve Windows Explorer folder view settings: view mode and column definitions.
 
+    .NOTES
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        -  Author:        Curtis Leggett                                  -
+        =  Copyright:     2026 Divergent Cortex                           =
+        -  Organization:  Divergent Cortex                                -
+        =  Version:       See docs/CHANGELOG.md                           =
+        =-=-                       =-=-=-=-=-=-=-=                     -=-=
+        -  it is not water they seek, but the truth beneath the trees     -
+        =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+        Alias: dtemplate
+        Source: Get-FolderTemplate.ps1 (standalone scripts, had live execution code outside function)
+        Fixed: live execution code removed; -folderPath renamed to -Path; [CmdletBinding()] added.
+        Shell.Application GetDetailsOf loop (0..500) can be slow, so Write-Progress is included.
+
     .DESCRIPTION
         Uses Shell.Application COM to query a folder's current Explorer view mode
         (Details, Tiles, Icons, etc.) and the list of visible column definitions
@@ -11,7 +26,7 @@ function Get-DowserTemplate {
         Useful for understanding or cloning a folder's Explorer template when
         automating folder setup.
 
-        Windows only -- Shell.Application COM is not available on Linux/macOS.
+        Windows only. Shell.Application COM is not available on Linux or macOS.
 
     .PARAMETER Path
         The folder path to inspect. Defaults to current directory.
@@ -22,11 +37,8 @@ function Get-DowserTemplate {
     .EXAMPLE
         Get-DowserTemplate
 
-    .NOTES
-        Alias: dtemplate
-        Source: Get-FolderTemplate.ps1 (standalone scripts -- had live execution code outside function)
-        Fixed: live execution code removed; -folderPath renamed to -Path; [CmdletBinding()] added.
-        Shell.Application GetDetailsOf loop (0..500) can be slow -- Write-Progress included.
+    .OUTPUTS
+        PSCustomObject with Path, ViewMode, and Columns (array of Index/Name pairs).
     #>
     [CmdletBinding()]
     param (
