@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.037] - 2026-06-29
+### docs(CBH): Standardize comment-based help across the module with signature in NOTES
+
+What changed:
+- Added/repaired comment-based help on Dowser.psm1 and all 26 Public functions plus the 5 Private helpers: one-line SYNOPSIS, NOTES moved to sit immediately under SYNOPSIS, then DESCRIPTION, a PARAMETER entry per parameter, at least one EXAMPLE, and OUTPUTS/INPUTS where applicable
+- Placed the Curtis Leggett / Divergent Cortex framed signature block (it is not water they seek, but the truth beneath the trees) in every function's NOTES; real pre-existing metadata (Alias, Source, Ported-from) kept below the signature
+- Corrected stale example invocation names (e.g. Find-FileDuplicates -> Find-DowserDuplicate, Find-OrphanFiles -> Find-DowserOrphan) and converted em dashes and double-hyphens in help prose to ASCII
+- Verified every module file parses clean and is fully ASCII via the PowerShell AST parser; signature presence confirmed across all files
+
+Why:
+- Comment-based help was incomplete or missing on many functions and lacked a consistent author signature; this brings the whole public and private surface to one documented standard with NOTES-under-SYNOPSIS ordering and the house signature, with no logic changes
+
+
 ## [2026.06.29.036] - 2026-06-29
 ### refactor(Write-Log): Align Write-Log comments and platform-guard tests with the Witness backport
 
