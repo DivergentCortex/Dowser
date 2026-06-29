@@ -1,6 +1,5 @@
 function Get-SafeLogIdentity {
-    # Returns current user identity string, cross-platform safe.
-    # Used in CMTrace log format context field. $IsWindows null on 5.1 = Windows.
+    # $IsWindows null on 5.1 means windows
     if ($IsWindows -ne $false) {
         try {
             return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -9,7 +8,7 @@ function Get-SafeLogIdentity {
             return $env:USERNAME
         }
     }
-    # Linux/macOS: use environment variables
+    # non-windows falls back to env
     if ($env:USER) {
         return $env:USER 
     }
@@ -146,12 +145,8 @@ function Write-Log {
     )
 
     # ==================== AUTO LOG MANAGEMENT ====================
-    # Global settings (set before dot-sourcing to override defaults):
-    #   $Global:WriteLogAutoCleanup    = $true   # Enable auto-cleanup (default: $true)
-    #   $Global:WriteLogMaxSizeMB      = 10      # Max log size before rotation (default: 10MB)
-    #   $Global:WriteLogMaxAgeDays     = 7       # Delete logs older than N days (default: 7)
+    # globals override these, documented in the help block above
 
-    # Get settings from globals or use defaults
     $autoCleanup = if (Test-Path Variable:Global:WriteLogAutoCleanup) {
         $Global:WriteLogAutoCleanup 
     }
@@ -171,21 +166,19 @@ function Write-Log {
         7 
     }
 
-    # REQUIRE $LogFilePath to be set - no TEMP fallback ever
-    # caller must set $LogFilePath before dot-sourcing Write-Log.ps1
+    # no temp fallback ever, caller sets this before dot-sourcing
     if ([string]::IsNullOrWhiteSpace($Logfile)) {
         throw "FATAL: `$LogFilePath is not set. You must define `$LogFilePath BEFORE dot-sourcing Write-Log.ps1. Example:`n`$LogFilePath = Join-Path `$PSScriptRoot 'logs\MyScript_`$(Get-Date -Format 'yyyyMMdd').log'"
     }
 
-    # Resolve tilde/PS-drive paths; log file may not exist yet so use unresolved provider path
+    # unresolved because the log file may not exist yet
     $Logfile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Logfile)
 
-    # Map "Information" to "Info" for internal processing
+    # normalize the information alias
     if ($Severity -eq "Information") {
         $Severity = "Info"
     }
 
-    # Granular output control via global variables (all default to $true if not defined)
     $verboseToConsole = if (Test-Path Variable:Global:VerboseConsole) {
         $Global:VerboseConsole 
     }
@@ -211,7 +204,7 @@ function Write-Log {
         $true 
     }
 
-    # Early return if both outputs disabled for this severity (performance optimization)
+    # skip the work if nobody is listening
     if ($Severity -eq "Verbose" -and (-not $verboseToConsole) -and (-not $verboseToLogfile)) {
         return 
     }
@@ -219,43 +212,35 @@ function Write-Log {
         return 
     }
 
-    # Store original location
     $originalLocation = Get-Location
-    $isSCCMDrive = $false    # PS 2.0 compatible check for CMSite provider
+    $isSCCMDrive = $false
     if ($null -ne $originalLocation.Provider -and $originalLocation.Provider.Name -eq 'CMSite') {
         $isSCCMDrive = $true
-        # Switch to C: drive temporarily
+        # cmsite drive breaks file io
         Set-Location C:
     }
     
     try {
-        # Get caller information more reliably
-        # First, get the call stack
         $callStack = Get-PSCallStack
         
-        # Default values if we can't determine them
         $Source = "Unknown"
         $callerFunctionName = "Unknown"
         $lineNumber = "?"
         
-        # If we have a call stack with at least 2 entries (current function and caller)
         if ($null -ne $callStack -and $callStack.Count -gt 1) {
             $callerInfo = $callStack[1]
             
-            # Get the source file location
             if ($callerInfo.Location) {
                 $Source = $callerInfo.Location
             }
             
-            # Get line number for console output
             if ($callerInfo.ScriptLineNumber) {
                 $lineNumber = $callerInfo.ScriptLineNumber
             }
-            # Determine the calling function name
             if ($callerInfo.Command) {
                 $callerFunctionName = $callerInfo.Command
                 
-                # If it looks like a script path rather than a function name, extract just the script name
+                # script body shows as a path not a function
                 if ($callerFunctionName -like "*.ps1") {
                     $callerFunctionName = [System.IO.Path]::GetFileNameWithoutExtension($callerFunctionName)
                     Write-Verbose "Call from script body: $callerFunctionName"
@@ -271,44 +256,37 @@ function Write-Log {
         # 3. Script:Component if defined in the calling script
         # 4. "Unknown" as last resort
         if ([string]::IsNullOrEmpty($Component)) {
-            # PRIORITIZE function name from call stack over Script:Component
             if ($callerFunctionName -ne "Unknown" -and $callerFunctionName -notlike "*ps1") {
-                # Use the function name from the call stack if it's a proper function
                 $Component = $callerFunctionName
             }
-            # Only fall back to Script:Component if we couldn't get a function name
             elseif (Test-Path Variable:Script:Component) {
                 $Component = $Script:Component
             }
             else {
-                # Use whatever we could get from the call stack
                 $Component = $callerFunctionName
             }
         }
         
-        # Final check - make sure Component isn't empty
         if ([string]::IsNullOrEmpty($Component) -or $Component -eq "Unknown") {
-            # One last attempt - try to get it from MyInvocation of the caller
+            # last ditch, dig it out of myinvocation
             if ($callStack.Count -gt 1 -and $null -ne $callStack[1].InvocationInfo -and $null -ne $callStack[1].InvocationInfo.MyCommand) {
                 $Component = $callStack[1].InvocationInfo.MyCommand.Name
             }
             
-            # If still empty, use a default
             if ([string]::IsNullOrEmpty($Component)) {
                 $Component = "Unknown"
             }
         }
         
-        # Format dates EXACTLY as CMTrace expects them
+        # cmtrace is picky about this exact date shape
         $DateTime = Get-Date
-        # Date must be MM-dd-yyyy format
         $LogDate = $DateTime.ToString('MM-dd-yyyy')
-        # Time must be HH:mm:ss.fff format with direct UTC offset in minutes
+        # offset in raw minutes the way cmtrace wants it
         $UtcOffset = [TimeZoneInfo]::Local.GetUtcOffset($DateTime).TotalMinutes
         $LogTime = "$($DateTime.ToString('HH:mm:ss.fff'))$UtcOffset"
 
-        # Get correct severity type mapping for CMTrace - numeric codes
-        $severityType = "1" # Default to Info
+        # cmtrace severity codes
+        $severityType = "1"
         if ($Severity -eq "Error") {
             $severityType = "3" 
         }
@@ -320,7 +298,7 @@ function Write-Log {
         }
         elseif ($Severity -eq "Success") {
             $severityType = "1" 
-        } # Map to Info for CMTrace
+        } # cmtrace has no success, fold into info
         elseif ($Severity -eq "Verbose") {
             $severityType = "4" 
         }
@@ -328,7 +306,7 @@ function Write-Log {
             $severityType = "5" 
         }
 
-        # Build CMTrace compatible log line - NO SPACES between attributes
+        # cmtrace breaks if there are spaces between attributes
         $logline = "<![LOG[$Message]LOG]!>" + 
         "<time=`"$LogTime`" " + 
         "date=`"$LogDate`" " + 
@@ -338,13 +316,11 @@ function Write-Log {
         "thread=`"$PID`" " + 
         "file=`"$Source`">"
 
-        # Create log directory if needed
         $logDir = Split-Path $Logfile
         if (!(Test-Path $logDir)) {
             New-Item -Path $logDir -ItemType Directory -Force | Out-Null
         }
 
-        # Check if console output is enabled for this severity
         $shouldWriteConsole = switch ($Severity) {
             'Verbose' {
                 $verboseToConsole 
@@ -357,15 +333,13 @@ function Write-Log {
             }
         }
 
-        # Write to console if enabled
         if ($WriteBackToHost -and $shouldWriteConsole) {
-            # Truncate component name for display if too long
+            # cmtrace component field maxes out short
             $displayComponent = $Component
             if ($displayComponent.Length -gt 12) {
                 $displayComponent = $displayComponent.Substring(0, 10) + ".."
             }
 
-            # Define severity label and color mappings
             $severityConfig = @{
                 'Error'   = @{ Label = ' ERROR '; LabelColor = 'Red'; MessageColor = 'Red' }
                 'Warning' = @{ Label = ' WARNING '; LabelColor = 'Yellow'; MessageColor = 'Yellow' }
@@ -375,10 +349,8 @@ function Write-Log {
                 'Debug'   = @{ Label = ' DEBUG '; LabelColor = 'Magenta'; MessageColor = 'Magenta' }
             }
 
-            # Get configuration for current severity
             $config = $severityConfig[$Severity]
 
-            # Determine final message color (use -Color parameter if specified, otherwise default)
             $finalMessageColor = if ($PSBoundParameters.ContainsKey('Color')) {
                 $Color
             }
@@ -386,7 +358,6 @@ function Write-Log {
                 $config.MessageColor
             }
 
-            # Write formatted output: [ SEVERITY ] [Component..] [LineNum]: Message
             Write-Host "[" -NoNewline -ForegroundColor Gray
             Write-Host $config.Label -NoNewline -ForegroundColor $config.LabelColor
             Write-Host "] [" -NoNewline -ForegroundColor Gray
@@ -398,7 +369,6 @@ function Write-Log {
             Write-Host "$Message" -ForegroundColor $finalMessageColor
         }
 
-        # Check if logfile output is enabled for this severity
         $shouldWriteLogfile = switch ($Severity) {
             'Verbose' {
                 $verboseToLogfile 
@@ -412,7 +382,6 @@ function Write-Log {
         }
 
         # ==================== SIZE-BASED LOG ROTATION ====================
-        # If current log exceeds max size, rotate (rename) old file and start fresh
         if ($shouldWriteLogfile -and (Test-Path $Logfile)) {
             $currentSize = (Get-Item $Logfile).Length / 1MB
             if ($currentSize -ge $maxSizeMB) {
@@ -420,7 +389,6 @@ function Write-Log {
                 $logBase = [System.IO.Path]::GetFileNameWithoutExtension($Logfile)
                 $logExt = [System.IO.Path]::GetExtension($Logfile)
 
-                # Find next available rotation number for the ARCHIVE name
                 $rotationNum = 1
                 do {
                     $archiveName = "{0}_r{1:D2}{2}" -f $logBase, $rotationNum, $logExt
@@ -428,16 +396,14 @@ function Write-Log {
                     $rotationNum++
                 } while (Test-Path $archivePath)
 
-                # RENAME old file to archive name (removes it from original path)
                 try {
                     Rename-Item -Path $Logfile -NewName $archiveName -Force
                 }
                 catch {
-                    # If rename fails, continue writing to current file
+                    # rename lost the race, keep writing the current file
                 }
 
-                # $Logfile path now doesn't exist - will be created fresh
-                # Log rotation event as first entry in new log
+                # stamp the rotation as the first line of the fresh log
                 $rotationMsg = "<![LOG[LOG ROTATION: Previous log archived to $archiveName (exceeded ${maxSizeMB}MB)]LOG]!>" +
                 "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
                 "context=`"$(Get-SafeLogIdentity)`" " +
@@ -452,7 +418,6 @@ function Write-Log {
         }
 
         # ==================== AUTO-CLEANUP (ONCE PER SESSION) ====================
-        # Run cleanup once on first Write-Log call in this session
         $cleanupAlreadyRan = if (Test-Path Variable:Script:WriteLogCleanupRan) {
             $Script:WriteLogCleanupRan 
         }
@@ -460,20 +425,19 @@ function Write-Log {
             $false 
         }
         if ($autoCleanup -and (-not $cleanupAlreadyRan) -and (Test-Path $Logfile)) {
-            $Script:WriteLogCleanupRan = $true  # Set BEFORE cleanup to prevent recursion
+            $Script:WriteLogCleanupRan = $true  # set before cleanup or it recurses
             $logFolder = Split-Path $Logfile
             if (Test-Path $logFolder) {
                 try {
                     Remove-DowserOldLogFiles -LogFolder $logFolder -MaxAgeDays $maxAgeDays
                 }
                 catch {
-                    # Cleanup failure shouldn't break logging
+                    # cleanup dying must not kill logging
                     Write-Warning "Auto-cleanup failed: $_"
                 }
             }
         }
 
-        # Write to logfile if enabled
         if ($shouldWriteLogfile) {
             $retryCount = 0
             $writeSucceeded = $false
@@ -492,7 +456,7 @@ function Write-Log {
                     $streamWriter.WriteLine($logline)
                     $writeSucceeded = $true
 
-                    # If we had to retry, log that fact for visibility into file contention
+                    # note the contention so the lock is visible later
                     if ($retryCount -gt 0) {
                         $retryNote = "<![LOG[WRITE-LOG FILE CONTENTION: Previous entry required $retryCount retry attempt(s) due to file lock on $Logfile]LOG]!>" +
                         "<time=`"$LogTime`" date=`"$LogDate`" component=`"Write-Log`" " +
@@ -502,7 +466,7 @@ function Write-Log {
                     }
                 }
                 catch [System.IO.IOException] {
-                    # File is locked - retry if we have attempts left
+                    # locked, retry while attempts remain
                     $retryCount++
                     if ($retryCount -le $MaxRetries) {
                         Start-Sleep -Milliseconds ([int]($RetryDelay * 1000))
@@ -512,7 +476,7 @@ function Write-Log {
                     }
                 }
                 catch {
-                    # Non-lock error - don't retry
+                    # not a lock, retrying will not help
                     Write-Warning "Failed to write to log file: $_"
                     break
                 }
@@ -528,7 +492,7 @@ function Write-Log {
         }
     }
     finally {
-        # Return to original location if possible (SCCM drive may have disconnected)
+        # cmsite drive may have dropped, try anyway
         if ($isSCCMDrive) {
             try {
                 Set-Location $originalLocation -ErrorAction SilentlyContinue 
@@ -609,13 +573,9 @@ function Write-LogFinal {
         [string]$Severity = 'Info'
     )
     
-    # Write the final log message using your existing Write-Log function.
     Write-Log -Message $Message -Severity $Severity
-    
-    # Write another log message indicating that the cleanup routine is triggered.
     Write-Log -Message "Final log entry: Triggering log cleanup." -Severity 'Verbose'
     
-    # Determine the log folder -- assuming your global $LogFile variable holds the current log file path.
     $logFolder = Split-Path $LogFile
     
     try {
@@ -640,14 +600,13 @@ function Get-ExecutionContextInfo {
         }
     }
 
-    # Original Windows code continues unchanged below...
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
 
     $isSystem = $identity.Name -eq 'NT AUTHORITY\SYSTEM'
     $isAdmin = $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 
-    # Best-effort "interactive" guess: has a non-empty USERNAME and explorer.exe for that user
+    # interactive guess, find explorer owned by a user
     $interactiveUser = $null
     try {
         $explorer = Get-Process explorer -IncludeUserName -ErrorAction SilentlyContinue
