@@ -67,8 +67,9 @@ function New-DowserHiddenFolder {
             if ($PSCmdlet.ShouldProcess($Path, 'Set hidden attributes')) {
                 $folder = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
 
-                # IsWindows null on 5.1, so -ne false means windows
+                # $IsWindows is $null on PS 5.1, so -ne $false means Windows.
                 if ($IsWindows -ne $false) {
+                    # Windows: NTFS Hidden+System attributes hide the folder in Explorer.
                     $folder.Attributes = [System.IO.FileAttributes]'Hidden,System,Directory'
                     Write-Verbose "Applied Hidden+System attributes to: $Path"
 
@@ -78,8 +79,10 @@ function New-DowserHiddenFolder {
                     }
                 }
                 else {
-                    # no ntfs attrs here, hiding means a leading dot
-                    # AttributesOnly must not rename out from under the caller, so warn instead
+                    # Linux/macOS have no NTFS Hidden/System attributes. True hiding is a
+                    # leading dot on the folder name. Under -AttributesOnly we must not
+                    # rename (that would move the path out from under the caller), so we
+                    # warn honestly instead of silently doing nothing.
                     Write-Verbose 'NTFS Hidden/System attributes are Windows-only; on this platform a folder is hidden by a leading dot in its name.'
                     $leafName = $folder.Name
 
@@ -102,7 +105,8 @@ function New-DowserHiddenFolder {
                         }
                     }
 
-                    # re-read so returned attributes match disk, not a claimed value
+                    # Re-read so the returned Attributes reflect the real on-disk state,
+                    # never a claimed Hidden,System value.
                     $folder = Get-Item -LiteralPath $folder.FullName -Force -ErrorAction Stop
                     [PSCustomObject]@{
                         Path         = $folder.FullName

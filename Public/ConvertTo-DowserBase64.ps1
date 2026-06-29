@@ -45,6 +45,8 @@ param(
     [switch]$CopyToClipboard
 )
 
+# --- Main Execution ---
+
 $resolvedInput = $Path
 if (Test-Path $Path) {
     $resolvedInput = (Resolve-Path $Path).Path
@@ -57,6 +59,7 @@ if ($OutputFile) {
     $OutputFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputFile)
 }
 
+# 1. DECODE MODE
 if ($Decode) {
     if (-not $OutputFile) {
         Write-Error "Output file is required for decoding."
@@ -66,13 +69,14 @@ if ($Decode) {
     Write-Verbose "Decoding Base64 to Image..."
     
     try {
+        # Check if input is a file or raw string
         if (Test-Path $resolvedInput) {
             $b64Str = Get-Content $resolvedInput -Raw
         } else {
             $b64Str = $Path
         }
 
-        # strip data uri header before decode
+        # Strip header if present (e.g. data:image/png;base64,...)
         if ($b64Str -match "base64,") { 
             $b64Str = $b64Str.Split(",")[1] 
         }
@@ -86,6 +90,7 @@ if ($Decode) {
         Write-Error "PowerShell decoding failed: $_"
     }
 }
+# 2. ENCODE MODE
 else {
     Write-Verbose "Converting Image to Base64..."
     
@@ -112,7 +117,10 @@ else {
             Write-Verbose "Saved to file: $OutputFile"
         }
 
-        # set-clipboard missing in headless sessions, warn not throw
+        # Handle Clipboard / Console Output. Set-Clipboard is unavailable in
+        # headless/no-display sessions (common on Linux); warn instead of throwing.
+        # On clipboard failure, only fall back to the pipeline when no -OutputFile
+        # was given -- if a file is the destination, do not emit an unexpected blob.
         if ($CopyToClipboard) {
             $clipboardOk = $false
             if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
@@ -133,7 +141,8 @@ else {
         }
 
         if (-not $OutputFile -and -not $CopyToClipboard) {
-            # no destination, emit to pipeline so callers can use it
+            # No destination requested: emit the Base64 string to the pipeline so it
+            # is actually usable by callers (previously only Write-Verbose).
             Write-Output $b64
         } elseif (-not $OutputFile) {
             Write-Verbose "Length: $($b64.Length) chars"

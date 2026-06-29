@@ -100,6 +100,7 @@ function Invoke-DowserRunspacePool {
         $totalItems = $inputItems.Count
         $ComputedMaxThreads = [Math]::Max(1, $ThreadCount)
 
+        # Determine batch size
         if ($BatchSize -gt 0) {
             $chunkSize = $BatchSize
         } else {
@@ -127,14 +128,17 @@ function Invoke-DowserRunspacePool {
             $ps.RunspacePool = $pool
             [void]$ps.AddScript($ScriptBlock)
             
+            # 1st arg: the chunk of items
             [void]$ps.AddArgument($chunk)
 
+            # Subsequent args: user-provided ArgumentList
             if ($ArgumentList) {
                 foreach ($arg in $ArgumentList) {
                     [void]$ps.AddArgument($arg)
                 }
             }
 
+            # Final arg: ConcurrentQueue (if requested)
             if ($UseProgressQueue) {
                 [void]$ps.AddArgument($progressQueue)
             }
@@ -146,6 +150,7 @@ function Invoke-DowserRunspacePool {
         $totalJobs = $jobs.Count
         $startTime = Get-Date
 
+        # Wait loop with Write-Progress
         while (@($jobs | Where-Object { -not $_.Result.IsCompleted }).Count -gt 0) {
             $completedChunks = @($jobs | Where-Object { $_.Result.IsCompleted }).Count
             
@@ -178,6 +183,7 @@ function Invoke-DowserRunspacePool {
 
         Write-Progress -Activity $ProgressActivity -Status "Finalizing results..." -PercentComplete 100
 
+        # Collect and return results
         $results = [System.Collections.ArrayList]::new()
         foreach ($j in $jobs) {
             try {

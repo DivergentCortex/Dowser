@@ -28,7 +28,7 @@
 #>
 
 # visual tree builder. self-recursive. dont reorder the filter logic unless you enjoy broken connectors.
-# size and .ps1 count annotations bolt onto the folder line, computed lazily per folder
+# size and .ps1 count annotations bolt onto the folder line — computed lazily per folder.
 
 function Get-DowserMap {
     [CmdletBinding()]
@@ -74,7 +74,7 @@ function Get-DowserMap {
         [string]$MarkdownFile,
         [switch]$EmitSummary,
 
-        # internal for recursion, dont mess with these
+        # Internal (for recursion) — dont mess with these
         [string]$Indent = "",
         [int]$CurrentDepth = 0,
         [Parameter(DontShow = $true)]
@@ -104,6 +104,7 @@ function Get-DowserMap {
         if ($ext -notmatch '^\.') { return ".$ext" } else { return $ext }
     }
 
+    # --- Folder annotation helper: builds the "[1.2 GB] [14 .ps1]" suffix ---
     function Get-FolderAnnotation {
         param([string]$folderPath)
         $annotation = ''
@@ -139,6 +140,7 @@ function Get-DowserMap {
         return $annotation
     }
 
+    # Precompute normalized extension filters
     $normInclude = @()
     if ($IncludeExtensions) { $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormalizedExtension $_ }) }
 
@@ -156,7 +158,7 @@ function Get-DowserMap {
     $normExclude = @()
     if ($allExcludeExts) { $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) }
 
-    # folder exclude defaults, bypass with -NoDefaultExcludes
+    # folder exclude defaults — opinionated but documented. use -NoDefaultExcludes to bypass.
     $defaultExcludes = @(
         '__pycache__', 'node_modules', '.git', '.svn', '.hg', '.vs', '.vscode', 'obj', '.idea',
         'dist', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv', 'env', '.env',
@@ -180,6 +182,7 @@ function Get-DowserMap {
         $excludeWild  = @($allExcludes | Where-Object { $_ -match     '[\*\?\[\]]' })
     }
 
+    # file-level excludes
     $defaultExcludeFiles = @( 'settings.local.json', '.env', 'sccm.code-workspace', '*.code-workspace' )
     $allExcludeFiles = @()
     if (-not $NoDefaultExcludes) { $allExcludeFiles += $defaultExcludeFiles }
@@ -206,10 +209,14 @@ function Get-DowserMap {
         }
     }
 
-    # native separator so path compares stay valid on linux and windows
+    # path normalization helpers
+    # Internal path comparison/filtering uses the platform separator so that
+    # Get-ChildItem -LiteralPath calls and string compares stay valid on Linux
+    # (forward slash) as well as Windows (backslash). $sep is computed once.
     $sep = [string][IO.Path]::DirectorySeparatorChar
     function ConvertTo-NativeSeparator { param([string]$s) if ($null -eq $s) { return $null } if ($sep -eq '/') { return ($s -replace '\\', '/') } else { return ($s -replace '/', '\') } }
-    # regex needs backslash input so normalize locally
+    # ConvertTo-WslPath translates a Windows drive/UNC path into a /mnt style path.
+    # It needs backslash-normalized input for its regex, so it normalizes locally.
     function ConvertTo-WslPath {
         param([string]$inputPath)
         if ([string]::IsNullOrWhiteSpace($inputPath)) { return $inputPath }
@@ -237,6 +244,7 @@ function Get-DowserMap {
     $excludePaths = @()
     if ($ExcludePathPatterns) { $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) }
 
+    # IncludeFolders breakdown: exact names, wildcards, exact paths, wildcard paths
     $includeExactNames = @(); $includeWildcardNames = @()
     $includeExactPaths = @(); $includeWildcardPaths = @()
     if ($IncludeFolders) {
@@ -270,6 +278,7 @@ function Get-DowserMap {
         }
     }
 
+    # --- Parallel Pre-scan Phase ---
     if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($effectiveIncludePatterns -or $IncludeExtensions -or $IncludeFolders)) {
         Write-Verbose "Starting parallel pre-scan of '$Path' to populate caches..."
 
@@ -364,6 +373,7 @@ function Get-DowserMap {
         Write-Verbose "Pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths."
     }
 
+    # --- Filter helper functions ---
     function ConvertTo-RelativePath { param([string]$full)
         if ([string]::IsNullOrEmpty($rootFull)) { return $full }
         if ($full -and $full.Length -ge $rootFull.Length) {
@@ -429,7 +439,8 @@ function Get-DowserMap {
             if (Test-IncludeFolder $item) { return $false }
         }
         if (Test-ExcludeByPath $item) { return $true }
-        # includehidden was asked for so dont let excludes drop hidden items
+        # When -IncludeHidden is active, hidden items bypass the name-based exclude list.
+        # The user explicitly asked to see hidden items; defaultExcludes should not silently discard them.
         if ($IncludeHidden -and (Test-IsHidden $item)) { return $false }
         if ((@($excludeExact).Count -gt 0) -and ($excludeExact -contains $item.Name)) { return $true }
         if ((@($excludeWild).Count -gt 0)) {
@@ -511,6 +522,7 @@ function Get-DowserMap {
         return $false
     }
 
+    # auto-enable HTML when output file ends in .html
     if (-not $PSBoundParameters.ContainsKey('AsHtml') -and $OutputFile -and ($OutputFile -match '\.html?$')) { $AsHtml = $true }
 
     $output = @()
@@ -527,6 +539,7 @@ function Get-DowserMap {
         }
     } catch {}
 
+    # box-drawing characters
     if ($Ascii) {
         $treeChars = @{ Branch = '+-'; Last = '\\-'; Pipe = '| '; Space = '  ' }
         $fileChar = '-'; $folderChar = '+'; $errorChar = 'X'
@@ -628,6 +641,7 @@ function Get-DowserMap {
         return $finalLines
     }
 
+    # --- Non-ShowFullPathTree rendering ---
     if (-not $ShowFullPathTree) {
         $rawItems = @()
         $itemsLoaded = $true
@@ -641,7 +655,7 @@ function Get-DowserMap {
             return Complete-DirectoryMapOutput -Lines $errorLines -TreeLines $errorLines
         }
 
-        # filter before isLast or connectors break
+        # pre-filter items before calculating isLast (fixes tree connector bug)
         $filteredFolders = @(); $filteredLinks = @(); $filteredFiles = @()
         foreach ($item in $rawItems) {
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
@@ -683,6 +697,7 @@ function Get-DowserMap {
                 $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
                 $TraversalState.LinkCount++
             } elseif ($item.PSIsContainer) {
+                # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
                 $annotation = Get-FolderAnnotation -folderPath $item.FullName
                 $line = "$Indent$connector $folderChar $($item.Name)$folderSuffix$annotation"
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
@@ -699,6 +714,7 @@ function Get-DowserMap {
         return Complete-DirectoryMapOutput -Lines $output -TreeLines $output
     }
 
+    # --- ShowFullPathTree logic ("trunk" with artistic connectors) ---
     $segments = @()
     if ($LinuxPaths) {
         $displayPath = ConvertTo-WslPath $Path
@@ -740,6 +756,7 @@ function Get-DowserMap {
         return Complete-DirectoryMapOutput -Lines $errorLines -TreeLines $errorLines
     }
 
+    # filter folders
     $folders = @(); $links = @()
     foreach ($child in $children) {
         if (-not $child.PSIsContainer) { continue }
@@ -753,6 +770,7 @@ function Get-DowserMap {
         $folders += $child
     }
 
+    # filter files
     $files = @()
     if (-not $FoldersOnly -or $fileFilterActive) {
         foreach ($child in $children) {
@@ -781,6 +799,7 @@ function Get-DowserMap {
             $output += Format-HiddenLine -Line $line2 -IsHidden:(Test-IsHidden $item)
             $TraversalState.LinkCount++
         } elseif ($item.PSIsContainer) {
+            # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
             $annotation = Get-FolderAnnotation -folderPath $item.FullName
             $line = "$childrenBaseIndent$connector $folderChar $($item.Name)$folderSuffix$annotation"
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)

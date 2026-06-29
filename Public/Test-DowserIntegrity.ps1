@@ -149,6 +149,7 @@ function Test-DowserIntegrity {
     )
 
     begin {
+        # Extension buckets
         $archiveExts = @(
             '.zip', '.7z', '.rar', '.cab', '.msu', '.tar', '.gz', '.bz2', '.xz',
             '.lzh', '.lha', '.arj', '.z', '.tgz', '.tbz2', '.txz',
@@ -172,6 +173,7 @@ function Test-DowserIntegrity {
             '.cfg', '.conf', '.properties'
         )
 
+        # 7-Zip availability
         $sevenZipAvailable = (-not $SkipSevenZip) -and (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)
         if ($sevenZipAvailable) {
             Write-Verbose "7-Zip found at $SevenZipPath"
@@ -180,9 +182,11 @@ function Test-DowserIntegrity {
             Write-Verbose '7-Zip not available. Native-only validation for archives.'
         }
 
+        # expand.exe for CAB/MSU
         $expandExe = if ($IsWindows -eq $false) { $null } else { Join-Path $env:SystemRoot 'System32\expand.exe' }
         $hasExpand = $expandExe -and (Test-Path $expandExe)
 
+        # ZipFile assembly (built-in on PS 5.1+)
         try {
             Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
             Add-Type -AssemblyName System.IO.Compression -ErrorAction Stop
@@ -193,6 +197,7 @@ function Test-DowserIntegrity {
             $zipNativeAvailable = $false
         }
 
+        # Baseline load
         $baseline = $null
         if ($BaselineCsv) {
             if (-not (Test-Path -LiteralPath $BaselineCsv -PathType Leaf)) {
@@ -212,10 +217,13 @@ function Test-DowserIntegrity {
                 }
             }
             Write-Verbose "Loaded baseline: $($baseline.Count) entries from $BaselineCsv"
-            # baseline compare needs hashes
+            # Baseline implies hashing
             $ComputeHash = $true
         }
 
+        # -------------------------------------------------------------------
+        # Helper: build the result PSCustomObject
+        # -------------------------------------------------------------------
         function New-IntegrityResult {
             param($File, [string]$Category, [string]$RelPath)
             [PSCustomObject]@{
@@ -238,6 +246,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: 7z t archive test
+        # -------------------------------------------------------------------
         function Test-ArchiveWith7Zip {
             param([string]$ArchivePath, [string]$SevenZip)
             $out = & $SevenZip t $ArchivePath '-y' 2>&1 | Out-String
@@ -245,6 +256,9 @@ function Test-DowserIntegrity {
             [PSCustomObject]@{ ExitCode = $code; Output = $out }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: native ZIP full-read test
+        # -------------------------------------------------------------------
         function Test-ZipNative {
             param([string]$ZipPath)
             $zip = $null
@@ -277,15 +291,19 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: CAB/MSU test via expand.exe -D (display only, no extraction)
+        # -------------------------------------------------------------------
         function Test-CabNative {
             param([string]$CabPath, [string]$Expand)
-            # -D lists contents only, no extraction
             $out = & $Expand '-D' $CabPath 2>&1 | Out-String
             $code = $LASTEXITCODE
             [PSCustomObject]@{ ExitCode = $code; Output = $out }
         }
 
-        # ole magic check, fallback when no 7-zip
+        # -------------------------------------------------------------------
+        # Helper: MSI OLE compound-file magic check (fallback when no 7-Zip)
+        # -------------------------------------------------------------------
         function Test-MsiMagic {
             param([string]$MsiPath)
             $fs = $null
@@ -314,6 +332,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: PE structural validation
+        # -------------------------------------------------------------------
         function Test-PeStructure {
             param([string]$PePath)
 
@@ -405,6 +426,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: XmlDocument parse (catches malformed or truncated XML)
+        # -------------------------------------------------------------------
         function Test-XmlParse {
             param([string]$XmlPath)
             try {
@@ -418,6 +442,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: JSON parse
+        # -------------------------------------------------------------------
         function Test-JsonParse {
             param([string]$JsonPath)
             try {
@@ -433,6 +460,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: PowerShell AST tokenizer
+        # -------------------------------------------------------------------
         function Test-PowerShellParse {
             param([string]$PsPath)
             try {
@@ -455,7 +485,11 @@ function Test-DowserIntegrity {
             }
         }
 
-        # nul bytes in a text file mean truncation or encoding damage
+        # -------------------------------------------------------------------
+        # Helper: text-file binary-sanity check
+        # A declared text file with embedded NUL bytes is almost always
+        # truncated, replaced with a binary, or encoding-damaged.
+        # -------------------------------------------------------------------
         function Test-TextSanity {
             param([string]$TextPath, [int64]$Length)
             $fs = $null
@@ -468,7 +502,7 @@ function Test-DowserIntegrity {
                 $buf = New-Object byte[] $toRead
                 $read = $fs.Read($buf, 0, $toRead)
 
-                # utf-16 has real nuls, skip it via bom
+                # UTF-16 (LE or BE) legitimately contains NULs. Detect BOM and skip.
                 $utf16 = $false
                 if ($read -ge 2) {
                     if (($buf[0] -eq 0xFF -and $buf[1] -eq 0xFE) -or
@@ -496,6 +530,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: generic read-accessibility probe
+        # -------------------------------------------------------------------
         function Test-ReadAccess {
             param([string]$FilePath)
             $fs = $null
@@ -519,6 +556,9 @@ function Test-DowserIntegrity {
             }
         }
 
+        # -------------------------------------------------------------------
+        # Helper: extract the useful error line from 7z/expand output
+        # -------------------------------------------------------------------
         function Get-FirstErrorLine {
             param([string]$Text)
             if (-not $Text) {
@@ -534,6 +574,7 @@ function Test-DowserIntegrity {
             return (($lines | Select-Object -Last 2) -join ' | ')
         }
 
+        # Residue filename patterns (package-hygiene remnants)
         $residuePatterns = @(
             '^Thumbs\.db$',
             '^desktop\.ini$',
@@ -551,6 +592,9 @@ function Test-DowserIntegrity {
             '\.part$'
         )
 
+        # -------------------------------------------------------------------
+        # Helper: hygiene findings (attrs, ADS, residue names)
+        # -------------------------------------------------------------------
         function Get-HygieneFindings {
             param($File, [string[]]$Patterns)
             $findings = [System.Collections.Generic.List[string]]::new()
@@ -569,7 +613,7 @@ function Test-DowserIntegrity {
                 }
             }
 
-            # zone.identifier ADS is the sccm killer
+            # Alternate data streams (Zone.Identifier is the SCCM killer)
             try {
                 $streams = Get-Item -LiteralPath $File.FullName -Stream '*' -ErrorAction Stop |
                     Where-Object { $_.Stream -ne ':$DATA' }
@@ -583,12 +627,13 @@ function Test-DowserIntegrity {
                 }
             }
             catch {
-                # -Stream is windows ntfs only, nothing to find elsewhere
+                # -Stream is Windows FileSystem only; swallow on non-NTFS or access denied
             }
 
             return @($findings)
         }
 
+        # SCCM distribution risk patterns (match against Issues text)
         $sccmRiskPatterns = @(
             'Zone.Identifier ADS present',
             'Hidden attribute set',
@@ -615,12 +660,14 @@ function Test-DowserIntegrity {
         $processedCount = 0
         $allResults = [System.Collections.Generic.List[object]]::new()
 
+        # Status values that count as "problems" for default per-file emission
         $problemStatuses = @('Corrupt', 'Error', 'Warning', 'Suspicious', 'Residue')
     }
 
     process {
         foreach ($inputPath in $Path) {
 
+            # Resolve to files; also capture a root for RelativePath computation
             $files = @()
             $rootPath = $null
 
@@ -654,6 +701,7 @@ function Test-DowserIntegrity {
             foreach ($file in $files) {
                 $processedCount++
 
+                # RelativePath
                 $relPath = $file.Name
                 if ($rootPath -and $file.FullName.StartsWith($rootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $relPath = $file.FullName.Substring($rootPath.Length).TrimStart('\', '/')
@@ -666,6 +714,7 @@ function Test-DowserIntegrity {
 
                 $ext = $file.Extension.ToLowerInvariant()
 
+                # Category selection
                 $category = 'Generic'
                 if     ($peExts      -contains $ext) { $category = 'PE' }
                 elseif ($archiveExts -contains $ext) { $category = 'Archive' }
@@ -676,6 +725,9 @@ function Test-DowserIntegrity {
 
                 $result = New-IntegrityResult -File $file -Category $category -RelPath $relPath
 
+                # -------------------------------------------------------
+                # Zero-byte special case
+                # -------------------------------------------------------
                 if ($file.Length -eq 0) {
                     $result.Status = 'Warning'
                     $result.Method = 'SizeCheck'
@@ -684,6 +736,9 @@ function Test-DowserIntegrity {
                     [void]$result.Issues.Add('Zero-byte file')
                 }
                 else {
+                    # -------------------------------------------------------
+                    # Structural / format dispatch
+                    # -------------------------------------------------------
                     switch ($category) {
 
                         'Archive' {
@@ -870,7 +925,10 @@ function Test-DowserIntegrity {
                         }
 
                         default {
-                            # no validator for this type, readable is good enough, not suspicious
+                            # Generic: read-accessibility probe.
+                            # If it opens cleanly, it is OK for our purposes. We have
+                            # no format-specific test for this extension, but that is
+                            # not a reason to label every unknown type as suspicious.
                             $r = Test-ReadAccess -FilePath $file.FullName
                             if ($r.Ok) {
                                 $result.Status = 'OK'
@@ -889,6 +947,9 @@ function Test-DowserIntegrity {
                     }
                 }
 
+                # -------------------------------------------------------
+                # Hygiene scan (always on; cheap per file)
+                # -------------------------------------------------------
                 $hygiene = Get-HygieneFindings -File $file -Patterns $residuePatterns
                 foreach ($h in $hygiene) {
                     [void]$result.Issues.Add($h)
@@ -903,6 +964,9 @@ function Test-DowserIntegrity {
                     }
                 }
 
+                # -------------------------------------------------------
+                # Hashing (opt-in or implied by baseline)
+                # -------------------------------------------------------
                 if ($ComputeHash) {
                     try {
                         $h = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256 -ErrorAction Stop
@@ -916,6 +980,9 @@ function Test-DowserIntegrity {
                     }
                 }
 
+                # -------------------------------------------------------
+                # Baseline comparison (opt-in)
+                # -------------------------------------------------------
                 if ($baseline) {
                     $key = $relPath.ToUpperInvariant()
                     if ($baseline.ContainsKey($key)) {
@@ -946,6 +1013,9 @@ function Test-DowserIntegrity {
                     }
                 }
 
+                # -------------------------------------------------------
+                # SCCM distribution-risk rollup
+                # -------------------------------------------------------
                 $sccmRiskReasons = [System.Collections.Generic.List[string]]::new()
                 if ($result.Status -in @('Corrupt', 'Error', 'Suspicious', 'Residue', 'Warning')) {
                     [void]$sccmRiskReasons.Add("Status: $($result.Status)")
@@ -961,6 +1031,9 @@ function Test-DowserIntegrity {
                 $result.SccmRisk = ($sccmRiskReasons.Count -gt 0)
                 $result.SccmRiskReasons = @($sccmRiskReasons)
 
+                # -------------------------------------------------------
+                # Emit / accumulate
+                # -------------------------------------------------------
                 [void]$allResults.Add($result)
 
                 if ($Detailed) {
@@ -973,14 +1046,15 @@ function Test-DowserIntegrity {
     }
 
     end {
-        # publish detail to the global even in detailed mode
+        # Always publish full detail array to the global for drill-down
         $global:DowserIntegrityDetails = $allResults.ToArray()
 
         if ($Detailed) {
-            # per-file objects already streamed in process
+            # Nothing more to emit; per-file objects were streamed in process.
             return
         }
 
+        # --- Summary object ---
         $statusGroups = $allResults | Group-Object -Property Status -AsHashTable -AsString
         function Get-StatusCount {
             param([string]$Name)

@@ -2,19 +2,6 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
-## [2026.06.29.034] - 2026-06-29
-### docs(comments): De-slop inline comments across module scripts, comments-only pass
-
-What changed:
-- Write-Log.ps1 (example/gold standard): 38 inline comments de-slopped, killed WHAT-restatement and step-marker narration, rewrote load-bearing comments into house voice, removed a -- double-hyphen in Write-LogFinal
-- Public/ scripts (26 files) and Private/ helpers plus Aliases.ps1 swept by parallel agents: pure WHAT-restatement and section-header narration deleted, load-bearing comments rewritten terse lowercase why-not-what
-- Converted remaining em dashes in active inline comments to ASCII in Get-DowserMap.ps1 (lines 31, 77, 159) and Get-DowserReport.ps1 (line 63)
-- Preserved all banner signature headers, comment-based help blocks, #region and ==== divider lines, and param-block doc comments
-
-Why:
-- Comments restating what the code already shows are AI slop and noise; this pass enforces the house comment standard (explain why not what, terse lowercase voice, ASCII only) without any logic, string, or whitespace changes to behavior
-
-
 ## [2026.06.29.033] - 2026-06-29
 
 ### chore(go-public): History purge, GitHub hardening, final sanitization pass

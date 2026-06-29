@@ -35,7 +35,7 @@ function Get-DowserTemplate {
         [string]$Path = $PWD
     )
 
-    # needs shell.application com, IsWindows null on 5.1 means windows
+    # platform guard: needs Shell.Application COM ($IsWindows null on 5.1 = Windows)
     if ($IsWindows -eq $false) {
         Write-Warning "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform."
         return $null
