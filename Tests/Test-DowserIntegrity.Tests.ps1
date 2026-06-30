@@ -69,9 +69,9 @@ Describe 'Test-DowserIntegrity - contract' {
         Get-Command Test-DowserIntegrity -Module Dowser | Should -Not -BeNullOrEmpty
     }
 
-    It 'has the expected aliases' {
-        (Get-Alias dintegrity -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
-        (Get-Alias dinteg -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
+    It 'gains the Test-Integrity alias after Enable-DowserAliases' {
+        Enable-DowserAliases
+        (Get-Alias Test-Integrity -ErrorAction SilentlyContinue).Definition | Should -Be 'Test-DowserIntegrity'
     }
 
     It 'summary mode emits exactly one summary object' {

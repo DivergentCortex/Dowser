@@ -307,10 +307,9 @@ Describe 'Measure-DowserDiskUsage' {
     }
 
     Context 'Alias' {
-        It 'ddu alias resolves to Measure-DowserDiskUsage' {
-            $alias = Get-Alias ddu -ErrorAction SilentlyContinue
-            $alias | Should -Not -BeNullOrEmpty
-            $alias.Definition | Should -Be 'Measure-DowserDiskUsage'
+        It 'gains the Measure-DiskUsage alias after Enable-DowserAliases' {
+            Enable-DowserAliases
+            (Get-Alias Measure-DiskUsage -ErrorAction SilentlyContinue).Definition | Should -Be 'Measure-DowserDiskUsage'
         }
     }
 
