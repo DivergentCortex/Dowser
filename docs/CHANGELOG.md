@@ -3,56 +3,66 @@
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
 ## [2026.06.29.043] - 2026-06-29
+
 ### feat(aliases): Replace cryptic short aliases with opt-in normalized verb-noun forms
 
 What changed:
-- Rewrote Aliases/Aliases.ps1: dropped the d* short aliases (dfile, dgrep, dtree and friends) in favor of brandless verb-noun aliases (Find-File, Get-Info, Measure-DiskUsage, Get-Tree, and the rest of the 27)
+
+- Rewrote Aliases/Aliases.ps1: dropped the d\* short aliases (dfile, dgrep, dtree and friends) in favor of brandless verb-noun aliases (Find-File, Get-Info, Measure-DiskUsage, Get-Tree, and the rest of the 27)
 - Aliases are no longer applied on import. They register only when the caller runs the new Enable-DowserAliases function, so a public import never drops generic names into a stranger's session
 - Enable-DowserAliases refuses to shadow a builtin (Cmdlet or Application) even with -Force, leaves any other already-taken name alone unless -Force, and is idempotent when an alias is already its own
 - Exported Enable-DowserAliases from the manifest and module
 
 Why:
+
 - The old short aliases were a decoder ring, not muscle memory, and auto-exported generic names would squat command names on import. Opt-in normalized forms give the natural names without the module barging into other sessions, and builtins stay protected
 
-
 ## [2026.06.29.042] - 2026-06-29
+
 ### chore(manifest): Point ProjectUri at the DivergentCortex org
 
 What changed:
+
 - Dowser.psd1 ProjectUri now reads https://github.com/DivergentCortex/Dowser instead of the personal kizer88 URL, ahead of transferring the repo into the DivergentCortex org alongside Witness
 
 Why:
+
 - The module already brands itself Divergent Cortex in Author and CompanyName; the public home should match, and the canonical URL should be correct before the repo goes public so no stale personal URL is ever the canonical one
 
-
 ## [2026.06.29.041] - 2026-06-29
+
 ### test(Tests): Fix platform-guard tests for Write-Log model and add a logging contract test
 
 What changed:
+
 - Fixed the 5 failing tests in Test-DowserPlatformGuards.Tests.ps1. They broke because the logging refactor routes warnings and verbose through Write-Log (console plus log file) instead of PowerShell native Warning/Verbose streams, so -WarningVariable and 4>&1 captured nothing, and dot-sourced functions hit FATAL: No log file path set. The tests now Initialize-Log to a temp log file in BeforeAll (redirecting the module script scope via the module session state) and assert against the log file content instead of the streams
 - Added Tests/Test-DowserLogging.Tests.ps1 (14 tests): Initialize-Log creates the dated file and writes the SCRIPT START banner; bare Write-Log lands as type 1 Info always; Write-Log -Severity Verbose is suppressed by default and only written when VerboseLogfile is on (type 4); Write-Log -Severity Warning is always written (type 2); CMTrace wire format markers and time/date fields present; Write-Log throws FATAL when no path is configured
 - Full suite now 110 passed, 0 failed (independently re-run)
 
 Why:
+
 - The logging refactor changed where diagnostics go (Write-Log file, not the native streams), so stream-based test assertions no longer saw the messages; the tests had to assert against the log file, and a dedicated logging test was added to lock the Write-Log severity-gating contract
 
-
 ## [2026.06.29.040] - 2026-06-29
+
 ### fix(logging): Demote diagnostic Write-Log calls to Severity Verbose so they are off by default
 
 What changed:
+
 - Added -Severity Verbose to every diagnostic/operational Write-Log call across all Public functions and Private helpers; the prior pass had wrongly left them bare (Info), which made them always-on. Verbose severity is suppressed unless the caller runs with -Verbose (Write-Log honors the caller VerbosePreference via its preference bridge)
 - Left the per-function Starting/Ending announce lines bare (Info) so a normal run still logs which function ran; left -Severity Warning and -Severity Error untouched (always-on)
 - Verified by grep: zero bare Write-Log calls remain anywhere except the Starting/Ending announces; all 33 module files parse clean (AST)
 
 Why:
+
 - Operational traces that were originally Write-Verbose must stay off by default and only surface when the user passes -Verbose; promoting them to Info spammed the console and log on every normal run. Now a default run logs only the announce plus warnings and errors, and -Verbose reveals the full trace
 
-
 ## [2026.06.29.039] - 2026-06-29
+
 ### fix(Public): Demote operational diagnostics from always-on Info to Verbose in five Public functions
 
 What changed:
+
 - ConvertTo-DowserBase64.ps1: added -Severity Verbose to 7 bare Write-Log calls (decode/encode path traces, clipboard state, file save confirmation, length report)
 - ConvertTo-DowserExe.ps1: added -Severity Verbose to 6 bare Write-Log calls (compile and ConfuserEx operation traces in both ConvertTo-DowserExe and ConvertTo-DowserExeConfuserEx)
 - ConvertTo-DowserIco.ps1: added -Severity Verbose to 4 bare Write-Log calls (UNC staging, icon write confirmation, temp cleanup)
@@ -60,72 +70,82 @@ What changed:
 - Test-DowserExtractable.ps1: adding -Severity Verbose to 20 bare Write-Log calls (7-Zip probe, file enumeration, per-file analysis traces, signature matches, native ZIP/CAB probes, 7-Zip oracle results)
 
 Why:
+
 - A prior pass converted Write-Verbose diagnostics to bare Write-Log with no -Severity, making them always-on Info. These are operational step traces, not user-facing outcomes. They must be -Severity Verbose so they are silent by default and only surface when the caller passes -Verbose.
 
-
 ## [2026.06.29.038] - 2026-06-29
+
 ### refactor(logging): Route all logging through Write-Log and harden error handling across every script
 
 What changed:
+
 - Converted every native Write-Host, Write-Verbose, Write-Warning, Write-Error, Write-Debug, and Write-Information across all Public functions and Private helpers to Write-Log; Info is the default so normal entries are bare Write-Log, Warning/Error use -Severity, and -Severity Verbose is reserved for genuinely high-volume per-item traces (per-node tree helpers, per-file access-denied, report rows that fire in bulk)
-- Verified zero native Write-* remain anywhere except inside Write-Log.ps1 itself (the logger, which cannot call itself) and two Find-DowserString CBH example strings that search for the literal text 'Write-Host'
+- Verified zero native Write-\* remain anywhere except inside Write-Log.ps1 itself (the logger, which cannot call itself) and two Find-DowserString CBH example strings that search for the literal text 'Write-Host'
 - Added Starting/Ending announce lines (bare Write-Log) to every real-work function; trivial pure helpers (ConvertTo-DowserBytes, Format-DowserSize, Get-DowserSortKey) deliberately left untouched to avoid slop
 - Hardened error handling to the sandwich pattern: risky operations wrapped in try/catch, catches log the real exception (GetType().Name, ScriptLineNumber, Message) instead of a generic message, empty/silent catch blocks given real Write-Log lines, no nested try/catch
-- Write-Progress (UI) and pipeline data output (Write-Output) left intact; logs continue to land in logs/Dowser_<yyyyMMdd>.log (dated file, already configured by the module loader). All 33 module files parse clean (AST verified)
+- Write-Progress (UI) and pipeline data output (Write-Output) left intact; logs continue to land in logs/Dowser\_<yyyyMMdd>.log (dated file, already configured by the module loader). All 33 module files parse clean (AST verified)
 
 Why:
-- The module mixed native Write-* cmdlets with gated Write-Verbose, so operational activity and errors were not reliably captured in the log file; routing everything through Write-Log gives one console-plus-file surface by default, and the sandwich error handling ensures real diagnostics reach the log instead of generic or swallowed errors
 
+- The module mixed native Write-\* cmdlets with gated Write-Verbose, so operational activity and errors were not reliably captured in the log file; routing everything through Write-Log gives one console-plus-file surface by default, and the sandwich error handling ensures real diagnostics reach the log instead of generic or swallowed errors
 
 ## [2026.06.29.037] - 2026-06-29
+
 ### docs(CBH): Standardize comment-based help across the module with signature in NOTES
 
 What changed:
+
 - Added/repaired comment-based help on Dowser.psm1 and all 26 Public functions plus the 5 Private helpers: one-line SYNOPSIS, NOTES moved to sit immediately under SYNOPSIS, then DESCRIPTION, a PARAMETER entry per parameter, at least one EXAMPLE, and OUTPUTS/INPUTS where applicable
 - Placed the Curtis Leggett / Divergent Cortex framed signature block (it is not water they seek, but the truth beneath the trees) in every function's NOTES; real pre-existing metadata (Alias, Source, Ported-from) kept below the signature
 - Corrected stale example invocation names (e.g. Find-FileDuplicates -> Find-DowserDuplicate, Find-OrphanFiles -> Find-DowserOrphan) and converted em dashes and double-hyphens in help prose to ASCII
 - Verified every module file parses clean and is fully ASCII via the PowerShell AST parser; signature presence confirmed across all files
 
 Why:
+
 - Comment-based help was incomplete or missing on many functions and lacked a consistent author signature; this brings the whole public and private surface to one documented standard with NOTES-under-SYNOPSIS ordering and the house signature, with no logic changes
 
-
 ## [2026.06.29.036] - 2026-06-29
+
 ### refactor(Write-Log): Align Write-Log comments and platform-guard tests with the Witness backport
 
 What changed:
+
 - Removed leftover WHAT-narration comments from the Write-Log function body (caller-info, component-priority, and console sections) so it matches the clean comment style of the canonical DivergentCortex.Witness Write-Log
 - Updated Test-DowserPlatformGuards.Tests.ps1 to the Witness-aligned helper names: Remove-DowserOldLogFiles -> Clear-LogFile, and Get-ExecutionContextInfo -> Get-PlatformContext with the new platform shape (asserts Platform in Linux/macOS instead of SessionType eq NonWindows)
 - Verified via AST parse: no parse errors, all six functions intact
 
 Why:
+
 - The updated Write-Log.ps1 is a single-file backport of DivergentCortex.Witness; its body still carried pre-backport narration comments and the Pester suite still referenced the old helper names, which would fail after the rename
 
-
 ## [2026.06.29.035] - 2026-06-29
+
 ### fix(Get-DowserTemplate): Fix phantom process block so the function actually runs on Windows
 
 What changed:
+
 - Wrapped the platform guard in a begin block and moved the $unsupported flag check into the process block
 - process { } was previously free-floating code after a bare if, so PowerShell parsed it as a call to a nonexistent process command (AST confirmed ProcessBlock present: False), meaning the COM body never ran and the function threw on Windows
 - After the fix the AST reports ProcessBlock present: True with no parse errors; pipeline input declared by the param now binds correctly
 
 Why:
+
 - The function was broken on its target platform: free statements before a process block turn the block into a phantom command call, so the Shell.Application query never executed and Windows callers hit a process-not-recognized error
 
-
 ## [2026.06.29.034] - 2026-06-29
+
 ### docs(comments): De-slop inline comments across module scripts, comments-only pass
 
 What changed:
+
 - Write-Log.ps1 (example/gold standard): 38 inline comments de-slopped, killed WHAT-restatement and step-marker narration, rewrote load-bearing comments into house voice, removed a -- double-hyphen in Write-LogFinal
 - Public/ scripts (26 files) and Private/ helpers plus Aliases.ps1 swept by parallel agents: pure WHAT-restatement and section-header narration deleted, load-bearing comments rewritten terse lowercase why-not-what
 - Converted remaining em dashes in active inline comments to ASCII in Get-DowserMap.ps1 (lines 31, 77, 159) and Get-DowserReport.ps1 (line 63)
 - Preserved all banner signature headers, comment-based help blocks, #region and ==== divider lines, and param-block doc comments
 
 Why:
-- Comments restating what the code already shows are AI slop and noise; this pass enforces the house comment standard (explain why not what, terse lowercase voice, ASCII only) without any logic, string, or whitespace changes to behavior
 
+- Comments restating what the code already shows are AI slop and noise; this pass enforces the house comment standard (explain why not what, terse lowercase voice, ASCII only) without any logic, string, or whitespace changes to behavior
 
 ## [2026.06.29.033] - 2026-06-29
 
