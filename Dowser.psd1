@@ -13,6 +13,7 @@
         'ConvertTo-DowserBase64'
         'ConvertTo-DowserExe'
         'ConvertTo-DowserIco'
+        'Enable-DowserAliases'
         'Expand-DowserExe'
         'Find-DowserDependency'
         'Find-DowserDuplicate'
