@@ -1,103 +1,82 @@
 # Dowser
 
-Filesystem recon and inspection module for PowerShell. Point it at a path and get answers: what is there, what is duplicated, what is orphaned, what changed, what depends on what, who owns it, how big it is, and whether files are corrupt. This is a tracker's kit, not a mover's kit -- it reads and reports, it does not move your files (the only writers are ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, and Expand-DowserExe).
+> Every folder is a grave pretending to be a drawer.
 
-Runs on Windows PowerShell 5.1 and PowerShell 7+ (Windows, Linux, macOS). Functions that depend on Windows-only facilities degrade or warn rather than crash on Linux/macOS; see [Platform support](#platform-support).
+Filesystem recon for PowerShell. Point Dowser at a path and it tells you what is actually down there: what is duplicated, what changed, what got orphaned, who owns it, how much space it eats, what depends on what, and whether anything is corrupt. It reads and it reports. It does not move your files. The only four functions that write anything are ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, and Expand-DowserExe.
+
+Runs on Windows PowerShell 5.1 and PowerShell 7+, across Windows, Linux, and macOS. The handful of functions that lean on Windows-only facilities warn and step aside on other platforms instead of crashing. See [Platform support](#platform-support).
 
 ## Install
 
 ```powershell
-# Import from a local clone
 Import-Module ./Dowser/Dowser.psd1 -Force
-
-# Confirm the exported surface (27 functions plus aliases)
 Get-Command -Module Dowser
 ```
 
-No external dependencies on Windows. On Linux/macOS the archive functions need `7z` on PATH (install p7zip-full or the equivalent for your distro).
+No external dependencies on Windows. On Linux and macOS the archive functions want `7z` on PATH (install p7zip-full or whatever your distro calls it).
 
 ## Quick start
 
 ```powershell
-# Search for a string across a directory tree
-Find-DowserString -Path ~/projects -Pattern "TODO"
-
-# Find duplicate files
-Find-DowserDuplicate -Path ./src
-
-# Map a directory tree with sizes
-Get-DowserMap -Path . -IncludeSize
-
-# Find what is eating your disk (ranked rollup + HTML treemap)
+# what is eating the disk, ranked, with an HTML treemap
 Measure-DowserDiskUsage -Path . -ExportHtml ./diskusage.html
 
-# Check file integrity in a release package
+# search a whole tree for a string
+Find-DowserString -Path ~/projects -Pattern "TODO"
+
+# duplicate files, matched by hash not just name
+Find-DowserDuplicate -Path ./src
+
+# render a directory as a tree
+Get-DowserMap -Path . -IncludeSize
+
+# corruption and hygiene sweep across a release folder
 Test-DowserIntegrity -Path ./release -Recurse
 
-# Generate a file metrics report with CSV export
-Get-DowserReport -Path ./src -ExportCsv ./report.csv
+# pull one file apart: version info, PE headers, hashes
+Get-DowserProperty -Path ./bin/app.exe
 ```
 
-## Exported functions
+## What it does
 
-27 exported functions. 26 live one-per-file in `Public/`; the 27th, `Compare-DowserReport`, is dot-sourced from `Public/Get-DowserReport.ps1` and exported by name. Each carries one or more short aliases for interactive use.
+Twenty-seven functions, grouped by the question they answer.
 
-| Function                 | Alias                        | Purpose                                                                            |
-| ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------- |
-| ConvertTo-DowserBase64   | db64                         | Convert images to/from Base64 strings                                              |
-| ConvertTo-DowserExe      | dexe                         | Generate a C# EXE wrapper for a PS script (Windows)                                |
-| ConvertTo-DowserIco      | dico                         | Create .ico files from images (Windows)                                            |
-| Expand-DowserExe         | dexpand, dextract            | Extract files from extractable EXE archives via 7-Zip                              |
-| Find-DowserDependency    | ddep                         | Scan PS scripts for function calls and dot-source deps                             |
-| Find-DowserDuplicate     | ddupe                        | Detect duplicate files by name, size, or chunked hash                              |
-| Find-DowserFile          | dfile, dfind                 | Multi-threaded file search by attributes, size, date                               |
-| Find-DowserModified      | dmod                         | Find files modified on a specific date                                             |
-| Find-DowserOrphan        | dorphan                      | Find unreferenced files in a project directory                                     |
-| Find-DowserRecentLog     | dlog                         | Return the most recent log file from a directory                                   |
-| Find-DowserScript        | dscript                      | Search directory trees for script files by type                                    |
-| Find-DowserString        | dstr, dgrep                  | Multi-pattern text search with Aho-Corasick matching                               |
-| Get-DowserInfo           | dinfo                        | Report module version and latest changelog entry                                   |
-| Get-DowserMap            | dmap                         | Visual directory tree with optional size/PS1 annotations                           |
-| Get-DowserOwnership      | down                         | File ownership and Shell.Application metadata                                      |
-| Get-DowserProperty       | dprop                        | Deep single-file inspector (VersionInfo, PE, hashes)                               |
-| Get-DowserReport         | dreport                      | File metrics report with parallel processing and export                            |
-| Get-DowserTemplate       | dtemplate                    | Windows Explorer folder template configs (Windows)                                 |
-| Get-DowserTopology       | dtree, dtopo, pstree, shtree | Visual tree for any PSProvider path                                                |
-| Invoke-DowserFastSearch  | dfast                        | Parallel single-pattern text search                                                |
-| Invoke-DowserNumericSort | dsort, dnsort                | Natural numeric sort (Item-2 before Item-10)                                       |
-| Measure-DowserDirectory  | dsize                        | Directory size and file count summary                                              |
-| Measure-DowserDiskUsage  | ddu                          | WinDirStat-style recursive disk-usage report with HTML treemap                     |
-| New-DowserHiddenFolder   | dhide                        | Hide a directory: NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS |
-| Test-DowserExtractable   | dtest, dtestexe              | Classify EXEs as extractable vs decompile-required                                 |
-| Test-DowserIntegrity     | dintegrity, dinteg           | Layered corruption and hygiene detection                                           |
-| Compare-DowserReport     | dcompare                     | Diff two Get-DowserReport snapshots (NEW/CHANGED/REMOVED/UNCHANGED)                |
+**Find things.** `Find-DowserFile` is a multi-threaded search by attribute, size, and date. `Find-DowserString` runs multi-pattern text search with Aho-Corasick matching; `Invoke-DowserFastSearch` is the single-pattern parallel variant. `Find-DowserDuplicate` catches duplicates by name, size, or chunked hash. `Find-DowserModified` pulls files changed on a given date, `Find-DowserRecentLog` grabs the newest log in a directory, and `Find-DowserScript` walks a tree for script files by type.
 
-`Compare-DowserReport` ships inside `Public/Get-DowserReport.ps1` and diffs two `Get-DowserReport` snapshots. Because it shares a file with `Get-DowserReport` it has no Public/ basename of its own, so the loader exports it by name (`Export-ModuleMember` adds it explicitly) and the manifest's `FunctionsToExport` lists it. It is a normal exported public function.
+**Understand a project.** `Find-DowserOrphan` surfaces files nothing references. `Find-DowserDependency` scans scripts for calls and dot-source links. `Get-DowserReport` builds a file-metrics report with parallel processing and export, and `Compare-DowserReport` diffs two of those snapshots into NEW, CHANGED, REMOVED, and UNCHANGED.
+
+**See the shape of a tree.** `Get-DowserMap` draws a directory tree with optional size and PS1 annotations. `Get-DowserTopology` renders a tree for any PSProvider path, not just the filesystem. `Measure-DowserDirectory` gives a quick size and count summary; `Measure-DowserDiskUsage` is the WinDirStat-style recursive rollup with an HTML treemap.
+
+**Inspect a single file.** `Get-DowserProperty` is the deep inspector: VersionInfo, PE structure, hashes. `Get-DowserOwnership` reports ownership and metadata. `Test-DowserIntegrity` runs layered corruption and hygiene detection, and `Test-DowserExtractable` classifies an EXE as extractable versus decompile-required.
+
+**Convert and tuck away.** `ConvertTo-DowserBase64` moves images to and from Base64. `ConvertTo-DowserExe` wraps a PowerShell script in a C# EXE, `ConvertTo-DowserIco` builds .ico files from images, and `Expand-DowserExe` pulls files out of extractable EXE archives. `New-DowserHiddenFolder` hides a directory the right way per platform (NTFS Hidden plus System on Windows, a leading-dot rename on Linux and macOS). `Invoke-DowserNumericSort` sorts naturally, so Item-2 lands before Item-10. `Get-DowserInfo` reports the module version and latest changelog entry; `Get-DowserTemplate` reads Explorer folder-template configs on Windows.
 
 ## Platform support
 
-All functions run on Windows PowerShell 5.1 and PowerShell 7+. On Linux/macOS (PowerShell 7+ only -- 5.1 is Windows-only), behavior splits three ways:
+Everything runs on Windows PowerShell 5.1 and PowerShell 7+. On Linux and macOS (PowerShell 7+ only, since 5.1 is Windows-only) behavior splits three ways:
 
-- **Windows-only** -- emit a warning and return without producing output: ConvertTo-DowserIco, ConvertTo-DowserExe, Get-DowserTemplate. These require System.Drawing/GDI+, the C# compiler, or Shell.Application COM.
-- **Reduced** -- run and return results, minus the Windows-only enrichments (Shell.Application extended metadata, expand.exe CAB handling): Get-DowserProperty, Test-DowserExtractable, Expand-DowserExe, Test-DowserIntegrity. The archive functions need `7z` on PATH.
-- **Full cross-platform** -- identical or platform-equivalent behavior on every supported platform: everything else, including Get-DowserOwnership (returns Owner/Group/UnixMode plus a PlatformNote on Linux/macOS; the extended Shell.Application metadata is the Windows-only enrichment) and New-DowserHiddenFolder (NTFS Hidden+System on Windows, leading-dot rename on Linux/macOS).
+Windows-only, warns and returns without output: `ConvertTo-DowserIco`, `ConvertTo-DowserExe`, `Get-DowserTemplate`. These need System.Drawing/GDI+, the C# compiler, or Shell.Application COM.
 
-Platform detection happens at module load. PowerShell 5.1 lacks the `$IsWindows`/`$IsLinux`/`$IsMacOS` automatic variables, so the loader defines them (5.1 only runs on Windows, so it sets `$IsWindows = $true`). On PowerShell 7+, the engine's own automatic variables drive the guards.
+Reduced, runs and returns minus the Windows-only enrichments: `Get-DowserProperty`, `Test-DowserExtractable`, `Expand-DowserExe`, `Test-DowserIntegrity`. The archive functions need `7z` on PATH.
 
-## Naming convention
+Full cross-platform, same behavior everywhere: everything else, including `Get-DowserOwnership` (Owner, Group, and UnixMode plus a platform note off Windows) and `New-DowserHiddenFolder`.
 
-All exports follow `Verb-DowserNoun` with approved PowerShell verbs and singular nouns. Aliases carry the short-form personality; cmdlets stay boring and compliant. All aliases are defined in `Aliases/Aliases.ps1`.
+Platform detection happens at module load. PowerShell 5.1 has no `$IsWindows`/`$IsLinux`/`$IsMacOS`, so the loader defines them (5.1 only runs on Windows). On 7+, the engine's own variables drive the guards.
+
+## Short names
+
+Dowser exports its commands under their full `Verb-DowserNoun` names, so importing the module never drops generic names into your session. Want terser names at the prompt? Run `Enable-DowserAliases` (or put it in your profile) to register brandless aliases like `Find-File`, `Get-Tree`, and `Measure-DiskUsage`. It will not shadow a builtin or another module's command, so the system `pstree` on Linux stays the system `pstree`.
 
 ## Project layout
 
 ```
-Dowser.psd1            Module manifest (v0.2.0)
+Dowser.psd1            Module manifest
 Dowser.psm1            Loader: dot-sources Private, Public, Aliases
-Public/                Exported functions, one per file (26 files; Get-DowserReport.ps1 also holds Compare-DowserReport)
-Private/               Internal helpers (6 files), not exported
-Aliases/Aliases.ps1    All alias definitions
-Tests/                 Pester suites and test runner
-docs/                  Project documentation
+Public/                Exported functions, one per file
+Private/               Internal helpers, not exported
+Aliases/Aliases.ps1    Enable-DowserAliases, the opt-in alias set
+Tests/                 Pester suites and the test runner
+docs/                  Architecture, index, changelog
 ```
 
 ## License
@@ -106,6 +85,6 @@ docs/                  Project documentation
 
 ## Further reading
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- component design, data flow, design decisions
-- [docs/INDEX.md](docs/INDEX.md) -- per-function inventory with inputs, outputs, and relationships
-- [docs/CHANGELOG.md](docs/CHANGELOG.md) -- full change history
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): component design, data flow, design decisions
+- [docs/INDEX.md](docs/INDEX.md): per-function inventory with inputs, outputs, and relationships
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): full change history
