@@ -19,7 +19,7 @@ function Get-DowserTopology {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Ported from: Get-TreeTopology.ps1 (standalone scripts)
-        Aliases preserved: pstree, shtree
+        Opt-in aliases via Enable-DowserAliases: Get-Tree, pstree, shtree
 
     .DESCRIPTION
         Displays a visual tree of containers and optionally items for any PSProvider
@@ -61,8 +61,6 @@ function Get-DowserTopology {
     #>
 
     [CmdletBinding(DefaultParameterSetName = "Path")]
-    [Alias("pstree", "shtree")]
-
     param(
         [Parameter(
             Position = 0,
