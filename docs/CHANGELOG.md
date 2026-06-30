@@ -2,6 +2,16 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.042] - 2026-06-29
+### chore(manifest): Point ProjectUri at the DivergentCortex org
+
+What changed:
+- Dowser.psd1 ProjectUri now reads https://github.com/DivergentCortex/Dowser instead of the personal kizer88 URL, ahead of transferring the repo into the DivergentCortex org alongside Witness
+
+Why:
+- The module already brands itself Divergent Cortex in Author and CompanyName; the public home should match, and the canonical URL should be correct before the repo goes public so no stale personal URL is ever the canonical one
+
+
 ## [2026.06.29.041] - 2026-06-29
 ### test(Tests): Fix platform-guard tests for Write-Log model and add a logging contract test
 
