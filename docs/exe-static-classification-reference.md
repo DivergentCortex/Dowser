@@ -1,6 +1,6 @@
 # Dowser: Canonical Static-Analysis Reference
 
-## Static Classification of Windows .EXE Files — Extractable vs Requires Decompilation
+## Static Classification of Windows .EXE Files - Extractable vs Requires Decompilation
 
 ### Version: 2026.04.15.002 | Sources: verityvulture + verityfactseeker deep-research merges
 
@@ -35,9 +35,9 @@
 
 ## TERMINOLOGY
 
-- **HIGH_CONFIDENCE**: Definitive signature match — a unique byte sequence or structural marker
+- **HIGH_CONFIDENCE**: Definitive signature match - a unique byte sequence or structural marker
   with near-zero false-positive rate, derivable from primary source specification or source code.
-- **HEURISTIC**: Probabilistic match — a pattern that strongly suggests the type but can appear
+- **HEURISTIC**: Probabilistic match - a pattern that strongly suggests the type but can appear
   in other contexts or is undocumented in primary specs.
 - **Extractable**: 7-Zip, expand.exe, extrac32.exe, System.IO.Compression, or Windows Shell can
   unpack into usable artifacts (DLLs, scripts, configs, MSIs, installers).
@@ -53,9 +53,9 @@
 Every Windows EXE begins with:
 
 ```
-Offset 0x00:      4D 5A                ("MZ") — DOS header magic
-Offset 0x3C:      DWORD e_lfanew       — offset to PE signature
-Offset [e_lfanew]: 50 45 00 00         ("PE\x00\x00") — PE signature
+Offset 0x00:      4D 5A                ("MZ") - DOS header magic
+Offset 0x3C:      DWORD e_lfanew - offset to PE signature
+Offset [e_lfanew]: 50 45 00 00         ("PE\x00\x00") - PE signature
 ```
 
 The PE signature is followed by:
@@ -77,23 +77,23 @@ section) is called the **overlay**. Self-extracting archives embed their payload
 #### ZIP Archive [HIGH_CONFIDENCE]
 
 ```
-Local File Header:    50 4B 03 04  ("PK\x03\x04") — at each file entry
-Central Directory:    50 4B 01 02  ("PK\x01\x02") — per-file in EOCD region
-End of Central Dir:   50 4B 05 06  ("PK\x05\x06") — exactly once, ≥22 bytes from EOF
-End of CD (ZIP64):    50 4B 06 06  ("PK\x06\x06") — ZIP64 EOCD record
+Local File Header:    50 4B 03 04  ("PK\x03\x04") - at each file entry
+Central Directory:    50 4B 01 02  ("PK\x01\x02") - per-file in EOCD region
+End of Central Dir:   50 4B 05 06  ("PK\x05\x06") - exactly once, >=22 bytes from EOF
+End of CD (ZIP64):    50 4B 06 06  ("PK\x06\x06") - ZIP64 EOCD record
 ```
 
-**Scanning strategy — EOCD is the reliable locator**:
+**Scanning strategy - EOCD is the reliable locator**:
 
 - EOCD is exactly 22 bytes minimum: `50 4B 05 06 [diskNum:2] [startDisk:2] [entriesOnDisk:2] [totalEntries:2] [CDSize:4] [CDOffset:4] [commentLen:2]`
 - Search last 65,557 bytes (22 + max comment 65,535) from EOF for the EOCD signature
 - Validate: `i + 22 + commentLen == fileLength`
-- If valid, check `CDOffset` field — if it points into valid PE section data, it is an embedded ZIP
+- If valid, check `CDOffset` field - if it points into valid PE section data, it is an embedded ZIP
 
 **Important**: `System.IO.Compression.ZipFile.OpenRead()` uses EOCD scanning internally.
 Calling it on a PE+ZIP SFX will **succeed** automatically, finding the embedded ZIP. [HIGH_CONFIDENCE]
 
-**Source**: PKWARE APPNOTE.TXT §4.3 — https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+**Source**: PKWARE APPNOTE.TXT section 4.3 - https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 
 ```powershell
 function Find-EmbeddedZip {
@@ -130,8 +130,8 @@ https://github.com/ip7z/7zip/blob/main/CPP/7zip/Archive/7z/7zHeader.h
 
 For 7-Zip SFX, the archive begins immediately after the SFX stub PE. Typical stub sizes:
 
-- `7z.sfx` (GUI): ~120,000–130,000 bytes
-- `7zSD.sfx` (no GUI): ~40,000–50,000 bytes
+- `7z.sfx` (GUI): ~120,000-130,000 bytes
+- `7zSD.sfx` (no GUI): ~40,000-50,000 bytes
 - `7zCon.sfx` (console): varies
 
 Scan the full file for `37 7A BC AF 27 1C`. If found at offset > 0x1000 (past normal PE headers),
@@ -141,9 +141,9 @@ treat as embedded 7z.
 
 ```
 Signature:    4D 53 43 46  ("MSCF")
-Reserved1:    00 00 00 00  (must be zero — validation check)
+Reserved1:    00 00 00 00  (must be zero - validation check)
 CabinetSize:  DWORD        (total cabinet size)
-Reserved2:    00 00 00 00  (must be zero — validation check)
+Reserved2:    00 00 00 00  (must be zero - validation check)
 FirstOffset:  DWORD        (offset of first CFFILE entry)
 ```
 
@@ -166,7 +166,7 @@ Offset  Size  Field
 34      2     iCabinet
 ```
 
-**Source**: [MS-CAB] Cabinet File Format §2.2 — https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cab/
+**Source**: [MS-CAB] Cabinet File Format section 2.2 - https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cab/
 
 `expand.exe` and `extrac32.exe` both scan for `MSCF` anywhere in an EXE and will find embedded CABs.
 
@@ -194,12 +194,12 @@ function Find-EmbeddedCab {
 #### RAR Archive [HIGH_CONFIDENCE]
 
 ```
-RAR 1.5–4.x: 52 61 72 21 1A 07 00     (7 bytes: "Rar!\x1A\x07\x00")
+RAR 1.5-4.x: 52 61 72 21 1A 07 00     (7 bytes: "Rar!\x1A\x07\x00")
 RAR 5.0+:    52 61 72 21 1A 07 01 00   (8 bytes: "Rar!\x1A\x07\x01\x00")
 ```
 
 **Source**: RARLAB UnRAR source `rarformat.h` (RAR5 marker block, `static const byte HEADER5_MARK[8]`).
-WinRAR SFX stubs are typically 350–550 KB; the RAR archive appears at the overlay offset.
+WinRAR SFX stubs are typically 350-550 KB; the RAR archive appears at the overlay offset.
 
 #### WIM (Windows Imaging Format) [HIGH_CONFIDENCE]
 
@@ -217,7 +217,7 @@ Offset  Size  Field
 ```
 
 WIM total header: 208 bytes.
-**Source**: [MS-WIM] — https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-wim/
+**Source**: [MS-WIM] - https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-wim/
 
 #### XZ / LZMA2 Stream [HIGH_CONFIDENCE]
 
@@ -225,7 +225,7 @@ WIM total header: 208 bytes.
 XZ stream header: FD 37 7A 58 5A 00  (6 bytes: "\xFD7zXZ\x00")
 ```
 
-**Source**: https://tukaani.org/xz/xz-file-format-1.1.0.txt §2.1.1
+**Source**: https://tukaani.org/xz/xz-file-format-1.1.0.txt section 2.1.1
 
 #### LZMA Standalone Stream [HEURISTIC]
 
@@ -235,7 +235,7 @@ Dictionary size: 4 bytes LE DWORD (commonly 00 00 80 00 = 8 MB)
 Uncompressed size: 8 bytes (UInt64, or FF FF FF FF FF FF FF FF if unknown)
 ```
 
-HEURISTIC only — 0x5D is not a unique byte. Cross-reference with other evidence.
+HEURISTIC only - 0x5D is not a unique byte. Cross-reference with other evidence.
 Note: 7-Zip uses LZMA internally for 7z containers; the 7z container signature is the reliable outer marker.
 
 #### GZIP [HIGH_CONFIDENCE]
@@ -248,7 +248,7 @@ Signature: 1F 8B 08  (3 bytes; 08 = deflate method, always present)
 
 ```
 Stream magic: 42 5A 68  ("BZh")
-Block header:  31 41 59 26 53 59  (6 bytes — pi digits, immediately after stream magic + block size)
+Block header:  31 41 59 26 53 59  (6 bytes - pi digits, immediately after stream magic + block size)
 ```
 
 #### ZSTD [HIGH_CONFIDENCE]
@@ -265,11 +265,11 @@ Signature: D0 CF 11 E0 A1 B1 1A E1  (8 bytes at offset 0)
 
 MSI files are OLE Compound Files. If this signature appears in an EXE overlay, it contains an embedded MSI.
 
-#### ISO 9660 [HIGH_CONFIDENCE — rarely embedded]
+#### ISO 9660 [HIGH_CONFIDENCE - rarely embedded]
 
 ```
 Primary Volume Descriptor at offset 0x8001 (sector 16, 2048-byte sectors):
-Bytes 0x8001–0x8005: 01 43 44 30 30 31  (type byte 0x01 + "CD001")
+Bytes 0x8001-0x8005: 01 43 44 30 30 31  (type byte 0x01 + "CD001")
 ```
 
 Occasionally seen in dropper payloads; not a common EXE-wrapper format.
@@ -305,7 +305,7 @@ OriginalFilename: "Default.SFX" or "WinCon.SFX" or "WinRAR.exe"
 ```
 
 **Internal PE resources**: Contains RT_RCDATA resource named `"RAR"` or with ID 1000.
-**Archive location**: RAR signature `52 61 72 21 1A 07 xx` in overlay. Stub typically 350–550 KB.
+**Archive location**: RAR signature `52 61 72 21 1A 07 xx` in overlay. Stub typically 350-550 KB.
 
 #### WinZip SFX [HIGH_CONFIDENCE]
 
@@ -322,7 +322,7 @@ OriginalFilename: "WZSFX.EXE" or "WZSEPE32.EXE"
 
 #### Info-ZIP / UnZip SFX [HEURISTIC]
 
-**Strings in `.text` section** (not VersionInfo — VersionInfo often minimal or user-customized):
+**Strings in `.text` section** (not VersionInfo - VersionInfo often minimal or user-customized):
 
 ```
 "Info-ZIP's"    (literal string in binary)
@@ -394,12 +394,12 @@ in any other common framework. It is the **most reliable NSIS indicator**.
 The NSIS data block begins with the "deadbeef" signature (little-endian):
 
 ```
-EF BE AD DE  (= 0xDEADBEEF in little-endian — NSIS magic at start of first header)
+EF BE AD DE  (= 0xDEADBEEF in little-endian - NSIS magic at start of first header)
 ```
 
 **Byte-order note**: The raw bytes are `EF BE AD DE`, NOT `DE AD BE EF`. The NSIS source
-`Source/exehead/` checks for `0xDEADBEEF` as a DWORD — stored little-endian on x86 this
-becomes `EF BE AD DE` on disk. (Confirmed from verityvulture disagreements §10.)
+`Source/exehead/` checks for `0xDEADBEEF` as a DWORD - stored little-endian on x86 this
+becomes `EF BE AD DE` on disk. (Confirmed from verityvulture disagreements section 10.)
 
 NSIS source: `Contrib/Header/fileform.h`:
 
@@ -461,10 +461,10 @@ Hex for the common Inno 5.x header start:
 = "Inno Setup Setup Data (5..."
 ```
 
-#### [HIGH_CONFIDENCE] rDlPtS block (older Inno 1.x–4.x)
+#### [HIGH_CONFIDENCE] rDlPtS block (older Inno 1.x-4.x)
 
 ```
-72 44 6C 50 74 53  ("rDlPtS") — Inno Setup 1.x–4.x data block identifier
+72 44 6C 50 74 53  ("rDlPtS") - Inno Setup 1.x-4.x data block identifier
 ```
 
 #### [HEURISTIC] VersionInfo Strings
@@ -501,8 +501,8 @@ function Test-InnoSetup {
 }
 ```
 
-**Source**: innoextract — https://github.com/dscharrer/innoextract
-Official Inno Setup — https://jrsoftware.org/isinfo.php
+**Source**: innoextract - https://github.com/dscharrer/innoextract
+Official Inno Setup - https://jrsoftware.org/isinfo.php
 
 ### 2.3 InstallShield
 
@@ -530,24 +530,24 @@ The CAB `MSCF` signature appears within the `.rsrc` section.
 #### [HIGH_CONFIDENCE] Internal Strings
 
 ```
-"_ISMSIDLLS"  — InstallShield merge module marker
-"ISSetup.dll" — InstallShield setup DLL name (literal)
+"_ISMSIDLLS" - InstallShield merge module marker
+"ISSetup.dll" - InstallShield setup DLL name (literal)
 "_SETUP.DLL"
-"setup.lid"   — Language ID file
+"setup.lid" - Language ID file
 ```
 
 #### 7-Zip `Type =` output
 
 ```
 Type = Compound   (for MSI-wrapped InstallShield packages)
-Type = PE         (for pure bootstrapper EXE — 7z cannot extract)
+Type = PE         (for pure bootstrapper EXE - 7z cannot extract)
 ```
 
 InstallShield cabinet files use a proprietary CAB format handled by `i6comp`/`i5comp`, not 7-Zip.
 
 ### 2.4 WiX Toolset / MSI Burn Bootstrapper
 
-#### [HIGH_CONFIDENCE] WiX Burn — PE Section Name
+#### [HIGH_CONFIDENCE] WiX Burn - PE Section Name
 
 ```
 Section name: ".wixburn"  (8 bytes null-padded: 2E 77 69 78 62 75 72 6E 00 00)
@@ -555,7 +555,7 @@ Section name: ".wixburn"  (8 bytes null-padded: 2E 77 69 78 62 75 72 6E 00 00)
 
 This section contains the Burn manifest in structured binary format.
 
-#### [HIGH_CONFIDENCE] WiX Burn — Resource Name
+#### [HIGH_CONFIDENCE] WiX Burn - Resource Name
 
 ```
 Resource type RT_RCDATA, name "WIXBURN_MANIFEST"  (definitive)
@@ -581,8 +581,8 @@ If this signature appears in an EXE overlay, the EXE contains an embedded MSI.
 #### 7-Zip `Type =` output
 
 ```
-Type = Msi       (for .msi files — 7z can extract MSI tables and streams)
-Type = PE        (for WiX Burn bootstrapper EXE — 7z treats as PE)
+Type = Msi       (for .msi files - 7z can extract MSI tables and streams)
+Type = PE        (for WiX Burn bootstrapper EXE - 7z treats as PE)
 Type = Compound  (for OLE2 compound files)
 ```
 
@@ -591,7 +591,7 @@ Type = Compound  (for OLE2 compound files)
 #### [HIGH_CONFIDENCE] VersionInfo
 
 ```
-CompanyName: "Caphyon"  — definitive marker for Advanced Installer-built packages
+CompanyName: "Caphyon" - definitive marker for Advanced Installer-built packages
 ProductName: "Advanced Installer"
 ```
 
@@ -600,14 +600,14 @@ ProductName: "Advanced Installer"
 #### [HIGH_CONFIDENCE] Internal String
 
 ```
-"AI_SetupDir"   — resource identifier string embedded in binary
-"Advanced Installer"  — appears in binary text/resources
+"AI_SetupDir" - resource identifier string embedded in binary
+"Advanced Installer" - appears in binary text/resources
 ```
 
 #### 7-Zip `Type =` output
 
 ```
-Type = Inno   (if using Inno Setup backend — common)
+Type = Inno   (if using Inno Setup backend - common)
 Type = PE     (for native AI bootstrapper)
 Type = Nsis   (if using NSIS backend)
 ```
@@ -640,15 +640,15 @@ Type = PE  (no dedicated handler; not extractable via 7z)
 
 ```
 ProductName:  "Smart Install Maker"  (in default builds)
-CompanyName:  "Inf Solution" or custom (NOT "Nico Mak Computing" — that is WinZip)
+CompanyName:  "Inf Solution" or custom (NOT "Nico Mak Computing" - that is WinZip)
 ```
 
-**Note**: "Nico Mak Computing" is WinZip's parent company — do not confuse.
+**Note**: "Nico Mak Computing" is WinZip's parent company - do not confuse.
 
 #### Internal String
 
 ```
-"Smart Install Maker"  — appears in `.text` or `.rsrc` section data
+"Smart Install Maker" - appears in `.text` or `.rsrc` section data
 ```
 
 ### 2.8 CreateInstall
@@ -663,7 +663,7 @@ ProductName: "CreateInstall"
 #### Internal Marker
 
 ```
-"CREATEINSTALL" or "CreateInstall"  — literal string in binary
+"CREATEINSTALL" or "CreateInstall" - literal string in binary
 ```
 
 ### 2.9 Actual Installer
@@ -681,31 +681,31 @@ ProductName: user-set
 #### [HIGH_CONFIDENCE] Internal Strings
 
 ```
-"Squirrel.Windows"     — literal string
-"--squirrel-install"   — argument string in binary
+"Squirrel.Windows" - literal string
+"--squirrel-install" - argument string in binary
 ```
 
 Used by GitHub Desktop, Slack (older), Discord.
-VersionInfo FileDescription is often "Setup" (very generic — not reliable alone).
+VersionInfo FileDescription is often "Setup" (very generic - not reliable alone).
 
 ### 2.11 Installer Framework Detection Summary Table
 
-| Framework           | Section Name | VersionInfo Marker (HIGH_CONF)            | Internal / Resource Marker         | 7z Type=         |
+| Framework | Section Name | VersionInfo Marker (HIGH_CONF) | Internal / Resource Marker | 7z Type= |
 | ------------------- | ------------ | ----------------------------------------- | ---------------------------------- | ---------------- |
-| NSIS                | `.ndata`     | FileDesc: "Nullsoft Install System"       | `EF BE AD DE` in .ndata/.rsrc      | `Nsis`           |
-| Inno Setup          | Standard     | Comments: "built with Inno Setup" [HEUR]  | "Inno Setup Setup Data" in overlay | `Inno`           |
-| InstallShield       | Standard     | ProductName: contains "InstallShield"     | `ISSETUP\0` resource; `_ISMSIDLLS` | `Compound`/`PE`  |
-| WiX Burn            | `.wixburn`   | (developer-set)                           | `WIXBURN_MANIFEST` resource        | `PE` (wrapper)   |
-| MSI (pure)          | N/A          | N/A (not EXE)                             | `D0 CF 11 E0` at byte 0            | `Msi`/`Compound` |
-| Advanced Installer  | Standard     | CompanyName: "Caphyon"                    | "AI_SetupDir" string               | `Inno`/`PE`      |
-| InstallAware        | Custom       | CompanyName: "InstallAware Software Corp" | Internal strings                   | `PE`             |
-| Smart Install Maker | Standard     | ProductName: "Smart Install Maker"        | "Smart Install Maker" string       | `PE`             |
-| CreateInstall       | Standard     | CompanyName: "Gentee, Inc."               | "CREATEINSTALL" string             | `PE`             |
-| Squirrel            | Standard     | FileDesc: "Setup" [HEUR]                  | "Squirrel.Windows" string          | `PE`             |
-| WinRAR SFX          | Standard     | ProductName: "WinRAR"                     | RAR sig in overlay                 | `Rar`/`Rar5`     |
-| 7-Zip SFX           | Standard     | CompanyName: "Igor Pavlov"                | `37 7A BC AF 27 1C` in overlay     | `7z`             |
-| WinZip SFX          | Standard     | FileDesc: "WinZip Self-Extractor"         | ZIP EOCD in overlay                | `Zip`            |
-| IExpress            | Standard     | ProductName: "IExpress"                   | `MSCF` in .rsrc or overlay         | `Cab`            |
+| NSIS | `.ndata` | FileDesc: "Nullsoft Install System" | `EF BE AD DE` in .ndata/.rsrc | `Nsis` |
+| Inno Setup | Standard | Comments: "built with Inno Setup" [HEUR] | "Inno Setup Setup Data" in overlay | `Inno` |
+| InstallShield | Standard | ProductName: contains "InstallShield" | `ISSETUP\0` resource; `_ISMSIDLLS` | `Compound`/`PE` |
+| WiX Burn | `.wixburn` | (developer-set) | `WIXBURN_MANIFEST` resource | `PE` (wrapper) |
+| MSI (pure) | N/A | N/A (not EXE) | `D0 CF 11 E0` at byte 0 | `Msi`/`Compound` |
+| Advanced Installer | Standard | CompanyName: "Caphyon" | "AI_SetupDir" string | `Inno`/`PE` |
+| InstallAware | Custom | CompanyName: "InstallAware Software Corp" | Internal strings | `PE` |
+| Smart Install Maker | Standard | ProductName: "Smart Install Maker" | "Smart Install Maker" string | `PE` |
+| CreateInstall | Standard | CompanyName: "Gentee, Inc." | "CREATEINSTALL" string | `PE` |
+| Squirrel | Standard | FileDesc: "Setup" [HEUR] | "Squirrel.Windows" string | `PE` |
+| WinRAR SFX | Standard | ProductName: "WinRAR" | RAR sig in overlay | `Rar`/`Rar5` |
+| 7-Zip SFX | Standard | CompanyName: "Igor Pavlov" | `37 7A BC AF 27 1C` in overlay | `7z` |
+| WinZip SFX | Standard | FileDesc: "WinZip Self-Extractor" | ZIP EOCD in overlay | `Zip` |
+| IExpress | Standard | ProductName: "IExpress" | `MSCF` in .rsrc or overlay | `Cab` |
 
 ---
 
@@ -727,7 +727,7 @@ ps2exe produces .NET assemblies. The PE imports `mscoree.dll` with function `_Co
 Import: mscoree.dll -> _CorExeMain
 ```
 
-Additionally: `IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR` (data directory index 14) is non-zero (see §4).
+Additionally: `IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR` (data directory index 14) is non-zero (see section 4).
 
 #### [HIGH_CONFIDENCE] Embedded Script Resource
 
@@ -753,11 +753,11 @@ function Test-IsPs2exe {
 }
 ```
 
-**Note**: `ReflectionOnlyLoadFrom` is deprecated in .NET 5+. Use `MetadataLoadContext` instead (see §4.6).
+**Note**: `ReflectionOnlyLoadFrom` is deprecated in .NET 5+. Use `MetadataLoadContext` instead (see section 4.6).
 
 #### [HEURISTIC] VersionInfo
 
-No fixed fingerprint — authors customize freely. Default FileVersion is often "0.0.0.0".
+No fixed fingerprint - authors customize freely. Default FileVersion is often "0.0.0.0".
 
 #### 7-Zip `Type =`
 
@@ -796,7 +796,7 @@ Resource type: RT_RCDATA (type 10 = 0x0A)
 Resource name: "SCRIPT" or ">AUTOIT SCRIPT<" pattern
 ```
 
-#### [HIGH_CONFIDENCE] VersionInfo (default — frequently overridden)
+#### [HIGH_CONFIDENCE] VersionInfo (default - frequently overridden)
 
 ```
 FileDescription: "AutoIt v3 Script"
@@ -830,10 +830,10 @@ Resource type: RT_RCDATA (10)
 Resource name: ">AUTOHOTKEY SCRIPT<"  (literal string, exact match)
 ```
 
-#### [HIGH_CONFIDENCE] VersionInfo (default — overridable)
+#### [HIGH_CONFIDENCE] VersionInfo (default - overridable)
 
 ```
-OriginalFilename: "AutoHotkey.exe"  (v1) or "AutoHotkey64.exe" (v2)  — very reliable
+OriginalFilename: "AutoHotkey.exe"  (v1) or "AutoHotkey64.exe" (v2) - very reliable
 FileDescription:  "AutoHotkey"
 CompanyName:      "AutoHotkey Foundation LLC" (v2) or "AutoHotkey.com" (v1)
 ProductName:      "AutoHotkey"
@@ -845,7 +845,7 @@ ProductName:      "AutoHotkey"
 
 ### 3.4 PyInstaller
 
-**Extractable**: Partial — requires `pyinstxtractor` (https://github.com/extremecoders-re/pyinstxtractor).
+**Extractable**: Partial - requires `pyinstxtractor` (https://github.com/extremecoders-re/pyinstxtractor).
 7-Zip reports `Type = PE` and cannot extract the PKG archive.
 
 #### [HIGH_CONFIDENCE] CArchive PKG Trailer Magic
@@ -876,7 +876,7 @@ Offset  Size  Field
 
 https://github.com/pyinstaller/pyinstaller
 
-**CONFLICT RESOLVED**: verityfactseeker listed `4D 45 49 00 00 00 00 00` — this is INCORRECT.
+**CONFLICT RESOLVED**: verityfactseeker listed `4D 45 49 00 00 00 00 00` - this is INCORRECT.
 The authoritative verityvulture source (direct from bootloader C source) gives `4D 45 49 0C 0B 0A 0B 0E`.
 
 Scan the **last 4,096 bytes** (not exact EOF - 24) to handle alignment variations across versions.
@@ -903,9 +903,9 @@ function Test-IsPyInstaller {
 #### [HIGH_CONFIDENCE] Binary Strings
 
 ```
-"_MEIPASS"                       — PyInstaller temp directory name (always present)
-"pyi-windows-manifest-filename"  — PyInstaller manifest injection string
-"PyInstaller:"                   — appears in --version output string embedded in binary
+"_MEIPASS" - PyInstaller temp directory name (always present)
+"pyi-windows-manifest-filename" - PyInstaller manifest injection string
+"PyInstaller:" - appears in --version output string embedded in binary
 ```
 
 #### 7-Zip `Type =`
@@ -929,12 +929,12 @@ Imports: python3X.dll  (explicit import, visible in import table)
 Strings: "cx_Freeze", "bootstrap"
 ```
 
-When ZIP-mode is enabled: creates `library.zip` alongside the EXE — not embedded in the EXE.
+When ZIP-mode is enabled: creates `library.zip` alongside the EXE - not embedded in the EXE.
 If single EXE with embedded ZIP is found: scan for ZIP signatures (py stdlib may be ZIP-compressed).
 
 ### 3.6 Nuitka
 
-**Extractable**: NO — compiled native C code. Requires Ghidra/IDA Pro.
+**Extractable**: NO - compiled native C code. Requires Ghidra/IDA Pro.
 
 #### [HEURISTIC] Detection
 
@@ -945,27 +945,27 @@ Strings: "NUITKA_VERSION"  (env variable name injected into binary)
          "nuitka"          (may appear in metadata strings)
 ```
 
-Nuitka compiles Python → C → native machine code. No bytecode to extract.
+Nuitka compiles Python -> C -> native machine code. No bytecode to extract.
 
 ### 3.7 pkg (Node.js / Vercel)
 
-**Extractable**: Partial — VFS ZIP in overlay is technically extractable, but contents are compiled `.node` modules.
+**Extractable**: Partial - VFS ZIP in overlay is technically extractable, but contents are compiled `.node` modules.
 
 #### [HIGH_CONFIDENCE] Internal Strings
 
 Vercel pkg:
 
 ```
-"/snapshot/"             — virtual filesystem path prefix
-"PKG_PAYLOAD_POSITION"   — environment variable name (trailer)
-"pkg/payload"            — payload identifier string
+"/snapshot/" - virtual filesystem path prefix
+"PKG_PAYLOAD_POSITION" - environment variable name (trailer)
+"pkg/payload" - payload identifier string
 ```
 
 Node.js SEA (Single Executable Application, Node 18+):
 
 ```
-"SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2"  — Node.js SEA fuse string [DEFINITIVE]
-"NODE_SEA_BLOB"                               — SEA blob name
+"SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2" - Node.js SEA fuse string [DEFINITIVE]
+"NODE_SEA_BLOB" - SEA blob name
 ```
 
 **Source**: https://nodejs.org/api/single-executable-applications.html;
@@ -978,17 +978,17 @@ with the ZIP EOCD scan. 7-Zip may extract virtual filesystem paths (`/snapshot/.
 
 ### 3.8 Electron (ASAR packed)
 
-**Extractable**: YES — ASAR format; use `npx asar extract app.asar output/`.
+**Extractable**: YES - ASAR format; use `npx asar extract app.asar output/`.
 
 #### [HIGH_CONFIDENCE] ASAR Magic Bytes
 
 ASAR is a pickle-based format. Header structure:
 
 ```
-Bytes 0–3:   04 00 00 00  (uint32 LE = 4, header size indicator)
-Bytes 4–7:   XX XX XX XX  (size of header JSON pickle)
-Bytes 8–11:  XX XX XX XX  (pickle size again)
-Bytes 12–15: XX XX XX XX  (JSON string length)
+Bytes 0-3:   04 00 00 00  (uint32 LE = 4, header size indicator)
+Bytes 4-7:   XX XX XX XX  (size of header JSON pickle)
+Bytes 8-11:  XX XX XX XX  (pickle size again)
+Bytes 12-15: XX XX XX XX  (JSON string length)
 Bytes 16+:   {"files":{   (JSON header data starts here)
 ```
 
@@ -1000,11 +1000,11 @@ In single-file builds (electron-builder portable), ASAR may be embedded in the E
 #### [HIGH_CONFIDENCE] Binary Strings
 
 ```
-"ELECTRON_RUN_AS_NODE"    — environment variable (always present)
-"--type=renderer"         — Chromium argument
-"Chromium"                — embedded in binary
-"v8_context_snapshot"     — V8 snapshot reference
-"app.asar"                — path string (if hardcoded)
+"ELECTRON_RUN_AS_NODE" - environment variable (always present)
+"--type=renderer" - Chromium argument
+"Chromium" - embedded in binary
+"v8_context_snapshot" - V8 snapshot reference
+"app.asar" - path string (if hardcoded)
 ```
 
 #### 7-Zip `Type =`
@@ -1015,7 +1015,7 @@ Type = PE  (standard PE analysis; ASAR not understood by 7z directly)
 
 ### 3.9 Go Compiled Binaries
 
-**Extractable**: NO — compiled native code. Requires Ghidra/Binary Ninja.
+**Extractable**: NO - compiled native code. Requires Ghidra/Binary Ninja.
 
 #### [HIGH_CONFIDENCE] Import Table
 
@@ -1048,8 +1048,8 @@ Definitive Go binary indicator (added Go 1.13+).
 #### [MEDIUM_CONFIDENCE] Additional Go Section Names
 
 ```
-.noptrdata  — Go no-pointer data section
-.noptrbss   — Go no-pointer BSS section
+.noptrdata - Go no-pointer data section
+.noptrbss - Go no-pointer BSS section
 ```
 
 These section names are Go-specific but less universally present than `.go.buildinfo`.
@@ -1078,13 +1078,13 @@ function Test-IsGoBinary {
 
 ### 3.10 Rust Compiled Binaries
 
-**Extractable**: NO — compiled native code. Requires Ghidra/IDA Pro.
+**Extractable**: NO - compiled native code. Requires Ghidra/IDA Pro.
 
 #### [HIGH_CONFIDENCE] Panic String
 
 ```
-"panicked at"  — Rust panic message (literal, always present in Rust binaries)
-"called `Option::unwrap()` on a `None` value"  — very distinctive Rust string
+"panicked at" - Rust panic message (literal, always present in Rust binaries)
+"called `Option::unwrap()` on a `None` value" - very distinctive Rust string
 ```
 
 #### [HEURISTIC] Import Table
@@ -1096,18 +1096,18 @@ GNU/MinGW:      kernel32.dll, msvcrt.dll
 
 ### 3.11 Script-to-EXE Detection Summary Table
 
-| Tool        | Magic/Binary Marker                         | VersionInfo Default                | .NET? | Extractable?             |
+| Tool | Magic/Binary Marker | VersionInfo Default | .NET? | Extractable? |
 | ----------- | ------------------------------------------- | ---------------------------------- | ----- | ------------------------ |
-| ps2exe      | mscoree.dll import; COM_DESCRIPTOR non-zero | Custom (blank defaults)            | YES   | NO (needs ILSpy)         |
-| AutoIt      | `41 55 33 21 45 41 30 36` in overlay/rsrc   | "AutoIt v3 Script" / "AutoIt Team" | NO    | NO (needs Exe2Aut)       |
-| AutoHotkey  | `>AUTOHOTKEY SCRIPT<` resource name         | OriginalFilename="AutoHotkey.exe"  | NO    | NO (needs Exe2Ahk)       |
-| PyInstaller | `4D 45 49 0C 0B 0A 0B 0E` near EOF          | Custom (none by default)           | NO    | Partial (pyinstxtractor) |
-| cx_Freeze   | python3X.dll import                         | Custom                             | NO    | NO (stub EXE)            |
-| Nuitka      | "NUITKA_VERSION" string; python3X.dll [opt] | Custom                             | NO    | NO (compiled native)     |
-| pkg (Node)  | "PKG_PAYLOAD_POSITION"; "/snapshot/"        | Custom                             | NO    | Partial (ZIP in overlay) |
-| Electron    | "ELECTRON_RUN_AS_NODE" string               | App-specific                       | NO    | YES (ASAR tool)          |
-| Go          | FF 20 47 6F... ; `.go.buildinfo` section    | None                               | NO    | NO (compiled native)     |
-| Rust        | "panicked at" string                        | None                               | NO    | NO (compiled native)     |
+| ps2exe | mscoree.dll import; COM_DESCRIPTOR non-zero | Custom (blank defaults) | YES | NO (needs ILSpy) |
+| AutoIt | `41 55 33 21 45 41 30 36` in overlay/rsrc | "AutoIt v3 Script" / "AutoIt Team" | NO | NO (needs Exe2Aut) |
+| AutoHotkey | `>AUTOHOTKEY SCRIPT<` resource name | OriginalFilename="AutoHotkey.exe" | NO | NO (needs Exe2Ahk) |
+| PyInstaller | `4D 45 49 0C 0B 0A 0B 0E` near EOF | Custom (none by default) | NO | Partial (pyinstxtractor) |
+| cx_Freeze | python3X.dll import | Custom | NO | NO (stub EXE) |
+| Nuitka | "NUITKA_VERSION" string; python3X.dll [opt] | Custom | NO | NO (compiled native) |
+| pkg (Node) | "PKG_PAYLOAD_POSITION"; "/snapshot/" | Custom | NO | Partial (ZIP in overlay) |
+| Electron | "ELECTRON_RUN_AS_NODE" string | App-specific | NO | YES (ASAR tool) |
+| Go | FF 20 47 6F... ; `.go.buildinfo` section | None | NO | NO (compiled native) |
+| Rust | "panicked at" string | None | NO | NO (compiled native) |
 
 ---
 
@@ -1165,7 +1165,7 @@ If RVA == 0 AND Size == 0:  NOT a .NET assembly
 If RVA != 0 AND Size >= 72: IS a .NET assembly  [HIGH_CONFIDENCE]
 ```
 
-**Source**: ECMA-335 §25.3.3; Microsoft PE/COFF Specification v14.0 §6.1.3.3
+**Source**: ECMA-335 section 25.3.3; Microsoft PE/COFF Specification v14.0 section 6.1.3.3
 https://www.ecma-international.org/publications-and-standards/standards/ecma-335/
 https://docs.microsoft.com/en-us/windows/win32/debug/pe-format
 
@@ -1198,13 +1198,13 @@ typedef struct IMAGE_COR20_HEADER {
 **Flags field** (COMIMAGE_FLAGS):
 
 ```
-0x00000001  COMIMAGE_FLAGS_ILONLY           — Pure IL (no native code)
-0x00000002  COMIMAGE_FLAGS_32BITREQUIRED    — 32-bit only
-0x00000004  COMIMAGE_FLAGS_IL_LIBRARY       — DLL, not EXE
-0x00000008  COMIMAGE_FLAGS_STRONGNAMESIGNED — Has strong name
-0x00000010  COMIMAGE_FLAGS_NATIVE_ENTRYPOINT— Native entry point (mixed mode)
+0x00000001  COMIMAGE_FLAGS_ILONLY - Pure IL (no native code)
+0x00000002  COMIMAGE_FLAGS_32BITREQUIRED - 32-bit only
+0x00000004  COMIMAGE_FLAGS_IL_LIBRARY - DLL, not EXE
+0x00000008  COMIMAGE_FLAGS_STRONGNAMESIGNED - Has strong name
+0x00000010  COMIMAGE_FLAGS_NATIVE_ENTRYPOINT - Native entry point (mixed mode)
 0x00010000  COMIMAGE_FLAGS_TRACKDEBUGDATA
-0x00020000  COMIMAGE_FLAGS_PREFER32BIT      — Prefer 32-bit
+0x00020000  COMIMAGE_FLAGS_PREFER32BIT - Prefer 32-bit
 ```
 
 ### 4.3 .NET Metadata Root Signature
@@ -1218,7 +1218,7 @@ The .NET metadata root begins at MetaDataRVA and starts with:
 This 4-byte "BSJB" magic identifies the .NET metadata root. Scanning a .NET assembly's `.text`
 section for this 4-byte sequence will locate the metadata root.
 
-### 4.4 PowerShell .NET Detection (Raw PE Method — Safe for Untrusted Binaries)
+### 4.4 PowerShell .NET Detection (Raw PE Method - Safe for Untrusted Binaries)
 
 ```powershell
 function Test-DotNetAssembly {
@@ -1257,7 +1257,7 @@ function Test-DotNetAssembly {
 }
 ```
 
-### 4.5 Easier Method: AssemblyName (Loads Metadata — Not for Untrusted Files)
+### 4.5 Easier Method: AssemblyName (Loads Metadata - Not for Untrusted Files)
 
 ```powershell
 try {
@@ -1272,9 +1272,9 @@ try {
 ```
 
 **Caveat**: This loads file metadata into the AppDomain. For untrusted binaries, prefer the
-raw byte-offset method in §4.4.
+raw byte-offset method in section 4.4.
 
-### 4.6 MetadataLoadContext (.NET 5+ — Replacement for ReflectionOnlyLoadFrom)
+### 4.6 MetadataLoadContext (.NET 5+ - Replacement for ReflectionOnlyLoadFrom)
 
 ```powershell
 # .NET 5+ safe reflection (ReflectionOnlyLoadFrom is deprecated/throws in .NET 5+)
@@ -1293,12 +1293,12 @@ $ctx.Dispose()
 #### ps2exe / Script Wrapper .NET [NOT Extractable]
 
 - COM_DESCRIPTOR populated (IsDotNet=true)
-- Single EXE, small (10 KB–500 KB typically)
+- Single EXE, small (10 KB - 500 KB typically)
 - Imports ONLY `mscoree.dll`
-- `GetManifestResourceNames()` returns 1–3 resources; one matches `SCRIPT`/`ps2exe`
+- `GetManifestResourceNames()` returns 1-3 resources; one matches `SCRIPT`/`ps2exe`
 - Assembly references include `System.Management.Automation`
 
-#### ClickOnce [NOT Embedded — Downloads Payload]
+#### ClickOnce [NOT Embedded - Downloads Payload]
 
 - Imports `dfshim.dll` (ClickOnce deployment shim) [HIGH_CONFIDENCE]
 - VersionInfo `Comments` often contains "ClickOnce"
@@ -1308,9 +1308,9 @@ $ctx.Dispose()
 
 `dotnet publish --self-contained true --single-file true` embeds all DLLs as resources.
 
-Detection signatures — two complementary methods:
+Detection signatures - two complementary methods:
 
-**Method A** — ASCII string embedded in binary [HIGH_CONFIDENCE]:
+**Method A** - ASCII string embedded in binary [HIGH_CONFIDENCE]:
 
 ```
 ".NET Bundle"  = 2E 4E 45 54 20 42 75 6E 64 6C 65  (11 bytes, near EOF)
@@ -1318,7 +1318,7 @@ Detection signatures — two complementary methods:
 
 Bundle GUID string also present: `"6b6f9bd7-da7b-4cc3-8e3e-e18e64949b88"`
 
-**Method B** — 32-byte BundleSignature near EOF [HIGH_CONFIDENCE]:
+**Method B** - 32-byte BundleSignature near EOF [HIGH_CONFIDENCE]:
 
 ```
 8B 12 02 B9 6A 61 20 38 D6 AF 45 6E 60 F9 A4 98
@@ -1364,43 +1364,43 @@ Resource name pattern: costura.<assemblyname>.dll.compressed   [HIGH_CONFIDENCE]
 `7z l <file>` outputs `Type = <value>`. This value comes directly from the archive handler name.
 **Source**: 7-Zip source `CPP/7zip/UI/Common/ArchiveCommandLine.cpp` and handlers in `CPP/7zip/Archive/`.
 
-| Type= Value | Meaning                                 | Extractable?  | Notes                      |
+| Type= Value | Meaning | Extractable? | Notes |
 | ----------- | --------------------------------------- | ------------- | -------------------------- |
-| `PE`        | Windows PE (native/unrecognized format) | NO            | PE sections shown as paths |
-| `7z`        | 7-Zip archive                           | YES           |                            |
-| `Zip`       | ZIP / OOXML / JAR / APK                 | YES           |                            |
-| `Rar`       | RAR v1.5–4.x                            | YES           |                            |
-| `Rar5`      | RAR v5.0+                               | YES           |                            |
-| `Cab`       | Microsoft Cabinet                       | YES           | Also: `expand.exe`         |
-| `Iso`       | ISO 9660 / UDF disc image               | YES           |                            |
-| `Msi`       | Windows Installer MSI (OLE2)            | YES           |                            |
-| `Nsis`      | NSIS installer                          | YES           | Full file tree             |
-| `Inno`      | Inno Setup installer                    | YES           | `{app}\` path prefixes     |
-| `Compound`  | OLE2 Compound Document (generic)        | YES           | MSI, old Office docs       |
-| `Wim`       | Windows Imaging Format                  | YES           | Also: DISM                 |
-| `Tar`       | TAR archive                             | YES           |                            |
-| `GZip`      | .gz                                     | YES           |                            |
-| `BZip2`     | .bz2                                    | YES           |                            |
-| `Xz`        | XZ / LZMA2 stream                       | YES           |                            |
-| `Lzma`      | Raw LZMA stream                         | YES           |                            |
-| `Lzma86`    | LZMA86 stream                           | YES           |                            |
-| `Lzh`       | LHA/LZH archive                         | YES           |                            |
-| `Arj`       | ARJ archive                             | YES           |                            |
-| `Cpio`      | CPIO archive                            | YES           |                            |
-| `Rpm`       | RPM package                             | YES           |                            |
-| `Deb`       | Debian package                          | YES           |                            |
-| `Dmg`       | Apple disk image                        | YES (limited) |                            |
-| `Hfs`       | HFS/HFS+ filesystem                     | YES           |                            |
-| `Udf`       | UDF filesystem                          | YES           |                            |
-| `Fat`       | FAT filesystem image                    | YES           |                            |
-| `Ntfs`      | NTFS filesystem image                   | YES           |                            |
-| `SquashFs`  | SquashFS filesystem                     | YES           |                            |
-| `Ext`       | ext2/3/4 filesystem                     | YES           |                            |
-| `Swf`       | SWF Flash file                          | NO            | Analysis only              |
-| `Swfc`      | Compressed SWF                          | Partial       |                            |
-| `Ppmd`      | PPMd stream                             | YES           |                            |
-| `Elf`       | ELF binary                              | NO            | Analysis only              |
-| `Macho`     | Mach-O binary                           | NO            | Analysis only              |
+| `PE` | Windows PE (native/unrecognized format) | NO | PE sections shown as paths |
+| `7z` | 7-Zip archive | YES | |
+| `Zip` | ZIP / OOXML / JAR / APK | YES | |
+| `Rar` | RAR v1.5-4.x | YES | |
+| `Rar5` | RAR v5.0+ | YES | |
+| `Cab` | Microsoft Cabinet | YES | Also: `expand.exe` |
+| `Iso` | ISO 9660 / UDF disc image | YES | |
+| `Msi` | Windows Installer MSI (OLE2) | YES | |
+| `Nsis` | NSIS installer | YES | Full file tree |
+| `Inno` | Inno Setup installer | YES | `{app}\` path prefixes |
+| `Compound` | OLE2 Compound Document (generic) | YES | MSI, old Office docs |
+| `Wim` | Windows Imaging Format | YES | Also: DISM |
+| `Tar` | TAR archive | YES | |
+| `GZip` | .gz | YES | |
+| `BZip2` | .bz2 | YES | |
+| `Xz` | XZ / LZMA2 stream | YES | |
+| `Lzma` | Raw LZMA stream | YES | |
+| `Lzma86` | LZMA86 stream | YES | |
+| `Lzh` | LHA/LZH archive | YES | |
+| `Arj` | ARJ archive | YES | |
+| `Cpio` | CPIO archive | YES | |
+| `Rpm` | RPM package | YES | |
+| `Deb` | Debian package | YES | |
+| `Dmg` | Apple disk image | YES (limited) | |
+| `Hfs` | HFS/HFS+ filesystem | YES | |
+| `Udf` | UDF filesystem | YES | |
+| `Fat` | FAT filesystem image | YES | |
+| `Ntfs` | NTFS filesystem image | YES | |
+| `SquashFs` | SquashFS filesystem | YES | |
+| `Ext` | ext2/3/4 filesystem | YES | |
+| `Swf` | SWF Flash file | NO | Analysis only |
+| `Swfc` | Compressed SWF | Partial | |
+| `Ppmd` | PPMd stream | YES | |
+| `Elf` | ELF binary | NO | Analysis only |
+| `Macho` | Mach-O binary | NO | Analysis only |
 
 **KEY RULE**: When 7-Zip opens an SFX .exe, it identifies the **inner** archive format and reports
 THAT as Type= (not "SFX"). A WinRAR SFX shows `Type = Rar5`, a 7-Zip SFX shows `Type = 7z`,
@@ -1408,7 +1408,7 @@ an NSIS installer shows `Type = Nsis`, a plain PE shows `Type = PE`.
 
 ### 5.2 PE-Section Paths vs Real File Paths
 
-When `Type = PE`, 7-Zip lists PE sections and resources as virtual paths — NOT real files:
+When `Type = PE`, 7-Zip lists PE sections and resources as virtual paths - NOT real files:
 
 **PE-section path patterns** (NOT real files):
 
@@ -1432,8 +1432,8 @@ setup.exe                        (embedded executable)
 
 **Decision rule**:
 
-- If ALL paths match PE section patterns (`.`-prefixed or known section names) → `Type = PE` only, NOT extractable
-- If paths include real-looking file names with extensions (`.dll`, `.exe`, `.cfg`, `.msi`) → extractable
+- If ALL paths match PE section patterns (`.`-prefixed or known section names) -> `Type = PE` only, NOT extractable
+- If paths include real-looking file names with extensions (`.dll`, `.exe`, `.cfg`, `.msi`) -> extractable
 - Exception: `.rsrc\1\RCDATA\<name>` can contain extractable resources
 
 ### 5.3 Nested Archive Inspection
@@ -1475,21 +1475,21 @@ function Test-7zExtractable {
 
 ### 5.4 7-Zip Detection Behaviors by Framework
 
-| Input                  | Type=            | Lists real files? | Notes                             |
+| Input | Type= | Lists real files? | Notes |
 | ---------------------- | ---------------- | ----------------- | --------------------------------- |
-| NSIS .exe              | `Nsis`           | YES               | Full file tree (caveat: see §10)  |
-| Inno .exe              | `Inno`           | YES               | {app}\ paths                      |
-| 7z SFX .exe            | `7z`             | YES               | Archive contents                  |
-| WinRAR SFX .exe        | `Rar`/`Rar5`     | YES               | Archive contents                  |
-| WinZip SFX .exe        | `Zip`            | YES               | Archive contents                  |
-| WinZip SFX .exe        | `Zip`            | YES               | Archive contents                  |
-| InstallShield .exe     | `Compound`/`PE`  | Partial           | May need IS-specific tools        |
-| WiX Burn .exe          | `PE`             | NO (sections)     | `.wixburn` present but not parsed |
-| MSI .msi               | `Msi`/`Compound` | YES               | Tables and streams                |
-| ps2exe .exe            | `PE`             | NO                | .NET sections only                |
-| AutoIt .exe            | `PE`             | NO                | PE sections only                  |
-| PyInstaller .exe       | `PE`             | NO                | Needs pyinstxtractor              |
-| Native C++/Go/Rust EXE | `PE`             | NO                | PE sections only                  |
+| NSIS .exe | `Nsis` | YES | Full file tree (caveat: see section 10) |
+| Inno .exe | `Inno` | YES | {app}\ paths |
+| 7z SFX .exe | `7z` | YES | Archive contents |
+| WinRAR SFX .exe | `Rar`/`Rar5` | YES | Archive contents |
+| WinZip SFX .exe | `Zip` | YES | Archive contents |
+| WinZip SFX .exe | `Zip` | YES | Archive contents |
+| InstallShield .exe | `Compound`/`PE` | Partial | May need IS-specific tools |
+| WiX Burn .exe | `PE` | NO (sections) | `.wixburn` present but not parsed |
+| MSI .msi | `Msi`/`Compound` | YES | Tables and streams |
+| ps2exe .exe | `PE` | NO | .NET sections only |
+| AutoIt .exe | `PE` | NO | PE sections only |
+| PyInstaller .exe | `PE` | NO | Needs pyinstxtractor |
+| Native C++/Go/Rust EXE | `PE` | NO | PE sections only |
 
 ---
 
@@ -1512,7 +1512,7 @@ try {
 }
 ```
 
-**Caveat**: Loads metadata into AppDomain. Use raw PE method (§4.4) for untrusted binaries.
+**Caveat**: Loads metadata into AppDomain. Use raw PE method (section 4.4) for untrusted binaries.
 
 ### 6.2 System.Diagnostics.FileVersionInfo::GetVersionInfo()
 
@@ -1527,10 +1527,9 @@ $fvi | Select-Object `
     IsDebug, IsPatched, IsPreRelease, IsPrivateBuild, IsSpecialBuild
 ```
 
-**What this reveals**: All VS_VERSION_INFO StringFileInfo strings. `OriginalFilename` is critical —
-it often reveals the true product name (e.g., "AutoIt3.exe").
+**What this reveals**: All VS_VERSION_INFO StringFileInfo strings. `OriginalFilename` is critical - it often reveals the true product name (e.g., "AutoIt3.exe").
 Works on ANY PE file (not just .NET). Returns empty strings (not null) for absent fields.
-This is a **pure resource parse** — calls `GetFileVersionInfo` Win32 API on `.rsrc` section. Safe.
+This is a **pure resource parse** - calls `GetFileVersionInfo` Win32 API on `.rsrc` section. Safe.
 
 ```powershell
 function Get-InstallerFramework {
@@ -1583,7 +1582,7 @@ function Get-InstallerFramework {
 function Test-EmbeddedZipNative {
     param([string]$Path)
     Add-Type -AssemblyName System.IO.Compression
-    # Method 1: ZipFile.OpenRead() uses EOCD scan internally — WILL find embedded ZIPs in SFX EXEs
+    # Method 1: ZipFile.OpenRead() uses EOCD scan internally - WILL find embedded ZIPs in SFX EXEs
     try {
         $zip = [System.IO.Compression.ZipFile]::OpenRead($Path)
         $count = $zip.Entries.Count
@@ -1607,7 +1606,7 @@ function Test-EmbeddedZipNative {
 }
 ```
 
-**Key behavior**: `ZipFile.OpenRead()` / `ZipArchive` use EOCD scanning internally — they search
+**Key behavior**: `ZipFile.OpenRead()` / `ZipArchive` use EOCD scanning internally - they search
 backward from EOF. This means they WILL find a ZIP embedded in a PE's overlay automatically.
 
 ### 6.4 Shell.Application COM Object Extended Properties
@@ -1652,7 +1651,7 @@ function Test-ContainsCab {
 **Scope**: Detects pure CABs, IExpress EXEs, some InstallShield packages, Windows hotfix/update EXEs.
 **Does NOT detect**: 7-Zip, RAR, ZIP, NSIS/Inno Setup.
 
-Both tools scan for `MSCF` anywhere in the file — they will find embedded CABs in EXEs.
+Both tools scan for `MSCF` anywhere in the file - they will find embedded CABs in EXEs.
 
 ### 6.6 .NET Reflection for Embedded Resource Inspection (No Execution)
 
@@ -1684,7 +1683,7 @@ function Get-DotNetEmbeddedResources {
 ```
 
 `ReflectionOnlyLoadFrom` does NOT execute code. Safe for static analysis on trusted files.
-For .NET 5+, use `MetadataLoadContext` (see §4.6).
+For .NET 5+, use `MetadataLoadContext` (see section 4.6).
 
 ---
 
@@ -1697,7 +1696,7 @@ The import table (data directory index 1) reveals which DLLs are statically link
 #### [HIGH_CONFIDENCE] .NET Assembly
 
 ```
-REQUIRED: mscoree.dll  —  _CorExeMain (EXE) or _CorDllMain (DLL)
+REQUIRED: mscoree.dll - _CorExeMain (EXE) or _CorDllMain (DLL)
 ```
 
 No other common framework mandates `mscoree.dll`. Finding this import = .NET, guaranteed.
@@ -1705,7 +1704,7 @@ No other common framework mandates `mscoree.dll`. Finding this import = .NET, gu
 #### [HIGH_CONFIDENCE] Go Binary (gc toolchain)
 
 ```
-Typically ONLY: kernel32.dll  (5–15 imports)
+Typically ONLY: kernel32.dll  (5-15 imports)
 Sometimes:      ntdll.dll, ws2_32.dll (network programs)
 NEVER:          mscoree.dll, VCRUNTIME140.dll, MSVCRT.dll, python3X.dll
 ```
@@ -1721,10 +1720,10 @@ DLL mode: "rtl70.bpl", "vcl70.bpl" (dynamically-linked Borland/Embarcadero runti
 STRINGS:  "Embarcadero", "Borland", "TApplication", "TForm" in binary
 ```
 
-Also: `DVCLAL` resource in RT_RCDATA section — Delphi VCL Application License [HIGH_CONFIDENCE]:
+Also: `DVCLAL` resource in RT_RCDATA section - Delphi VCL Application License [HIGH_CONFIDENCE]:
 
 ```
-Resource name: "DVCLAL"  in the RT_RCDATA section  [HIGH_CONFIDENCE — definitively Delphi]
+Resource name: "DVCLAL"  in the RT_RCDATA section  [HIGH_CONFIDENCE - definitively Delphi]
 ```
 
 Also: `PACKAGEINFO` resource for Delphi package-aware applications.
@@ -1768,23 +1767,23 @@ Section names are 8-byte null-padded ASCII strings in the section table.
 
 **Framework-specific sections** [confidence noted]:
 
-| Section Name    | Framework                | Confidence      |
+| Section Name | Framework | Confidence |
 | --------------- | ------------------------ | --------------- |
-| `.ndata`        | NSIS                     | HIGH_CONFIDENCE |
-| `UPX0`          | UPX packer               | HIGH_CONFIDENCE |
-| `UPX1`          | UPX packer               | HIGH_CONFIDENCE |
-| `UPX2`          | UPX packer (rare)        | HIGH_CONFIDENCE |
-| `.wixburn`      | WiX Burn bootstrapper    | HIGH_CONFIDENCE |
-| `.go.buildinfo` | Go (1.13+)               | HIGH_CONFIDENCE |
-| `.noptrdata`    | Go                       | MEDIUM          |
-| `.noptrbss`     | Go                       | MEDIUM          |
-| `CODE`          | Delphi (uppercase)       | HIGH_CONFIDENCE |
-| `DATA`          | Delphi (uppercase)       | HIGH_CONFIDENCE |
-| `BSS`           | Delphi (uppercase)       | HIGH_CONFIDENCE |
-| `.textbss`      | MSVC incremental (debug) | LOW             |
-| `.gfids`        | MSVC with CFG            | LOW             |
-| `.pyi`          | PyInstaller (rare)       | MEDIUM          |
-| `_TEXT`         | Watcom C                 | LOW             |
+| `.ndata` | NSIS | HIGH_CONFIDENCE |
+| `UPX0` | UPX packer | HIGH_CONFIDENCE |
+| `UPX1` | UPX packer | HIGH_CONFIDENCE |
+| `UPX2` | UPX packer (rare) | HIGH_CONFIDENCE |
+| `.wixburn` | WiX Burn bootstrapper | HIGH_CONFIDENCE |
+| `.go.buildinfo` | Go (1.13+) | HIGH_CONFIDENCE |
+| `.noptrdata` | Go | MEDIUM |
+| `.noptrbss` | Go | MEDIUM |
+| `CODE` | Delphi (uppercase) | HIGH_CONFIDENCE |
+| `DATA` | Delphi (uppercase) | HIGH_CONFIDENCE |
+| `BSS` | Delphi (uppercase) | HIGH_CONFIDENCE |
+| `.textbss` | MSVC incremental (debug) | LOW |
+| `.gfids` | MSVC with CFG | LOW |
+| `.pyi` | PyInstaller (rare) | MEDIUM |
+| `_TEXT` | Watcom C | LOW |
 
 #### UPX Detection [HIGH_CONFIDENCE]
 
@@ -1827,21 +1826,21 @@ function Test-UPXPacked {
 `IMAGE_FILE_HEADER.Characteristics` at `PeOffset + 22` (2 bytes):
 
 ```
-0x0002  IMAGE_FILE_EXECUTABLE_IMAGE    — Valid EXE (always set for .exe)
-0x0020  IMAGE_FILE_LARGE_ADDRESS_AWARE — Can address >2 GB (common in 64-bit)
-0x0100  IMAGE_FILE_32BIT_MACHINE       — 32-bit machine word
-0x0200  IMAGE_FILE_DEBUG_STRIPPED      — Debug info removed
-0x2000  IMAGE_FILE_DLL                 — This is a DLL (not EXE)
+0x0002  IMAGE_FILE_EXECUTABLE_IMAGE - Valid EXE (always set for .exe)
+0x0020  IMAGE_FILE_LARGE_ADDRESS_AWARE - Can address >2 GB (common in 64-bit)
+0x0100  IMAGE_FILE_32BIT_MACHINE - 32-bit machine word
+0x0200  IMAGE_FILE_DEBUG_STRIPPED - Debug info removed
+0x2000  IMAGE_FILE_DLL - This is a DLL (not EXE)
 ```
 
 `IMAGE_OPTIONAL_HEADER.DllCharacteristics` at `OptHdrOffset + 70` (PE32) or `OptHdrOffset + 70` (PE32+):
 
 ```
-0x0020  DYNAMIC_BASE          — ASLR enabled
-0x0040  FORCE_INTEGRITY       — Code integrity check required
-0x0100  NX_COMPAT             — DEP compatible
-0x0400  NO_SEH                — No structured exception handling
-0x4000  GUARD_CF              — Control Flow Guard (CFG) enabled
+0x0020  DYNAMIC_BASE - ASLR enabled
+0x0040  FORCE_INTEGRITY - Code integrity check required
+0x0100  NX_COMPAT - DEP compatible
+0x0400  NO_SEH - No structured exception handling
+0x4000  GUARD_CF - Control Flow Guard (CFG) enabled
 0x8000  TERMINAL_SERVER_AWARE
 ```
 
@@ -1851,10 +1850,10 @@ DYNAMIC_BASE suggests older or stripped binary. These flags help classify vintag
 ### 7.4 Machine Type Values
 
 ```
-0x014C  IMAGE_FILE_MACHINE_I386    — x86 32-bit
-0x8664  IMAGE_FILE_MACHINE_AMD64   — x64 64-bit
-0x01C4  IMAGE_FILE_MACHINE_ARMNT   — ARM Thumb-2 (ARM32)
-0xAA64  IMAGE_FILE_MACHINE_ARM64   — ARM64
+0x014C  IMAGE_FILE_MACHINE_I386 - x86 32-bit
+0x8664  IMAGE_FILE_MACHINE_AMD64 - x64 64-bit
+0x01C4  IMAGE_FILE_MACHINE_ARMNT - ARM Thumb-2 (ARM32)
+0xAA64  IMAGE_FILE_MACHINE_ARM64 - ARM64
 ```
 
 A `Machine = 0x014C` binary with non-zero COM_DESCRIPTOR = MSIL-only/.NET AnyCPU binary compiled for compatibility.
@@ -1864,17 +1863,17 @@ A `Machine = 0x014C` binary with non-zero COM_DESCRIPTOR = MSIL-only/.NET AnyCPU
 `IMAGE_OPTIONAL_HEADER.Subsystem` (PE32: at `OptHdrOffset + 68`; PE32+: same relative offset):
 
 ```
-0x0001  IMAGE_SUBSYSTEM_NATIVE           — Driver / native application
-0x0002  IMAGE_SUBSYSTEM_WINDOWS_GUI      — Windows GUI (no console window)
-0x0003  IMAGE_SUBSYSTEM_WINDOWS_CUI      — Console application
-0x000E  IMAGE_SUBSYSTEM_WINDOWS_CE_GUI   — Windows CE
+0x0001  IMAGE_SUBSYSTEM_NATIVE - Driver / native application
+0x0002  IMAGE_SUBSYSTEM_WINDOWS_GUI - Windows GUI (no console window)
+0x0003  IMAGE_SUBSYSTEM_WINDOWS_CUI - Console application
+0x000E  IMAGE_SUBSYSTEM_WINDOWS_CE_GUI - Windows CE
 ```
 
 Classification hints:
 
-- GUI subsystem + .NET → likely WinForms or WPF app
-- CUI subsystem + .NET → likely ps2exe console (or any .NET console app)
-- GUI subsystem + no .NET + ONLY kernel32.dll imports → likely Go binary or minimal C program
+- GUI subsystem + .NET -> likely WinForms or WPF app
+- CUI subsystem + .NET -> likely ps2exe console (or any .NET console app)
+- GUI subsystem + no .NET + ONLY kernel32.dll imports -> likely Go binary or minimal C program
 
 ### 7.6 PowerShell PE Section Extractor
 
@@ -1914,143 +1913,143 @@ function Get-PESections {
 
 ```
 Is it a PE? (MZ at offset 0, PE\0\0 at e_lfanew)
-│
-├── NO: Check for raw archive magic at offset 0
-│   ├── 50 4B 03 04 → ZIP → EXTRACTABLE (7-Zip, ZipFile)
-│   ├── 37 7A BC AF 27 1C → 7z → EXTRACTABLE
-│   ├── 4D 53 43 46 → CAB → EXTRACTABLE (7-Zip, expand.exe)
-│   └── D0 CF 11 E0 A1 B1 1A E1 → MSI/OLE → EXTRACTABLE (7-Zip, Type=Msi)
-│
-└── YES: It's a PE — proceed:
-    │
-    ├── Step 1: .NET check — COM_DESCRIPTOR (data dir index 14) non-zero?
-    │   └── YES: .NET Assembly [HIGH_CONFIDENCE]
-    │       ├── Imports ONLY mscoree.dll?
-    │       │   └── YES: Managed binary
-    │       │       ├── Resources contain "costura.*" → Costura.Fody → DLLs extractable via ILSpy
-    │       │       ├── ".NET Bundle" or 32-byte BundleSignature near EOF → Single-file bundle
-    │       │       │   → Extractable via dotnet-bundle-extract [NOT 7-Zip]
-    │       │       ├── Resources contain "SCRIPT"/"ps2exe"/"PowerShell" → ps2exe
-    │       │       │   → NOT extractable by 7-Zip; needs ILSpy/dnSpy
-    │       │       └── dfshim.dll import → ClickOnce → payload NOT embedded
-    │       └── Otherwise → Pure .NET application → Requires ILSpy/dnSpy for code
-    │
-    ├── Step 2: Section names
-    │   ├── Has ".ndata" → NSIS → EXTRACTABLE (7-Zip, Type=Nsis) [HIGH_CONFIDENCE]
-    │   ├── Has ".wixburn" or resource "WIXBURN_MANIFEST" → WiX Burn → EXTRACTABLE (WiX tools) [HIGH_CONF]
-    │   ├── Has "UPX0"/"UPX1" or UPX! last 4 bytes → UPX packed → UNPACK with upx -d first
-    │   ├── Has ".go.buildinfo" → Go binary → REQUIRES DECOMPILATION [HIGH_CONFIDENCE]
-    │   └── Has "CODE"/"DATA" (uppercase) → Delphi → REQUIRES DECOMPILATION [HIGH_CONFIDENCE]
-    │
-    ├── Step 3: 7-Zip Type= (if 7z.exe available)
-    │   ├── Nsis, Inno, 7z, Zip, Rar, Rar5, Cab, Msi, Wim, GZip, BZip2, Xz, ... → EXTRACTABLE
-    │   └── PE → continue to step 4
-    │
-    ├── Step 4: Overlay / embedded archive scan
-    │   ├── 37 7A BC AF 27 1C at overlay start → 7z SFX → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── 52 61 72 21 1A 07 00 at overlay → RAR4 SFX → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── 52 61 72 21 1A 07 01 00 at overlay → RAR5 SFX → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── 4D 53 43 46 anywhere (EOCD validated) → CAB SFX → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── "Inno Setup Setup Data" at overlay start → Inno Setup → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── ZIP EOCD (50 4B 05 06) valid near EOF → ZIP SFX → EXTRACTABLE [HIGH_CONFIDENCE]
-    │   ├── 4D 53 57 49 4D 00 00 00 anywhere → WIM embedded → EXTRACTABLE (7z/wimlib) [HIGH_CONF]
-    │   ├── 4D 45 49 0C 0B 0A 0B 0E in last 4 KB → PyInstaller → REQUIRES pyinstxtractor
-    │   └── 41 55 33 21 45 41 30 36 anywhere → AutoIt compiled → REQUIRES Exe2Aut
-    │
-    ├── Step 5: VersionInfo / binary strings
-    │   ├── CompanyName "Igor Pavlov" → 7-Zip SFX → EXTRACTABLE
-    │   ├── CompanyName "win.rar GmbH" / "Alexander Roshal" → WinRAR SFX → EXTRACTABLE
-    │   ├── FileDescription "WinZip Self-Extractor" → WinZip SFX → EXTRACTABLE
-    │   ├── FileDescription contains "Nullsoft Install" → NSIS → EXTRACTABLE
-    │   ├── ProductName contains "InstallShield" → InstallShield → MAYBE (version-dependent)
-    │   ├── CompanyName "Caphyon" → Advanced Installer → MAYBE (depends on output type)
-    │   ├── OriginalFilename "AutoHotkey.exe" → AHK → REQUIRES DECOMPILATION
-    │   ├── FileDescription "AutoIt v3 Script" → AutoIt → REQUIRES Exe2Aut
-    │   ├── "_MEIPASS" string in binary → PyInstaller → REQUIRES pyinstxtractor
-    │   ├── "ELECTRON_RUN_AS_NODE" string → Electron → EXTRACTABLE (ASAR tool)
-    │   ├── "panicked at" string → Rust → REQUIRES DECOMPILATION
-    │   └── "Squirrel.Windows" string → Squirrel → check for ZIP in overlay
-    │
-    └── Step 6: Import table fallback
-        ├── ONLY mscoree.dll → .NET (already covered step 1 if COM_DESC was zero — re-check)
-        ├── python3X.dll → cx_Freeze / Nuitka → likely NOT extractable
-        ├── ONLY kernel32.dll (minimal) → Go binary → REQUIRES DECOMPILATION
-        └── Standard Win32 set → Native C/C++/Delphi → REQUIRES DECOMPILATION
+|
++-- NO: Check for raw archive magic at offset 0
+|   +-- 50 4B 03 04 -> ZIP -> EXTRACTABLE (7-Zip, ZipFile)
+|   +-- 37 7A BC AF 27 1C -> 7z -> EXTRACTABLE
+|   +-- 4D 53 43 46 -> CAB -> EXTRACTABLE (7-Zip, expand.exe)
+|   \-- D0 CF 11 E0 A1 B1 1A E1 -> MSI/OLE -> EXTRACTABLE (7-Zip, Type=Msi)
+|
+\-- YES: It's a PE - proceed:
+    |
+    +-- Step 1: .NET check - COM_DESCRIPTOR (data dir index 14) non-zero?
+    |   \-- YES: .NET Assembly [HIGH_CONFIDENCE]
+    |       +-- Imports ONLY mscoree.dll?
+    |       |   \-- YES: Managed binary
+    |       |       +-- Resources contain "costura.*" -> Costura.Fody -> DLLs extractable via ILSpy
+    |       |       +-- ".NET Bundle" or 32-byte BundleSignature near EOF -> Single-file bundle
+    |       |       |   -> Extractable via dotnet-bundle-extract [NOT 7-Zip]
+    |       |       +-- Resources contain "SCRIPT"/"ps2exe"/"PowerShell" -> ps2exe
+    |       |       |   -> NOT extractable by 7-Zip; needs ILSpy/dnSpy
+    |       |       \-- dfshim.dll import -> ClickOnce -> payload NOT embedded
+    |       \-- Otherwise -> Pure .NET application -> Requires ILSpy/dnSpy for code
+    |
+    +-- Step 2: Section names
+    |   +-- Has ".ndata" -> NSIS -> EXTRACTABLE (7-Zip, Type=Nsis) [HIGH_CONFIDENCE]
+    |   +-- Has ".wixburn" or resource "WIXBURN_MANIFEST" -> WiX Burn -> EXTRACTABLE (WiX tools) [HIGH_CONF]
+    |   +-- Has "UPX0"/"UPX1" or UPX! last 4 bytes -> UPX packed -> UNPACK with upx -d first
+    |   +-- Has ".go.buildinfo" -> Go binary -> REQUIRES DECOMPILATION [HIGH_CONFIDENCE]
+    |   \-- Has "CODE"/"DATA" (uppercase) -> Delphi -> REQUIRES DECOMPILATION [HIGH_CONFIDENCE]
+    |
+    +-- Step 3: 7-Zip Type= (if 7z.exe available)
+    |   +-- Nsis, Inno, 7z, Zip, Rar, Rar5, Cab, Msi, Wim, GZip, BZip2, Xz, ... -> EXTRACTABLE
+    |   \-- PE -> continue to step 4
+    |
+    +-- Step 4: Overlay / embedded archive scan
+    |   +-- 37 7A BC AF 27 1C at overlay start -> 7z SFX -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- 52 61 72 21 1A 07 00 at overlay -> RAR4 SFX -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- 52 61 72 21 1A 07 01 00 at overlay -> RAR5 SFX -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- 4D 53 43 46 anywhere (EOCD validated) -> CAB SFX -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- "Inno Setup Setup Data" at overlay start -> Inno Setup -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- ZIP EOCD (50 4B 05 06) valid near EOF -> ZIP SFX -> EXTRACTABLE [HIGH_CONFIDENCE]
+    |   +-- 4D 53 57 49 4D 00 00 00 anywhere -> WIM embedded -> EXTRACTABLE (7z/wimlib) [HIGH_CONF]
+    |   +-- 4D 45 49 0C 0B 0A 0B 0E in last 4 KB -> PyInstaller -> REQUIRES pyinstxtractor
+    |   \-- 41 55 33 21 45 41 30 36 anywhere -> AutoIt compiled -> REQUIRES Exe2Aut
+    |
+    +-- Step 5: VersionInfo / binary strings
+    |   +-- CompanyName "Igor Pavlov" -> 7-Zip SFX -> EXTRACTABLE
+    |   +-- CompanyName "win.rar GmbH" / "Alexander Roshal" -> WinRAR SFX -> EXTRACTABLE
+    |   +-- FileDescription "WinZip Self-Extractor" -> WinZip SFX -> EXTRACTABLE
+    |   +-- FileDescription contains "Nullsoft Install" -> NSIS -> EXTRACTABLE
+    |   +-- ProductName contains "InstallShield" -> InstallShield -> MAYBE (version-dependent)
+    |   +-- CompanyName "Caphyon" -> Advanced Installer -> MAYBE (depends on output type)
+    |   +-- OriginalFilename "AutoHotkey.exe" -> AHK -> REQUIRES DECOMPILATION
+    |   +-- FileDescription "AutoIt v3 Script" -> AutoIt -> REQUIRES Exe2Aut
+    |   +-- "_MEIPASS" string in binary -> PyInstaller -> REQUIRES pyinstxtractor
+    |   +-- "ELECTRON_RUN_AS_NODE" string -> Electron -> EXTRACTABLE (ASAR tool)
+    |   +-- "panicked at" string -> Rust -> REQUIRES DECOMPILATION
+    |   \-- "Squirrel.Windows" string -> Squirrel -> check for ZIP in overlay
+    |
+    \-- Step 6: Import table fallback
+        +-- ONLY mscoree.dll -> .NET (already covered step 1 if COM_DESC was zero - re-check)
+        +-- python3X.dll -> cx_Freeze / Nuitka -> likely NOT extractable
+        +-- ONLY kernel32.dll (minimal) -> Go binary -> REQUIRES DECOMPILATION
+        \-- Standard Win32 set -> Native C/C++/Delphi -> REQUIRES DECOMPILATION
 ```
 
 ### 8.2 Confidence Levels Summary Table
 
-| Detection Method                           | Confidence Level | False Positive Risk |
+| Detection Method | Confidence Level | False Positive Risk |
 | ------------------------------------------ | ---------------- | ------------------- |
-| COM_DESCRIPTOR non-zero                    | HIGH_CONFIDENCE  | Near zero           |
-| NSIS `.ndata` section                      | HIGH_CONFIDENCE  | Near zero           |
-| NSIS `EF BE AD DE` magic in .ndata         | HIGH_CONFIDENCE  | Very low            |
-| 7z signature `37 7A BC AF 27 1C`           | HIGH_CONFIDENCE  | Very low            |
-| RAR4 sig `52 61 72 21 1A 07 00`            | HIGH_CONFIDENCE  | Very low            |
-| RAR5 sig `52 61 72 21 1A 07 01 00`         | HIGH_CONFIDENCE  | Very low            |
-| ZIP EOCD `50 4B 05 06` validated           | HIGH_CONFIDENCE  | Low                 |
-| CAB `MSCF` with validated size             | HIGH_CONFIDENCE  | Very low            |
-| "Inno Setup Setup Data" in overlay         | HIGH_CONFIDENCE  | Near zero           |
-| `.wixburn` section                         | HIGH_CONFIDENCE  | Near zero           |
-| `WIXBURN_MANIFEST` resource                | HIGH_CONFIDENCE  | Near zero           |
-| UPX section names + UPX! overlay magic     | HIGH_CONFIDENCE  | Near zero           |
-| AutoIt sig `41 55 33 21 45 41 30 36`       | HIGH_CONFIDENCE  | Very low            |
-| `mscoree.dll` import                       | HIGH_CONFIDENCE  | Near zero           |
-| PyInstaller `4D 45 49 0C 0B 0A 0B 0E`      | HIGH_CONFIDENCE  | Very low            |
-| `.go.buildinfo` section name               | HIGH_CONFIDENCE  | Near zero           |
-| `FF 20 47 6F ...` Go buildinf magic        | HIGH_CONFIDENCE  | Low                 |
-| WIM `4D 53 57 49 4D 00 00 00`              | HIGH_CONFIDENCE  | Very low            |
-| `DVCLAL` resource name                     | HIGH_CONFIDENCE  | Near zero (Delphi)  |
-| "AutoIt v3 Script" VersionInfo             | HIGH_CONFIDENCE  | Low (customizable)  |
-| OriginalFilename "AutoHotkey.exe"          | HIGH_CONFIDENCE  | Low (customizable)  |
-| CompanyName "Igor Pavlov"                  | HIGH_CONFIDENCE  | Low (customizable)  |
-| CompanyName "Caphyon"                      | HIGH_CONFIDENCE  | Low (customizable)  |
-| "\_MEIPASS" string in binary               | HIGH_CONFIDENCE  | Low                 |
-| "ELECTRON_RUN_AS_NODE" string              | HIGH_CONFIDENCE  | Low                 |
-| `BSJB` .NET metadata magic                 | HIGH_CONFIDENCE  | Near zero           |
-| .NET BundleSignature (32 bytes)            | HIGH_CONFIDENCE  | Near zero           |
-| CompanyName "Nullsoft" only                | HEURISTIC        | Medium              |
-| Only `kernel32.dll` imported               | HEURISTIC        | Medium              |
-| "panicked at" string                       | HEURISTIC        | Low                 |
-| Large overlay with no recognized signature | HEURISTIC        | High                |
-| `.noptrdata` section name                  | HEURISTIC        | Low                 |
-| `.noptrbss` section name                   | HEURISTIC        | Low                 |
+| COM_DESCRIPTOR non-zero | HIGH_CONFIDENCE | Near zero |
+| NSIS `.ndata` section | HIGH_CONFIDENCE | Near zero |
+| NSIS `EF BE AD DE` magic in .ndata | HIGH_CONFIDENCE | Very low |
+| 7z signature `37 7A BC AF 27 1C` | HIGH_CONFIDENCE | Very low |
+| RAR4 sig `52 61 72 21 1A 07 00` | HIGH_CONFIDENCE | Very low |
+| RAR5 sig `52 61 72 21 1A 07 01 00` | HIGH_CONFIDENCE | Very low |
+| ZIP EOCD `50 4B 05 06` validated | HIGH_CONFIDENCE | Low |
+| CAB `MSCF` with validated size | HIGH_CONFIDENCE | Very low |
+| "Inno Setup Setup Data" in overlay | HIGH_CONFIDENCE | Near zero |
+| `.wixburn` section | HIGH_CONFIDENCE | Near zero |
+| `WIXBURN_MANIFEST` resource | HIGH_CONFIDENCE | Near zero |
+| UPX section names + UPX! overlay magic | HIGH_CONFIDENCE | Near zero |
+| AutoIt sig `41 55 33 21 45 41 30 36` | HIGH_CONFIDENCE | Very low |
+| `mscoree.dll` import | HIGH_CONFIDENCE | Near zero |
+| PyInstaller `4D 45 49 0C 0B 0A 0B 0E` | HIGH_CONFIDENCE | Very low |
+| `.go.buildinfo` section name | HIGH_CONFIDENCE | Near zero |
+| `FF 20 47 6F ...` Go buildinf magic | HIGH_CONFIDENCE | Low |
+| WIM `4D 53 57 49 4D 00 00 00` | HIGH_CONFIDENCE | Very low |
+| `DVCLAL` resource name | HIGH_CONFIDENCE | Near zero (Delphi) |
+| "AutoIt v3 Script" VersionInfo | HIGH_CONFIDENCE | Low (customizable) |
+| OriginalFilename "AutoHotkey.exe" | HIGH_CONFIDENCE | Low (customizable) |
+| CompanyName "Igor Pavlov" | HIGH_CONFIDENCE | Low (customizable) |
+| CompanyName "Caphyon" | HIGH_CONFIDENCE | Low (customizable) |
+| "\_MEIPASS" string in binary | HIGH_CONFIDENCE | Low |
+| "ELECTRON_RUN_AS_NODE" string | HIGH_CONFIDENCE | Low |
+| `BSJB` .NET metadata magic | HIGH_CONFIDENCE | Near zero |
+| .NET BundleSignature (32 bytes) | HIGH_CONFIDENCE | Near zero |
+| CompanyName "Nullsoft" only | HEURISTIC | Medium |
+| Only `kernel32.dll` imported | HEURISTIC | Medium |
+| "panicked at" string | HEURISTIC | Low |
+| Large overlay with no recognized signature | HEURISTIC | High |
+| `.noptrdata` section name | HEURISTIC | Low |
+| `.noptrbss` section name | HEURISTIC | Low |
 
-### 8.3 Extractable vs Requires Decompilation — Summary
+### 8.3 Extractable vs Requires Decompilation - Summary
 
 **EXTRACTABLE** (7-Zip or built-in tools):
 
 ```
-NSIS installer          — 7z (Type=Nsis)
-Inno Setup installer    — 7z (Type=Inno), innoextract
-WinRAR SFX              — 7z (Type=Rar/Rar5)
-7-Zip SFX               — 7z (Type=7z)
-WinZip SFX              — 7z (Type=Zip), ZipFile
-Info-ZIP SFX            — 7z (Type=Zip)
-IExpress                — expand.exe, 7z (Type=Cab)
-MSI                     — 7z (Type=Msi)
-WIM                     — 7z (Type=Wim), DISM
-Costura.Fody .NET       — ILSpy/dnSpy resource extraction
-.NET single-file bundle — dotnet-bundle-extract
-WiX Burn                — WiX tools (partial; 7z sees Type=PE)
+NSIS installer - 7z (Type=Nsis)
+Inno Setup installer - 7z (Type=Inno), innoextract
+WinRAR SFX - 7z (Type=Rar/Rar5)
+7-Zip SFX - 7z (Type=7z)
+WinZip SFX - 7z (Type=Zip), ZipFile
+Info-ZIP SFX - 7z (Type=Zip)
+IExpress - expand.exe, 7z (Type=Cab)
+MSI - 7z (Type=Msi)
+WIM - 7z (Type=Wim), DISM
+Costura.Fody .NET - ILSpy/dnSpy resource extraction
+.NET single-file bundle - dotnet-bundle-extract
+WiX Burn - WiX tools (partial; 7z sees Type=PE)
 ```
 
 **REQUIRES DECOMPILATION / SPECIALIZED TOOL**:
 
 ```
-ps2exe                  — ILSpy/dnSpy (or .NET reflection)
-AutoIt                  — Exe2Aut, myAut2Exe
-AutoHotkey              — AHK decompiler tools
-PyInstaller             — pyinstxtractor (not 7-Zip)
-cx_Freeze               — No single-EXE extraction; companion files needed
-Nuitka                  — Ghidra/IDA Pro (compiled native)
-Pure .NET apps          — ILSpy/dnSpy
-Go binaries             — Ghidra/Binary Ninja
-Rust binaries           — Ghidra/IDA Pro
-Delphi native           — Ghidra/IDA Pro
-Native C/C++ binaries   — Ghidra/IDA Pro/Binary Ninja
-Electron                — ASAR extraction (asar extract), then JS reversing
-pkg (Node.js)           — pkg-fetch + VFS extraction tools
+ps2exe - ILSpy/dnSpy (or .NET reflection)
+AutoIt - Exe2Aut, myAut2Exe
+AutoHotkey - AHK decompiler tools
+PyInstaller - pyinstxtractor (not 7-Zip)
+cx_Freeze - No single-EXE extraction; companion files needed
+Nuitka - Ghidra/IDA Pro (compiled native)
+Pure .NET apps - ILSpy/dnSpy
+Go binaries - Ghidra/Binary Ninja
+Rust binaries - Ghidra/IDA Pro
+Delphi native - Ghidra/IDA Pro
+Native C/C++ binaries - Ghidra/IDA Pro/Binary Ninja
+Electron - ASAR extraction (asar extract), then JS reversing
+pkg (Node.js) - pkg-fetch + VFS extraction tools
 ```
 
 ---
@@ -2301,17 +2300,17 @@ function Get-ExeClassification {
 
 - **ECMA-335 Common Language Infrastructure** (CLI/COM_DESCRIPTOR header, .NET metadata):
   https://www.ecma-international.org/publications-and-standards/standards/ecma-335/
-  (Partition II §25.3: PE/COFF Extensions; §25.3.3: CLI header)
+  (Partition II section 25.3: PE/COFF Extensions; section 25.3.3: CLI header)
 
 ### 10.2 Archive Format Specifications
 
-- **ZIP**: PKWARE APPNOTE.TXT §4.3
+- **ZIP**: PKWARE APPNOTE.TXT section 4.3
   https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 
 - **7-Zip format**: 7-Zip source `CPP/7zip/Archive/7z/7zHeader.h`
   https://github.com/ip7z/7zip/blob/main/CPP/7zip/Archive/7z/7zHeader.h
 
-- **CAB**: [MS-CAB] Cabinet File Format §2.2
+- **CAB**: [MS-CAB] Cabinet File Format section 2.2
   https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cab/
 
 - **WIM**: [MS-WIM] Windows Imaging Format
@@ -2320,7 +2319,7 @@ function Get-ExeClassification {
 - **RAR**: RARLAB documentation; unrar source `rarformat.h`
   https://www.rarlab.com/rar_add.htm
 
-- **XZ/LZMA2**: XZ File Format specification §2.1.1
+- **XZ/LZMA2**: XZ File Format specification section 2.1.1
   https://tukaani.org/xz/xz-file-format-1.1.0.txt
 
 - **7-Zip archive handlers** (Type= values): 7-Zip source `CPP/7zip/Archive/`
@@ -2354,7 +2353,7 @@ function Get-ExeClassification {
 
 - **AutoHotkey**: https://github.com/AutoHotkey/AutoHotkey
 
-- **PyInstaller** (CArchive / PKG format — `pyi_archive.c`):
+- **PyInstaller** (CArchive / PKG format - `pyi_archive.c`):
   https://github.com/pyinstaller/pyinstaller
   pyinstxtractor: https://github.com/extremecoders-re/pyinstxtractor
 
@@ -2407,9 +2406,9 @@ Format          | Magic Bytes (Hex)                          | Len | Location in
 ----------------|---------------------------------------------|-----|---------------------------
 PE/MZ           | 4D 5A                                       | 2   | Offset 0x00 (always)
 PE signature    | 50 45 00 00                                 | 4   | At e_lfanew
-.NET (indirect) | Non-zero at COM_DESCRIPTOR data dir #14     | —   | PE opt header +96/+112
+.NET (indirect) | Non-zero at COM_DESCRIPTOR data dir #14     | - | PE opt header +96/+112
 .NET metadata   | 42 53 4A 42  ("BSJB")                       | 4   | At MetaDataRVA
-ZIP EOCD        | 50 4B 05 06                                 | 4   | ≤65557 bytes from EOF
+ZIP EOCD        | 50 4B 05 06                                 | 4   | <=65557 bytes from EOF
 ZIP LFH         | 50 4B 03 04                                 | 4   | Each file entry
 7z              | 37 7A BC AF 27 1C                           | 6   | Archive start
 CAB             | 4D 53 43 46 00 00 00 00                     | 8   | Cabinet header offset 0
@@ -2433,12 +2432,12 @@ Go buildinf     | FF 20 47 6F 20 62 75 69 6C 64 69 6E 66 3A  | 14  | In .data/.r
 **PE Section Names of Note**:
 
 ```
-.ndata         → NSIS (HIGH_CONFIDENCE — unique to NSIS)
-.wixburn       → WiX Burn bootstrapper (HIGH_CONFIDENCE)
-UPX0 / UPX1   → UPX packer (HIGH_CONFIDENCE)
-.go.buildinfo  → Go binary ≥1.13 (HIGH_CONFIDENCE)
-.noptrdata     → Go binary (MEDIUM)
-CODE / DATA    → Delphi (uppercase, HIGH_CONFIDENCE)
+.ndata         -> NSIS (HIGH_CONFIDENCE - unique to NSIS)
+.wixburn       -> WiX Burn bootstrapper (HIGH_CONFIDENCE)
+UPX0 / UPX1   -> UPX packer (HIGH_CONFIDENCE)
+.go.buildinfo  -> Go binary >=1.13 (HIGH_CONFIDENCE)
+.noptrdata     -> Go binary (MEDIUM)
+CODE / DATA    -> Delphi (uppercase, HIGH_CONFIDENCE)
 ```
 
 ---
@@ -2448,44 +2447,44 @@ CODE / DATA    → Delphi (uppercase, HIGH_CONFIDENCE)
 ### B.1 Source Attribution by Finding
 
 The following table maps each hard claim to its primary source, as derived from the verityvulture
-evidence map (`research/runs/2026-04-15__1410/report.md` §Evidence Map):
+evidence map (`research/runs/2026-04-15__1410/report.md` section Evidence Map):
 
-| Claim                                           | Confidence      | Primary Source                                                      |
+| Claim | Confidence | Primary Source |
 | ----------------------------------------------- | --------------- | ------------------------------------------------------------------- |
-| ZIP EOCD `50 4B 05 06` structure                | HIGH_CONFIDENCE | PKWARE APPNOTE.TXT §4.3.16; .NET ZipArchive source                  |
-| 7z sig `37 7A BC AF 27 1C`                      | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/7z/7zHeader.h`                       |
-| RAR4 sig `52 61 72 21 1A 07 00`                 | HIGH_CONFIDENCE | RARLAB UnRAR source `rarformat.h`                                   |
-| CAB sig `4D 53 43 46`                           | HIGH_CONFIDENCE | Microsoft Cabinet SDK specification                                 |
-| WIM sig `4D 53 57 49 4D 00 00 00`               | HIGH_CONFIDENCE | Microsoft [MS-WIM] specification                                    |
-| NSIS `.ndata` section                           | HIGH_CONFIDENCE | NSIS source `Source/exehead/`, NSIS wiki                            |
-| NSIS 7z `Type = Nsis`                           | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/NsisHandler.cpp`                     |
-| Inno "Inno Setup Setup Data" string             | HIGH_CONFIDENCE | innoextract source; jrsoftware.org                                  |
-| Inno 7z `Type = Inno`                           | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/InnoHandler.cpp`                     |
-| COM_DESCRIPTOR at data dir index 14             | HIGH_CONFIDENCE | ECMA-335 §25.3.3; MSDN PE Format §6.1.3.3                           |
-| PE32 data dir offset +96 from opt hdr           | HIGH_CONFIDENCE | Microsoft PE/COFF spec §3.4.2                                       |
-| PE32+ data dir offset +112 from opt hdr         | HIGH_CONFIDENCE | Microsoft PE/COFF spec §3.4.3                                       |
-| ps2exe imports only mscoree.dll                 | HIGH_CONFIDENCE | ps2exe source; ILSpy analysis                                       |
-| AutoIt sig `41 55 33 21 45 41 30 36` (AU3!EA06) | HIGH_CONFIDENCE | AutoIt v3 RE community references (multiple independent analyses)   |
-| PyInstaller magic `4D 45 49 0C 0B 0A 0B 0E`     | HIGH_CONFIDENCE | PyInstaller bootloader `bootloader/src/pyi_archive.c`               |
-| .NET bundle 32-byte BundleSignature             | HIGH_CONFIDENCE | .NET runtime source `src/installer/managed/Microsoft.NET.HostModel` |
-| .NET bundle ".NET Bundle" ASCII string          | HIGH_CONFIDENCE | .NET runtime source (same); embedded in file near EOF               |
-| Costura.Fody "costura.\*" resource naming       | HIGH_CONFIDENCE | Costura.Fody source `github.com/Fody/Costura`                       |
-| Go `.go.buildinfo` section (Go 1.13+)           | HIGH_CONFIDENCE | Go release notes 1.13; `go version -m <binary>` behavior            |
-| Go `.noptrdata`/`.noptrbss` sections            | MEDIUM          | Go toolchain PE output analysis; community references               |
-| Delphi `CODE`/`DATA` uppercase sections         | HIGH_CONFIDENCE | Embarcadero Delphi PE output; multiple PE analysis tools confirm    |
-| Delphi `DVCLAL` resource name                   | HIGH_CONFIDENCE | Delphi VCL documentation; PE analysis of Delphi-built EXEs          |
-| WiX Burn `.wixburn` section                     | HIGH_CONFIDENCE | WiX toolset source `src/burn/engine/section.h`                      |
-| WiX Burn `WIXBURN_MANIFEST` resource            | HIGH_CONFIDENCE | WiX toolset Burn engine source                                      |
-| MSI/OLE sig `D0 CF 11 E0 A1 B1 1A E1`           | HIGH_CONFIDENCE | Microsoft OLE2/CFBF specification                                   |
-| `Type = PE` for non-extractable                 | HIGH_CONFIDENCE | 7-Zip PE handler behavior; widely documented                        |
-| expand.exe CAB detection                        | HIGH_CONFIDENCE | Microsoft Cabinet SDK; Windows built-in behavior                    |
-| ZipFile.OpenRead() finds embedded ZIP           | HIGH_CONFIDENCE | .NET System.IO.Compression docs; EOCD-based ZIP locator             |
-| AutoHotkey OriginalFilename "AutoHotkey.exe"    | HIGH_CONFIDENCE | AHK source; default VersionInfo set by Aut2Exe                      |
-| InstallShield CompanyName "Flexera/Acresso"     | HIGH_CONFIDENCE | InstallShield bootstrapper VersionInfo templates                    |
-| Advanced Installer CompanyName "Caphyon"        | HIGH_CONFIDENCE | Caphyon Advanced Installer output analysis                          |
-| WinZip FileDesc "WinZip Self-Extractor"         | HIGH_CONFIDENCE | WinZip SFX documentation; Corel/WinZip product strings              |
-| BSJB .NET metadata magic                        | HIGH_CONFIDENCE | ECMA-335 §24.2.1 (Metadata root structure)                          |
-| Node.js SEA fuse string "SEA_FUSE_fce680..."    | HIGH_CONFIDENCE | Node.js source `src/node_sea.h`                                     |
+| ZIP EOCD `50 4B 05 06` structure | HIGH_CONFIDENCE | PKWARE APPNOTE.TXT section 4.3.16; .NET ZipArchive source |
+| 7z sig `37 7A BC AF 27 1C` | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/7z/7zHeader.h` |
+| RAR4 sig `52 61 72 21 1A 07 00` | HIGH_CONFIDENCE | RARLAB UnRAR source `rarformat.h` |
+| CAB sig `4D 53 43 46` | HIGH_CONFIDENCE | Microsoft Cabinet SDK specification |
+| WIM sig `4D 53 57 49 4D 00 00 00` | HIGH_CONFIDENCE | Microsoft [MS-WIM] specification |
+| NSIS `.ndata` section | HIGH_CONFIDENCE | NSIS source `Source/exehead/`, NSIS wiki |
+| NSIS 7z `Type = Nsis` | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/NsisHandler.cpp` |
+| Inno "Inno Setup Setup Data" string | HIGH_CONFIDENCE | innoextract source; jrsoftware.org |
+| Inno 7z `Type = Inno` | HIGH_CONFIDENCE | 7-Zip source `CPP/7zip/Archive/InnoHandler.cpp` |
+| COM_DESCRIPTOR at data dir index 14 | HIGH_CONFIDENCE | ECMA-335 section 25.3.3; MSDN PE Format section 6.1.3.3 |
+| PE32 data dir offset +96 from opt hdr | HIGH_CONFIDENCE | Microsoft PE/COFF spec section 3.4.2 |
+| PE32+ data dir offset +112 from opt hdr | HIGH_CONFIDENCE | Microsoft PE/COFF spec section 3.4.3 |
+| ps2exe imports only mscoree.dll | HIGH_CONFIDENCE | ps2exe source; ILSpy analysis |
+| AutoIt sig `41 55 33 21 45 41 30 36` (AU3!EA06) | HIGH_CONFIDENCE | AutoIt v3 RE community references (multiple independent analyses) |
+| PyInstaller magic `4D 45 49 0C 0B 0A 0B 0E` | HIGH_CONFIDENCE | PyInstaller bootloader `bootloader/src/pyi_archive.c` |
+| .NET bundle 32-byte BundleSignature | HIGH_CONFIDENCE | .NET runtime source `src/installer/managed/Microsoft.NET.HostModel` |
+| .NET bundle ".NET Bundle" ASCII string | HIGH_CONFIDENCE | .NET runtime source (same); embedded in file near EOF |
+| Costura.Fody "costura.\*" resource naming | HIGH_CONFIDENCE | Costura.Fody source `github.com/Fody/Costura` |
+| Go `.go.buildinfo` section (Go 1.13+) | HIGH_CONFIDENCE | Go release notes 1.13; `go version -m <binary>` behavior |
+| Go `.noptrdata`/`.noptrbss` sections | MEDIUM | Go toolchain PE output analysis; community references |
+| Delphi `CODE`/`DATA` uppercase sections | HIGH_CONFIDENCE | Embarcadero Delphi PE output; multiple PE analysis tools confirm |
+| Delphi `DVCLAL` resource name | HIGH_CONFIDENCE | Delphi VCL documentation; PE analysis of Delphi-built EXEs |
+| WiX Burn `.wixburn` section | HIGH_CONFIDENCE | WiX toolset source `src/burn/engine/section.h` |
+| WiX Burn `WIXBURN_MANIFEST` resource | HIGH_CONFIDENCE | WiX toolset Burn engine source |
+| MSI/OLE sig `D0 CF 11 E0 A1 B1 1A E1` | HIGH_CONFIDENCE | Microsoft OLE2/CFBF specification |
+| `Type = PE` for non-extractable | HIGH_CONFIDENCE | 7-Zip PE handler behavior; widely documented |
+| expand.exe CAB detection | HIGH_CONFIDENCE | Microsoft Cabinet SDK; Windows built-in behavior |
+| ZipFile.OpenRead() finds embedded ZIP | HIGH_CONFIDENCE | .NET System.IO.Compression docs; EOCD-based ZIP locator |
+| AutoHotkey OriginalFilename "AutoHotkey.exe" | HIGH_CONFIDENCE | AHK source; default VersionInfo set by Aut2Exe |
+| InstallShield CompanyName "Flexera/Acresso" | HIGH_CONFIDENCE | InstallShield bootstrapper VersionInfo templates |
+| Advanced Installer CompanyName "Caphyon" | HIGH_CONFIDENCE | Caphyon Advanced Installer output analysis |
+| WinZip FileDesc "WinZip Self-Extractor" | HIGH_CONFIDENCE | WinZip SFX documentation; Corel/WinZip product strings |
+| BSJB .NET metadata magic | HIGH_CONFIDENCE | ECMA-335 section 24.2.1 (Metadata root structure) |
+| Node.js SEA fuse string "SEA_FUSE_fce680..." | HIGH_CONFIDENCE | Node.js source `src/node_sea.h` |
 
 ### B.2 Disagreements and Resolutions
 
@@ -2494,7 +2493,7 @@ The following conflicts were identified between the two source documents and res
 **1. PyInstaller PKG trailer magic bytes**
 
 - verityfactseeker: `4D 45 49 00 00 00 00 00` ("MEI\x00\x00\x00\x00\x00")
-- verityvulture: `4D 45 49 0C 0B 0A 0B 0E` ("MEI\x0c\x0b\x0a\x0b\x0e") — from source code
+- verityvulture: `4D 45 49 0C 0B 0A 0B 0E` ("MEI\x0c\x0b\x0a\x0b\x0e") - from source code
 - **RESOLUTION**: verityvulture wins. Direct citation of `bootloader/src/pyi_archive.c`:
   `#define MAGIC "MEI\014\013\012\013\016"`. The factseeker value is incorrect.
   Scan last 4096 bytes (not exact EOF - 24) to handle version variation.
@@ -2510,20 +2509,20 @@ The following conflicts were identified between the two source documents and res
 - verityvulture: 6 bytes `4D 53 57 49 4D 00`
 - verityfactseeker: 8 bytes `4D 53 57 49 4D 00 00 00`
 - **RESOLUTION**: Both are valid subsets. The [MS-WIM] spec defines an 8-byte ImageTag. Using
-  8 bytes is more precise and reduces false positives — this document uses 8 bytes.
+  8 bytes is more precise and reduces false positives - this document uses 8 bytes.
 
 **4. AutoIt magic bytes**
 
-- verityfactseeker: `41 55 33 21` (4 bytes — "AU3!")
-- verityvulture: `41 55 33 21 45 41 30 36` (8 bytes — "AU3!EA06", AutoIt v3 primary)
+- verityfactseeker: `41 55 33 21` (4 bytes - "AU3!")
+- verityvulture: `41 55 33 21 45 41 30 36` (8 bytes - "AU3!EA06", AutoIt v3 primary)
 - **RESOLUTION**: Both are present in compiled scripts. The 4-byte prefix appears in the RCDATA
-  resource; the full 8-byte form is the definitive block marker for v3. Both included in §3.2.
+  resource; the full 8-byte form is the definitive block marker for v3. Both included in section 3.2.
   Older versions use `EA05` or `EA02` as the last two bytes. Scan for 4-byte prefix, validate
   next 4 bytes for version disambiguation.
 
 **5. 7-Zip's handling of NSIS installers**
 
-- verityvulture §10 notes: 7-Zip's NSIS handler can fail to parse some NSIS versions or
+- verityvulture section 10 notes: 7-Zip's NSIS handler can fail to parse some NSIS versions or
   custom-compressed installers, falling back to reporting `Type = PE` even for genuine NSIS.
 - **RESOLUTION**: Use `.ndata` PE section check as the **primary** NSIS detector;
   7z `Type = Nsis` is a confirmation, not the only signal.
@@ -2532,8 +2531,8 @@ The following conflicts were identified between the two source documents and res
 
 - verityfactseeker recommends `ReflectionOnlyLoadFrom` for .NET 4.x.
 - verityvulture notes it is deprecated in .NET 5+ (throws PlatformNotSupportedException).
-- **RESOLUTION**: For .NET 5+ environments, use `MetadataLoadContext` (§4.6). Both methods
-  noted in this document. The raw PE byte-offset method (§4.4) is always safe regardless of
+- **RESOLUTION**: For .NET 5+ environments, use `MetadataLoadContext` (section 4.6). Both methods
+  noted in this document. The raw PE byte-offset method (section 4.4) is always safe regardless of
   .NET version and is preferred for untrusted binaries.
 
 **7. Advanced Installer detection**
@@ -2542,19 +2541,19 @@ The following conflicts were identified between the two source documents and res
 - verityvulture: CompanyName "Caphyon" as HIGH_CONFIDENCE VersionInfo marker
 - **RESOLUTION**: Both are valid and complementary. CompanyName "Caphyon" is the more
   reliable indicator when VersionInfo is not stripped. "AI_SetupDir" string is useful when
-  VersionInfo has been customized. Both included in §2.5.
+  VersionInfo has been customized. Both included in section 2.5.
 
 **8. WiX Burn markers**
 
 - verityfactseeker: `.wixburn` PE section name as definitive
 - verityvulture: `WIXBURN_MANIFEST` resource name as definitive
 - **RESOLUTION**: Both are correct; they are complementary signals from the same binary.
-  Modern WiX Burn executables have both. Check for either; both included in §2.4.
+  Modern WiX Burn executables have both. Check for either; both included in section 2.4.
 
 ---
 
 _Document: exe-static-classification-reference.md_
-_Version: 2026.04.15.002 — Canonical merged reference_
+_Version: 2026.04.15.002 - Canonical merged reference_
 _Sources: verityvulture run 2026-04-15\_\_1410 + verityfactseeker artifact 2026.04.15.001_
 _Scope: Static analysis only. No execution of binaries._
 _Last updated: 2026-04-15_
