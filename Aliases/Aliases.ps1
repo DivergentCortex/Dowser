@@ -1,56 +1,118 @@
 # Aliases\Aliases.ps1
-# all Dowser short aliases. none defined inside function files.
+# brandless verb-noun aliases for the dowser commands
+# not applied on import so a public load never squats generic names
+# opt in with Enable-DowserAliases or drop that line in your profile
 
-# Compare-Dowser*
-Set-Alias -Name dcompare  -Value Compare-DowserReport
+function Enable-DowserAliases {
+    <#
+    .SYNOPSIS
+        Register short brandless aliases for the Dowser commands in the current session.
 
-# ConvertTo-Dowser*
-Set-Alias -Name db64      -Value ConvertTo-DowserBase64
-Set-Alias -Name dexe      -Value ConvertTo-DowserExe
-Set-Alias -Name dico      -Value ConvertTo-DowserIco
+    .DESCRIPTION
+        Dowser exports its commands under branded verb-Dowser-noun names so importing the
+        module never drops generic names like Find-File or Get-Info into your session
+        uninvited. This function opts the current session into the natural verb-noun forms
+        by registering them as global aliases.
 
-# Find-Dowser*
-Set-Alias -Name ddupe     -Value Find-DowserDuplicate
-Set-Alias -Name dfile     -Value Find-DowserFile
-Set-Alias -Name dfind     -Value Find-DowserFile
-Set-Alias -Name dmod      -Value Find-DowserModified
-Set-Alias -Name dlog      -Value Find-DowserRecentLog
-Set-Alias -Name dorphan   -Value Find-DowserOrphan
-Set-Alias -Name ddep      -Value Find-DowserDependency
-Set-Alias -Name dscript   -Value Find-DowserScript
-Set-Alias -Name dstr      -Value Find-DowserString
-Set-Alias -Name dgrep     -Value Find-DowserString
+        Put it in your PowerShell profile to have the aliases in every session:
 
-# Get-Dowser*
-Set-Alias -Name dinfo     -Value Get-DowserInfo
-Set-Alias -Name dmap      -Value Get-DowserMap
-Set-Alias -Name dtree     -Value Get-DowserTopology
-Set-Alias -Name down      -Value Get-DowserOwnership
-Set-Alias -Name dprop     -Value Get-DowserProperty
-Set-Alias -Name dreport   -Value Get-DowserReport
-Set-Alias -Name dtemplate -Value Get-DowserTemplate
-Set-Alias -Name dtopo     -Value Get-DowserTopology
-Set-Alias -Name pstree    -Value Get-DowserTopology
-Set-Alias -Name shtree    -Value Get-DowserTopology
+            Enable-DowserAliases
 
-# Measure-Dowser*
-Set-Alias -Name dsize     -Value Measure-DowserDirectory
-Set-Alias -Name ddu       -Value Measure-DowserDiskUsage
+        A name already taken by another command is left alone and reported, so this will not
+        clobber someone else's Find-File. Pass -Force to override that.
 
-# Invoke-Dowser*
-Set-Alias -Name dfast     -Value Invoke-DowserFastSearch
-Set-Alias -Name dsort     -Value Invoke-DowserNumericSort
-Set-Alias -Name dnsort    -Value Invoke-DowserNumericSort
+    .PARAMETER Force
+        Overwrite an alias or command name that already exists in the session.
 
-# New-Dowser*
-Set-Alias -Name dhide     -Value New-DowserHiddenFolder
+    .EXAMPLE
+        Enable-DowserAliases
 
-# Test-Dowser*
-Set-Alias -Name dtest       -Value Test-DowserExtractable
-Set-Alias -Name dtestexe    -Value Test-DowserExtractable
-Set-Alias -Name dintegrity  -Value Test-DowserIntegrity
-Set-Alias -Name dinteg      -Value Test-DowserIntegrity
+        Registers the brandless aliases, skipping any name already in use.
 
-# Expand-Dowser*
-Set-Alias -Name dexpand   -Value Expand-DowserExe
-Set-Alias -Name dextract  -Value Expand-DowserExe
+    .EXAMPLE
+        Enable-DowserAliases -Force
+
+        Registers them all, overwriting any colliding name.
+
+    .INPUTS
+        None.
+
+    .OUTPUTS
+        None. Registered aliases are written to the verbose log.
+
+    .NOTES
+        Author: Curtis Leggett / Divergent Cortex
+        it is not water they seek, it is truth, the path hidden in the trees
+        the rods tremble as they near the truth buried beneath the tree
+    #>
+    [CmdletBinding()]
+    param(
+        [switch]$Force
+    )
+
+    # branded command -> brandless alias
+    $map = [ordered]@{
+        'Compare-DowserReport'     = 'Compare-Report'
+        'ConvertTo-DowserBase64'   = 'ConvertTo-Base64'
+        'ConvertTo-DowserExe'      = 'ConvertTo-Exe'
+        'ConvertTo-DowserIco'      = 'ConvertTo-Ico'
+        'Expand-DowserExe'         = 'Expand-Exe'
+        'Find-DowserDependency'    = 'Find-Dependency'
+        'Find-DowserDuplicate'     = 'Find-Duplicate'
+        'Find-DowserFile'          = 'Find-File'
+        'Find-DowserModified'      = 'Find-Modified'
+        'Find-DowserOrphan'        = 'Find-Orphan'
+        'Find-DowserRecentLog'     = 'Find-RecentLog'
+        'Find-DowserScript'        = 'Find-Script'
+        'Find-DowserString'        = 'Find-String'
+        'Get-DowserInfo'           = 'Get-Info'
+        'Get-DowserMap'            = 'Get-Map'
+        'Get-DowserOwnership'      = 'Get-Ownership'
+        'Get-DowserProperty'       = 'Get-Property'
+        'Get-DowserReport'         = 'Get-Report'
+        'Get-DowserTemplate'       = 'Get-Template'
+        'Get-DowserTopology'       = 'Get-Tree'
+        'Invoke-DowserFastSearch'  = 'Invoke-FastSearch'
+        'Invoke-DowserNumericSort' = 'Invoke-NumericSort'
+        'Measure-DowserDirectory'  = 'Measure-Directory'
+        'Measure-DowserDiskUsage'  = 'Measure-DiskUsage'
+        'New-DowserHiddenFolder'   = 'New-HiddenFolder'
+        'Test-DowserExtractable'   = 'Test-Extractable'
+        'Test-DowserIntegrity'     = 'Test-Integrity'
+    }
+
+    Write-Log -Message "registering $($map.Count) dowser aliases" -Severity Verbose
+
+    $set = 0
+    foreach ($target in $map.Keys) {
+        $alias = $map[$target]
+
+        # leave a name that already exists alone unless forced
+        $existing = Get-Command -Name $alias -ErrorAction SilentlyContinue
+        if ($existing) {
+            if ($existing.CommandType -eq 'Alias' -and $existing.Definition -eq $target) {
+                continue   # already ours, nothing to do
+            }
+            # never shadow a builtin, force or not
+            if ($existing.CommandType -in 'Cmdlet', 'Application') {
+                Write-Log -Message "skipped $alias, will not shadow builtin $($existing.Name) ($($existing.CommandType))" -Severity Warning
+                continue
+            }
+            if (-not $Force) {
+                Write-Log -Message "skipped $alias, name already used by $($existing.Name) ($($existing.CommandType)). pass -Force to override" -Severity Warning
+                continue
+            }
+        }
+
+        try {
+            Set-Alias -Name $alias -Value $target -Scope Global -Force -ErrorAction Stop
+            Write-Log -Message "$alias -> $target" -Severity Verbose
+            $set++
+        }
+        catch {
+            Write-Log -Message "could not set $alias. $($_.Exception.Message)" -Severity Error
+        }
+    }
+
+    Write-Log -Message "dowser aliases ready: $set registered" -Severity Verbose
+}
