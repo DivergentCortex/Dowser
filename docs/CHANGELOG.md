@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.29.043] - 2026-06-29
+### feat(aliases): Replace cryptic short aliases with opt-in normalized verb-noun forms
+
+What changed:
+- Rewrote Aliases/Aliases.ps1: dropped the d* short aliases (dfile, dgrep, dtree and friends) in favor of brandless verb-noun aliases (Find-File, Get-Info, Measure-DiskUsage, Get-Tree, and the rest of the 27)
+- Aliases are no longer applied on import. They register only when the caller runs the new Enable-DowserAliases function, so a public import never drops generic names into a stranger's session
+- Enable-DowserAliases refuses to shadow a builtin (Cmdlet or Application) even with -Force, leaves any other already-taken name alone unless -Force, and is idempotent when an alias is already its own
+- Exported Enable-DowserAliases from the manifest and module
+
+Why:
+- The old short aliases were a decoder ring, not muscle memory, and auto-exported generic names would squat command names on import. Opt-in normalized forms give the natural names without the module barging into other sessions, and builtins stay protected
+
+
 ## [2026.06.29.042] - 2026-06-29
 ### chore(manifest): Point ProjectUri at the DivergentCortex org
 
