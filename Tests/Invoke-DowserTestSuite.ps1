@@ -1303,7 +1303,7 @@ if ($benchmarks.Count -gt 0) {
 # build fail section
 $failHtml = if ($fails -gt 0) {
     $frows = ($script:TestResults | Where-Object Status -EQ 'FAIL' | ForEach-Object {
-            '<tr style="background:#f8d7da"><td>' + (Escape-Html $_.Cmdlet) + '</td><td>' + (Escape-Html $_.TestName) + '</td><td>' + (Escape-Html $_.Detail) + '</td></tr>'
+            '<tr style="background:#f8d7da;color:#1e1e1e"><td>' + (Escape-Html $_.Cmdlet) + '</td><td>' + (Escape-Html $_.TestName) + '</td><td>' + (Escape-Html $_.Detail) + '</td></tr>'
         }) -join "`n"
     '<h2 style="color:red">Failed Tests</h2><table border="1" cellpadding="5" style="border-collapse:collapse"><tr style="background:#c0392b;color:#fff"><th>Cmdlet</th><th>Test</th><th>Detail</th></tr>' + $frows + '</table>'
 }
