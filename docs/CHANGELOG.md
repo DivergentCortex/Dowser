@@ -2,6 +2,16 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.30.045] - 2026-06-30
+### fix(Tests): Apply the legibility fix to the report's Failed Tests table too
+
+What changed:
+- Invoke-DowserTestSuite.ps1 now also sets color:#1e1e1e on the Failed Tests table rows (background:#f8d7da), which build separately from the All Test Results rows fixed in 2026.06.30.044
+
+Why:
+- The prior fix only touched the All Test Results row generator. The Failed Tests section emits its own light-red rows and still rendered light-gray text on a light fill, leaving the failure details unreadable -- the same contrast bug in a second code path.
+
+
 ## [2026.06.30.044] - 2026-06-30
 ### fix(Tests): Make the HTML report's All Test Results table legible
 
