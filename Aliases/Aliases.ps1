@@ -19,10 +19,11 @@ function Enable-DowserAliases {
             Enable-DowserAliases
 
         A name already taken by another command is left alone and reported, so this will not
-        clobber someone else's Find-File. Pass -Force to override that.
+        clobber another module's Find-File or the system pstree on Linux. Pass -Force to
+        override a non-builtin name; builtins (cmdlets and native apps) are never touched.
 
     .PARAMETER Force
-        Overwrite an alias or command name that already exists in the session.
+        Overwrite an alias or function name that already exists. Builtins are still skipped.
 
     .EXAMPLE
         Enable-DowserAliases
@@ -32,7 +33,7 @@ function Enable-DowserAliases {
     .EXAMPLE
         Enable-DowserAliases -Force
 
-        Registers them all, overwriting any colliding name.
+        Registers them all, overwriting any colliding alias or function.
 
     .INPUTS
         None.
@@ -50,44 +51,46 @@ function Enable-DowserAliases {
         [switch]$Force
     )
 
-    # branded command -> brandless alias
+    # brandless alias -> branded command. one function can carry several aliases.
     $map = [ordered]@{
-        'Compare-DowserReport'     = 'Compare-Report'
-        'ConvertTo-DowserBase64'   = 'ConvertTo-Base64'
-        'ConvertTo-DowserExe'      = 'ConvertTo-Exe'
-        'ConvertTo-DowserIco'      = 'ConvertTo-Ico'
-        'Expand-DowserExe'         = 'Expand-Exe'
-        'Find-DowserDependency'    = 'Find-Dependency'
-        'Find-DowserDuplicate'     = 'Find-Duplicate'
-        'Find-DowserFile'          = 'Find-File'
-        'Find-DowserModified'      = 'Find-Modified'
-        'Find-DowserOrphan'        = 'Find-Orphan'
-        'Find-DowserRecentLog'     = 'Find-RecentLog'
-        'Find-DowserScript'        = 'Find-Script'
-        'Find-DowserString'        = 'Find-String'
-        'Get-DowserInfo'           = 'Get-Info'
-        'Get-DowserMap'            = 'Get-Map'
-        'Get-DowserOwnership'      = 'Get-Ownership'
-        'Get-DowserProperty'       = 'Get-Property'
-        'Get-DowserReport'         = 'Get-Report'
-        'Get-DowserTemplate'       = 'Get-Template'
-        'Get-DowserTopology'       = 'Get-Tree'
-        'Invoke-DowserFastSearch'  = 'Invoke-FastSearch'
-        'Invoke-DowserNumericSort' = 'Invoke-NumericSort'
-        'Measure-DowserDirectory'  = 'Measure-Directory'
-        'Measure-DowserDiskUsage'  = 'Measure-DiskUsage'
-        'New-DowserHiddenFolder'   = 'New-HiddenFolder'
-        'Test-DowserExtractable'   = 'Test-Extractable'
-        'Test-DowserIntegrity'     = 'Test-Integrity'
+        'Compare-Report'     = 'Compare-DowserReport'
+        'ConvertTo-Base64'   = 'ConvertTo-DowserBase64'
+        'ConvertTo-Exe'      = 'ConvertTo-DowserExe'
+        'ConvertTo-Ico'      = 'ConvertTo-DowserIco'
+        'Expand-Exe'         = 'Expand-DowserExe'
+        'Find-Dependency'    = 'Find-DowserDependency'
+        'Find-Duplicate'     = 'Find-DowserDuplicate'
+        'Find-File'          = 'Find-DowserFile'
+        'Find-Modified'      = 'Find-DowserModified'
+        'Find-Orphan'        = 'Find-DowserOrphan'
+        'Find-RecentLog'     = 'Find-DowserRecentLog'
+        'Find-ScriptFile'    = 'Find-DowserScript'
+        'Find-String'        = 'Find-DowserString'
+        'Get-Info'           = 'Get-DowserInfo'
+        'Get-Map'            = 'Get-DowserMap'
+        'Get-Ownership'      = 'Get-DowserOwnership'
+        'Get-Property'       = 'Get-DowserProperty'
+        'Get-Report'         = 'Get-DowserReport'
+        'Get-Template'       = 'Get-DowserTemplate'
+        'Get-Tree'           = 'Get-DowserTopology'
+        'pstree'             = 'Get-DowserTopology'
+        'shtree'             = 'Get-DowserTopology'
+        'Invoke-FastSearch'  = 'Invoke-DowserFastSearch'
+        'Invoke-NumericSort' = 'Invoke-DowserNumericSort'
+        'Measure-Directory'  = 'Measure-DowserDirectory'
+        'Measure-DiskUsage'  = 'Measure-DowserDiskUsage'
+        'New-HiddenFolder'   = 'New-DowserHiddenFolder'
+        'Test-Extractable'   = 'Test-DowserExtractable'
+        'Test-Integrity'     = 'Test-DowserIntegrity'
     }
 
     Write-Log -Message "registering $($map.Count) dowser aliases" -Severity Verbose
 
     $set = 0
-    foreach ($target in $map.Keys) {
-        $alias = $map[$target]
+    foreach ($alias in $map.Keys) {
+        $target = $map[$alias]
 
-        # leave a name that already exists alone unless forced
+        # leave a name that already exists alone
         $existing = Get-Command -Name $alias -ErrorAction SilentlyContinue
         if ($existing) {
             if ($existing.CommandType -eq 'Alias' -and $existing.Definition -eq $target) {
@@ -95,7 +98,7 @@ function Enable-DowserAliases {
             }
             # never shadow a builtin, force or not
             if ($existing.CommandType -in 'Cmdlet', 'Application') {
-                Write-Log -Message "skipped $alias, will not shadow builtin $($existing.Name) ($($existing.CommandType))" -Severity Warning
+                Write-Log -Message "skipped $alias, will not shadow builtin $($existing.Name) ($($existing.CommandType))" -Severity Verbose
                 continue
             }
             if (-not $Force) {
