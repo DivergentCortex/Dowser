@@ -2,6 +2,16 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.30.044] - 2026-06-30
+### fix(Tests): Make the HTML report's All Test Results table legible
+
+What changed:
+- Invoke-DowserTestSuite.ps1 now sets color:#1e1e1e on each status-colored result row in the HTML report's All Test Results table
+
+Why:
+- The report's dark theme leaves body text light gray (#d4d4d4), but the per-row PASS/FAIL/WARN/SKIP backgrounds are all light colors (#d4edda and friends), so every row was light-gray text on a light fill -- effectively invisible. Forcing dark text on the light rows restores contrast without touching the rest of the dark theme.
+
+
 ## [2026.06.29.043] - 2026-06-29
 
 ### feat(aliases): Replace cryptic short aliases with opt-in normalized verb-noun forms
