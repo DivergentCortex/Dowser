@@ -1284,7 +1284,7 @@ $rowsHtml = ($script:TestResults | ForEach-Object {
                 '#e2e3e5'
             } 
         }
-        "<tr style='background:$bg'><td>$(Escape-Html $_.Cmdlet)</td><td>$(Escape-Html $_.TestName)</td><td><b>$($_.Status)</b></td><td>$(Escape-Html $_.Detail)</td><td align='right'>$($_.ElapsedMs)</td></tr>"
+        "<tr style='background:$bg;color:#1e1e1e'><td>$(Escape-Html $_.Cmdlet)</td><td>$(Escape-Html $_.TestName)</td><td><b>$($_.Status)</b></td><td>$(Escape-Html $_.Detail)</td><td align='right'>$($_.ElapsedMs)</td></tr>"
     }) -join "`n"
 
 # build benchmark html section
