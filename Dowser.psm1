@@ -1,15 +1,15 @@
 #Requires -Version 5.1
 <#
-.SYNOPSIS
-    Dowser module loader: filesystem reconnaissance, search, sizing, and reporting toolkit.
+    .SYNOPSIS
+        Dowser module loader: filesystem reconnaissance, search, sizing, and reporting toolkit.
 
-.NOTES
+    .NOTES
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
    
-         |                                
-      _` |   _ \ \ \  \ / (_-<   -_)   _| 
-      \__,_| \___/  \_/\_/  ___/ \___| _|  
-
+             |                            
+         _ ` |   _ \ \ \  \ / (_-<   -_)   _| 
+        \__,_| \___/  \_/\_/  ___/ \___| _|  
+     
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     -  Author:        Curtis Leggett                                  -
@@ -20,12 +20,12 @@
     -  it is not water they seek, but the truth beneath the trees     -
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-.DESCRIPTION
-    Loads the Dowser module. Sets PS 5.1 platform-compat variables, establishes a
-    default log path under the module root, dot-sources every Public and Private
-    function file plus the alias set, reads the module version from the newest
-    CHANGELOG slot, initializes the Witness logger with a session-start banner, and
-    exports the public command surface.
+    .DESCRIPTION
+        Loads the Dowser module. Sets PS 5.1 platform-compat variables, establishes a
+        default log path under the module root, dot-sources every Public and Private
+        function file plus the alias set, reads the module version from the newest
+        CHANGELOG slot, initializes the Witness logger with a session-start banner, and
+        exports the public command surface.
 #>
 
 # Platform compat: PS 5.1 lacks $IsWindows/$IsLinux/$IsMacOS automatic variables.
