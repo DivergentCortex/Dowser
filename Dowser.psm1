@@ -74,6 +74,10 @@ $aliasPath = Join-Path (Join-Path $PSScriptRoot 'Aliases') 'Aliases.ps1'
 if (Test-Path $aliasPath) {
     . $aliasPath
     Enable-DowserAliases
+    # register aliases at module scope so Export-ModuleMember -Alias * can see them
+    foreach ($entry in $DowserAliasMap.GetEnumerator()) {
+        Set-Alias -Name $entry.Key -Value $entry.Value -Force
+    }
 }
 
 # version is the latest changelog slot, read at load so nothing hardcodes it
