@@ -2,6 +2,29 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.30.047] - 2026-06-30
+### test(Tests): Sync the test suite with the opt-in alias model and Get-DowserInfo shape for a clean 0-FAIL run
+
+What changed:
+- Invoke-DowserTestSuite.ps1 now calls Enable-DowserAliases after import and counts global aliases whose definition targets a *-Dowser* command, instead of counting module-exported aliases (which are always 0 under the opt-in model)
+- Replaced the dead 'dfast' alias check with the current 'Invoke-FastSearch' alias; renamed the test to Alias-Invoke-FastSearch
+- Fixed the Get-DowserInfo StubInfo test to read .ModuleVersion instead of the nonexistent .Version property, which had been throwing a PropertyNotFoundException to stderr
+
+Why:
+- The suite predated changelog 2026.06.29.043, which dropped the auto-loaded d* aliases in favor of opt-in brandless verb-noun aliases registered by Enable-DowserAliases. That left three stale checks: the dfast alias FAIL, the AliasCount WARN (0 exported), and a harness PropertyNotFound crash reading Get-DowserInfo.Version. With these and the earlier Write-Log empty-string fix, the suite now runs 131 PASS / 0 FAIL / 0 WARN / 4 legitimate platform SKIPs.
+
+
+## [2026.06.30.046] - 2026-06-30
+### fix(Write-Log): Allow empty-string messages so blank log spacer lines do not throw
+
+What changed:
+- Added [AllowEmptyString()] to the -Message parameter of Write-Log in Private/Write-Log.ps1
+- Get-DowserReport (and Compare-DowserReport) emit blank spacer lines via Write-Log "" -Severity Verbose; these now succeed instead of throwing
+
+Why:
+- -Message was [Parameter(Mandatory)][string] with no AllowEmptyString, so any Write-Log \"\" threw 'Cannot bind argument to parameter Message because it is an empty string'. Get-DowserReport hits that on every completed scan when logging its summary spacer lines, so the function threw for real callers, not just under test. Allowing empty strings fixes the whole class at the logger. Note: Write-Log here is the single-file copy of the DivergentCortex.Witness logger; mirror this change into Witness to keep the two in sync.
+
+
 ## [2026.06.30.045] - 2026-06-30
 ### fix(Tests): Apply the legibility fix to the report's Failed Tests table too
 
