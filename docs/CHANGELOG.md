@@ -2,6 +2,17 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.30.054] - 2026-06-30
+### fix(Aliases): Fix alias export: change Set-Alias scope to Script, add dfast alias for Invoke-DowserFastSearch
+
+What changed:
+- Changed Set-Alias -Scope Global to -Scope Script in Enable-DowserAliases so aliases land in module scope where Export-ModuleMember -Alias * can see them
+- Added 'dfast' = 'Invoke-DowserFastSearch' to the alias map in Aliases/Aliases.ps1 (30 entries total, 29 registered on Linux after builtin collision guard skips pstree/shtree)
+
+Why:
+- Set-Alias -Scope Global puts aliases in the session global scope, invisible to Export-ModuleMember which only sees module scope -- result was AliasCount 0 on import. dfast alias was missing from the map entirely, causing Alias-dfast FAIL in the test suite.
+
+
 ## [2026.06.30.053] - 2026-06-30
 ### fix(Get-DowserReport): Guard empty Message parameter in Write-Log call to fix DirScan+ExportFiles failure
 
