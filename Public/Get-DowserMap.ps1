@@ -203,10 +203,26 @@ function Get-DowserMap {
             if (-not $SizeCache.ContainsKey($folderPath)) {
                 $sizeBytes = 0
                 try {
-                    $measured = Get-ChildItem -LiteralPath $folderPath -Recurse -File -Force -ErrorAction SilentlyContinue |
-                        Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue
-                    if ($measured.Sum) {
-                        $sizeBytes = $measured.Sum 
+                    $sizeStack = New-Object 'System.Collections.Generic.Stack[string]'
+                    $sizeStack.Push($folderPath)
+                    while ($sizeStack.Count -gt 0) {
+                        $sizeDir = $sizeStack.Pop()
+                        $sizeItems = if ($IncludeHidden) {
+                            Get-ChildItem -LiteralPath $sizeDir -Force -ErrorAction SilentlyContinue
+                        } else {
+                            Get-ChildItem -LiteralPath $sizeDir -ErrorAction SilentlyContinue
+                        }
+                        foreach ($si in $sizeItems) {
+                            if ($si.PSIsContainer) {
+                                if (-not (Test-ExcludeFolder $si)) {
+                                    $sizeStack.Push($si.FullName)
+                                }
+                            } else {
+                                if ((Test-IncludeFile $si) -and -not (Test-ExcludeByPath $si)) {
+                                    $sizeBytes += $si.Length
+                                }
+                            }
+                        }
                     }
                 }
                 catch {
@@ -362,6 +378,13 @@ function Get-DowserMap {
             return ($s -replace '/', '\') 
         } 
     }
+    # ConvertTo-ForwardSlashPath: canonical comparison form -- forward slash on all platforms.
+    # Used for rootFull/excludePaths so Test-ExcludeByPath comparisons work on Linux.
+    function ConvertTo-ForwardSlashPath {
+        param([string]$s)
+        if ($null -eq $s) { return $null }
+        return ($s -replace '\\', '/')
+    }
     # ConvertTo-WslPath translates a Windows drive/UNC path into a /mnt style path.
     # It needs backslash-normalized input for its regex, so it normalizes locally.
     function ConvertTo-WslPath {
@@ -398,14 +421,14 @@ function Get-DowserMap {
     }
     catch { 
     }
-    $rootFull = ConvertTo-NativeSeparator $rootFull
-    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length - 1] -ne $sep[0]) {
-        $rootFull += $sep 
+    $rootFull = ConvertTo-ForwardSlashPath $rootFull
+    if ($rootFull -and $rootFull.Length -gt 0 -and $rootFull[$rootFull.Length - 1] -ne '/') {
+        $rootFull += '/' 
     }
 
     $excludePaths = @()
     if ($ExcludePathPatterns) {
-        $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-NativeSeparator $_ }) 
+        $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-ForwardSlashPath $_ }) 
     }
 
     # IncludeFolders breakdown: exact names, wildcards, exact paths, wildcard paths
@@ -522,7 +545,7 @@ function Get-DowserMap {
                     }
                 }
                 if ($isMatch -and $excludePaths) {
-                    $full = $file.FullName
+                    $full = ($file.FullName -replace '\\', '/')
                     foreach ($p in $excludePaths) {
                         if ($full -like "*$p*") {
                             $isMatch = $false; break 
@@ -602,15 +625,16 @@ function Get-DowserMap {
     # --- Filter helper functions ---
     function ConvertTo-RelativePath {
         param([string]$full)
+        $fwd = ConvertTo-ForwardSlashPath $full
         if ([string]::IsNullOrEmpty($rootFull)) {
-            return $full 
+            return $fwd 
         }
-        if ($full -and $full.Length -ge $rootFull.Length) {
-            if ($full.Substring(0, $rootFull.Length) -ieq $rootFull) {
-                return $full.Substring($rootFull.Length) 
+        if ($fwd -and $fwd.Length -ge $rootFull.Length) {
+            if ($fwd.Substring(0, $rootFull.Length) -ieq $rootFull) {
+                return $fwd.Substring($rootFull.Length).TrimStart('/', '\')
             }
         }
-        return $full
+        return $fwd
     }
     function Test-MatchAny {
         param([string]$value, [string[]]$patterns)
@@ -629,7 +653,7 @@ function Get-DowserMap {
         if (-not $excludePaths -or (@($excludePaths).Count -eq 0)) {
             return $false 
         }
-        $full = ConvertTo-NativeSeparator $item.FullName
+        $full = ConvertTo-ForwardSlashPath $item.FullName
         $rel = ConvertTo-RelativePath $full
         if (Test-MatchAny -value $full -patterns $excludePaths) {
             return $true 
@@ -1085,8 +1109,13 @@ function Get-DowserMap {
                         $displayRoot = ConvertTo-WslPath $Path 
                     }
                     else {
-                        $displayRoot = if ($rootFull) {
-                            $rootFull.TrimEnd($sep[0]) 
+                        $rootDisplay = if ($IsWindows) {
+                            ($rootFull -replace '/', '\').TrimEnd('\')
+                        } else {
+                            $rootFull.TrimEnd('/')
+                        }
+                        $displayRoot = if ($rootDisplay) {
+                            $rootDisplay
                         }
                         else {
                             ConvertTo-NativeSeparator $Path 
