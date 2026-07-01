@@ -297,7 +297,9 @@ if ($t.Error) {
 Add-TestResult -Cmdlet "Module" -TestName "Import-Module" -Status PASS -Detail "OK in $([Math]::Round($t.ElapsedMs))ms" -ElapsedMs $t.ElapsedMs
 
 $funcCount = @(Get-Command -Module Dowser -CommandType Function).Count
-$aliasCount = @(Get-Command -Module Dowser -CommandType Alias).Count
+# aliases are opt-in (Enable-DowserAliases) and register globally, not as module exports
+$null = Enable-DowserAliases -ErrorAction SilentlyContinue
+$aliasCount = @(Get-Alias -ErrorAction SilentlyContinue | Where-Object { $_.Definition -like '*-Dowser*' }).Count
 Add-TestResult -Cmdlet "Module" -TestName "FunctionCount" -Status $(if ($funcCount -ge 21) {
         'PASS'
     }
@@ -309,7 +311,7 @@ Add-TestResult -Cmdlet "Module" -TestName "AliasCount" -Status $(if ($aliasCount
     }
     else {
         'WARN'
-    }) -Detail "$aliasCount exported (need >= 20)"
+    }) -Detail "$aliasCount registered via Enable-DowserAliases (need >= 20)"
 
 # ---------------------------------------------------------
 # T-02  help blocks
@@ -669,16 +671,16 @@ Add-TestResult -Cmdlet "Invoke-DowserFastSearch" -TestName "CaseSensitive" `
     }) `
     -Detail "$(if($t2.Error){$t2.Error}else{"$($t2.Result.Count) case-sensitive hits"})" -ElapsedMs $t2.ElapsedMs
 
-# alias test
-$t3 = Invoke-Timed { @(dfast -Path $smallDir -SearchString "Test-Item") }
-Add-TestResult -Cmdlet "Invoke-DowserFastSearch" -TestName "Alias-dfast" `
+# alias test (aliases are opt-in; Enable-DowserAliases was called after import)
+$t3 = Invoke-Timed { @(Invoke-FastSearch -Path $smallDir -SearchString "Test-Item") }
+Add-TestResult -Cmdlet "Invoke-DowserFastSearch" -TestName "Alias-Invoke-FastSearch" `
     -Status $(if (-not $t3.Error) {
         'PASS'
     }
     else {
         'FAIL'
     }) `
-    -Detail "$(if($t3.Error){$t3.Error}else{"alias dfast ok: $($t3.Result.Count) hits"})" -ElapsedMs $t3.ElapsedMs
+    -Detail "$(if($t3.Error){$t3.Error}else{"alias Invoke-FastSearch ok: $($t3.Result.Count) hits"})" -ElapsedMs $t3.ElapsedMs
 
 # Invoke-DowserNumericSort
 Write-Host "  [Invoke-DowserNumericSort]" -ForegroundColor DarkCyan
@@ -890,7 +892,7 @@ Add-TestResult -Cmdlet "Get-DowserInfo" -TestName "StubInfo" `
     else {
         'FAIL'
     }) `
-    -Detail "$(if($t.Error){$t.Error}else{"Module=$($t.Result.Module) Version=$($t.Result.Version)"})" -ElapsedMs $t.ElapsedMs
+    -Detail "$(if($t.Error){$t.Error}else{"Module=$($t.Result.Module) Version=$($t.Result.ModuleVersion)"})" -ElapsedMs $t.ElapsedMs
 
 # New-DowserHiddenFolder
 Write-Host "  [New-DowserHiddenFolder]" -ForegroundColor DarkCyan
