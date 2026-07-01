@@ -3,6 +3,40 @@
 # not applied on import so a public load never squats generic names
 # opt in with Enable-DowserAliases or drop that line in your profile
 
+# file-scope map so psm1 can register aliases at module scope via a top-level loop
+$DowserAliasMap = [ordered]@{
+    'Compare-Report'     = 'Compare-DowserReport'
+    'ConvertTo-Base64'   = 'ConvertTo-DowserBase64'
+    'ConvertTo-Exe'      = 'ConvertTo-DowserExe'
+    'ConvertTo-Ico'      = 'ConvertTo-DowserIco'
+    'Expand-Exe'         = 'Expand-DowserExe'
+    'Find-Dependency'    = 'Find-DowserDependency'
+    'Find-Duplicate'     = 'Find-DowserDuplicate'
+    'Find-File'          = 'Find-DowserFile'
+    'Find-Modified'      = 'Find-DowserModified'
+    'Find-Orphan'        = 'Find-DowserOrphan'
+    'Find-RecentLog'     = 'Find-DowserRecentLog'
+    'Find-ScriptFile'    = 'Find-DowserScript'
+    'Find-String'        = 'Find-DowserString'
+    'Get-Info'           = 'Get-DowserInfo'
+    'Get-Map'            = 'Get-DowserMap'
+    'Get-Ownership'      = 'Get-DowserOwnership'
+    'Get-Property'       = 'Get-DowserProperty'
+    'Get-Report'         = 'Get-DowserReport'
+    'Get-Template'       = 'Get-DowserTemplate'
+    'Get-Tree'           = 'Get-DowserTopology'
+    'pstree'             = 'Get-DowserTopology'
+    'shtree'             = 'Get-DowserTopology'
+    'dfast'              = 'Invoke-DowserFastSearch'
+    'Invoke-FastSearch'  = 'Invoke-DowserFastSearch'
+    'Invoke-NumericSort' = 'Invoke-DowserNumericSort'
+    'Measure-Directory'  = 'Measure-DowserDirectory'
+    'Measure-DiskUsage'  = 'Measure-DowserDiskUsage'
+    'New-HiddenFolder'   = 'New-DowserHiddenFolder'
+    'Test-Extractable'   = 'Test-DowserExtractable'
+    'Test-Integrity'     = 'Test-DowserIntegrity'
+}
+
 function Enable-DowserAliases {
     <#
     .SYNOPSIS
@@ -51,45 +85,11 @@ function Enable-DowserAliases {
         [switch]$Force
     )
 
-    # brandless alias -> branded command. one function can carry several aliases.
-    $map = [ordered]@{
-        'Compare-Report'     = 'Compare-DowserReport'
-        'ConvertTo-Base64'   = 'ConvertTo-DowserBase64'
-        'ConvertTo-Exe'      = 'ConvertTo-DowserExe'
-        'ConvertTo-Ico'      = 'ConvertTo-DowserIco'
-        'Expand-Exe'         = 'Expand-DowserExe'
-        'Find-Dependency'    = 'Find-DowserDependency'
-        'Find-Duplicate'     = 'Find-DowserDuplicate'
-        'Find-File'          = 'Find-DowserFile'
-        'Find-Modified'      = 'Find-DowserModified'
-        'Find-Orphan'        = 'Find-DowserOrphan'
-        'Find-RecentLog'     = 'Find-DowserRecentLog'
-        'Find-ScriptFile'    = 'Find-DowserScript'
-        'Find-String'        = 'Find-DowserString'
-        'Get-Info'           = 'Get-DowserInfo'
-        'Get-Map'            = 'Get-DowserMap'
-        'Get-Ownership'      = 'Get-DowserOwnership'
-        'Get-Property'       = 'Get-DowserProperty'
-        'Get-Report'         = 'Get-DowserReport'
-        'Get-Template'       = 'Get-DowserTemplate'
-        'Get-Tree'           = 'Get-DowserTopology'
-        'pstree'             = 'Get-DowserTopology'
-        'shtree'             = 'Get-DowserTopology'
-        'dfast'              = 'Invoke-DowserFastSearch'
-        'Invoke-FastSearch'  = 'Invoke-DowserFastSearch'
-        'Invoke-NumericSort' = 'Invoke-DowserNumericSort'
-        'Measure-Directory'  = 'Measure-DowserDirectory'
-        'Measure-DiskUsage'  = 'Measure-DowserDiskUsage'
-        'New-HiddenFolder'   = 'New-DowserHiddenFolder'
-        'Test-Extractable'   = 'Test-DowserExtractable'
-        'Test-Integrity'     = 'Test-DowserIntegrity'
-    }
-
-    Write-Log -Message "registering $($map.Count) dowser aliases" -Severity Verbose
+    Write-Log -Message "registering $($DowserAliasMap.Count) dowser aliases" -Severity Verbose
 
     $set = 0
-    foreach ($alias in $map.Keys) {
-        $target = $map[$alias]
+    foreach ($alias in $DowserAliasMap.Keys) {
+        $target = $DowserAliasMap[$alias]
 
         # leave a name that already exists alone
         $existing = Get-Command -Name $alias -ErrorAction SilentlyContinue
@@ -109,7 +109,7 @@ function Enable-DowserAliases {
         }
 
         try {
-            Set-Alias -Name $alias -Value $target -Scope Script -Force -ErrorAction Stop
+            Set-Alias -Name $alias -Value $target -Scope Global -Force -ErrorAction Stop
             Write-Log -Message "$alias -> $target" -Severity Verbose
             $set++
         }
