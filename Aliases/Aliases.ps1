@@ -75,6 +75,7 @@ function Enable-DowserAliases {
         'Get-Tree'           = 'Get-DowserTopology'
         'pstree'             = 'Get-DowserTopology'
         'shtree'             = 'Get-DowserTopology'
+        'dfast'              = 'Invoke-DowserFastSearch'
         'Invoke-FastSearch'  = 'Invoke-DowserFastSearch'
         'Invoke-NumericSort' = 'Invoke-DowserNumericSort'
         'Measure-Directory'  = 'Measure-DowserDirectory'
@@ -108,7 +109,7 @@ function Enable-DowserAliases {
         }
 
         try {
-            Set-Alias -Name $alias -Value $target -Scope Global -Force -ErrorAction Stop
+            Set-Alias -Name $alias -Value $target -Scope Script -Force -ErrorAction Stop
             Write-Log -Message "$alias -> $target" -Severity Verbose
             $set++
         }
