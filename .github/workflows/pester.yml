@@ -1,0 +1,18 @@
+name: Pester Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester
+        run: pwsh -Command "Install-Module -Name Pester -Force -Scope CurrentUser"
+
+      - name: Run tests
+        run: pwsh -Command "Invoke-Pester Tests/ -Output Detailed -ExcludeTag Windows"

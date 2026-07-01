@@ -2,6 +2,95 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.01.065] - 2026-07-01
+### chore(release): P0-4 fix (default branch) and Phase 6 pre-flip hardening
+
+What changed:
+- Changed GitHub default branch from master to main via API
+- Deleted stale master branch; only main remains
+- Enabled Dependabot vulnerability alerts and automated security fixes (pre-flip)
+- Verified .github/CODEOWNERS with rule: * @kizer88 (created by prior agent run)
+- Documented post-flip items: secret scanning, push protection, private vuln reporting, CodeQL, branch protection all require public visibility on free tier
+
+Why:
+- P0-4: master was the stale default branch while active development targets main. Mismatch would confuse contributors and break default clone behavior. Phase 6 hardening enables all free-tier security features possible while the repo is still private.
+
+
+## [2026.07.01.064] - 2026-07-01
+### chore(ci): Add GitHub Actions CI workflow for Pester tests on Linux
+
+What changed:
+- Created .github/workflows/pester.yml: triggers on push to main and pull_request, runs on ubuntu-latest, installs Pester, runs Invoke-Pester Tests/ -Output Detailed -ExcludeTag Windows
+
+Why:
+- Public repo needs automated test runs on PRs. Linux-only CI catches cross-platform regressions without requiring a Windows runner.
+
+
+## [2026.07.01.063] - 2026-07-01
+### docs(CODEOWNERS): Add CODEOWNERS file assigning all paths to @kizer88
+
+What changed:
+- Created .github/CODEOWNERS with a single rule: * @kizer88
+
+Why:
+- Ensures the maintainer is automatically requested for review on all pull requests before the repo goes public.
+
+
+## [2026.07.01.062] - 2026-07-01
+### chore(Tests): Add pre-run report cleanup to Invoke-DowserTestSuite.ps1
+
+What changed:
+- Added two-line Get-ChildItem / Remove-Item block after ReportDir creation in Invoke-DowserTestSuite.ps1 to purge stale .csv and .html files before each run
+
+Why:
+- Each test run now starts with an empty Reports directory so results from previous sessions cannot be mistaken for the current run's output.
+
+
+## [2026.07.01.061] - 2026-07-01
+### docs(SECURITY.md): Add security policy for vulnerability reporting
+
+What changed:
+- Created SECURITY.md at project root with private vulnerability reporting instructions (GitHub Security tab or maintainer email), 7-day acknowledgment and 30-day fix commitments, and in-scope/out-of-scope boundaries
+
+Why:
+- Required community file for public repository. Directs security reports to private channels instead of public issues.
+
+
+## [2026.07.01.060] - 2026-07-01
+### chore(ci): Prior session hook and test infrastructure changes
+
+What changed:
+- Created _set-executable.sh and _test-hook.sh scripts for hook testing
+- Generated test result artifacts (CSV and HTML reports) from Pester runs
+- Added workflow configuration files
+
+Why:
+- Retroactive changelog entry covering prior session infrastructure and test artifact changes that were not logged at time of creation
+
+
+## [2026.07.01.059] - 2026-07-01
+### chore(Tests): Delete stale test report files from Tests/Reports and add auto-purge before each run
+
+What changed:
+- Deleted 10 stale .csv and .html test result files from Tests/Reports/ (all timestamped 20260630)
+- Added pre-run cleanup logic in Invoke-DowserTestSuite.ps1 to remove all existing .csv and .html files from the Reports directory before each test run
+
+Why:
+- Tests/Reports accumulated result files from multiple prior sessions. The new auto-purge ensures each run starts with a clean Reports directory, preventing stale results from being confused with the current run's output.
+
+
+## [2026.07.01.058] - 2026-07-01
+### feat(git-hooks): Add machine-wide pre-commit denylist for sensitive strings
+
+What changed:
+- Configured global git hooks directory at ~/.git-hooks via core.hooksPath
+- Wrote pre-commit hook at ~/.git-hooks/pre-commit that blocks commits containing former-employer identifiers and secret patterns (private keys, cloud access keys, platform tokens)
+- Hook checks all staged added lines, prints the offending file and pattern, and exits 1 to abort the commit
+
+Why:
+- Sensitive strings (former employer hostnames, org names, internal infrastructure paths) kept appearing in commits and requiring after-the-fact history scrubbing. Machine-wide hook intercepts them before commit in every repo.
+
+
 ## [2026.07.01.057] - 2026-07-01
 ### fix(Dowser.psd1): Fix ProjectUri to match actual repo location kizer88/Dowser
 
@@ -13,7 +102,7 @@ Why:
 
 
 ## [2026.07.01.056] - 2026-07-01
-### fix(Write-Log): Update Organization field from Divergent Cortex/HP Inc to Divergent Cortex
+### fix(Write-Log): Update Organization field to Divergent Cortex
 
 What changed:
 - Changed .NOTES Organization field in Write-Log.ps1 line 140 from 'Divergent Cortex' to 'Divergent Cortex'
@@ -29,7 +118,7 @@ What changed:
 - Replaced UNC path comment on line 240 of ConvertTo-DowserIco.ps1 that exposed a former employer's internal infrastructure (server.example.com) with a generic server/share example
 
 Why:
-- Pre-public scrub: comment contained sensitive corporate UNC path referencing internal HP Inc infrastructure, not appropriate for a public repository
+- Pre-public scrub: comment contained sensitive corporate UNC path referencing internal infrastructure, not appropriate for a public repository
 
 
 ## [2026.06.30.054] - 2026-06-30

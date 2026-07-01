@@ -225,6 +225,8 @@ function Invoke-Timed {
 # setup
 # ---------------------------------------------------------
 $null = New-Item -ItemType Directory -Path $ReportDir -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path $ReportDir -Include '*.csv', '*.html' -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
 
 $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) "DowserTests_$(Get-Date -Format 'yyyyMMddHHmmss')"
 $null = New-Item -ItemType Directory -Path $tempBase -Force
