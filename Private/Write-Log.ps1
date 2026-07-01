@@ -187,6 +187,7 @@ function Write-Log {
     [OutputType([void])]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [AllowEmptyString()]
         [string]$Message,
 
         [Parameter(Mandatory = $False)]
