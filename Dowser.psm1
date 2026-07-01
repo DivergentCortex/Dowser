@@ -73,6 +73,7 @@ foreach ($file in @($Private + $Public)) {
 $aliasPath = Join-Path (Join-Path $PSScriptRoot 'Aliases') 'Aliases.ps1'
 if (Test-Path $aliasPath) {
     . $aliasPath
+    Enable-DowserAliases
 }
 
 # version is the latest changelog slot, read at load so nothing hardcodes it
