@@ -2,6 +2,79 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.06.30.053] - 2026-06-30
+### fix(Get-DowserReport): Guard empty Message parameter in Write-Log call to fix DirScan+ExportFiles failure
+
+What changed:
+- Changed three Write-Log "" calls to Write-Log " " in Public/Get-DowserReport.ps1 -- two blank-line separators in Get-DowserReport end block (lines 653, 669) and one in Compare-DowserReport end block (line 991)
+- Empty string passed as positional Message argument caused bind error at runtime despite Write-Log declaring [AllowEmptyString()]
+
+Why:
+- Test suite reported Get-DowserReport DirScan and ExportFiles FAIL with error: Cannot bind argument to parameter Message because it is an empty string
+
+
+## [2026.06.30.052] - 2026-06-30
+### fix(Aliases): Fix alias export mechanism; ensure >=20 aliases exported including dfast
+
+What changed:
+- Added Enable-DowserAliases call in Dowser.psm1 after dot-sourcing Aliases.ps1 so all 28 aliases register at module import time
+- Previously the function was defined but never invoked, leaving AliasCount at 0 and Export-ModuleMember -Alias * exporting nothing
+
+Why:
+- Test suite reported AliasCount 0 (need >= 20) and Invoke-FastSearch alias unavailable because Enable-DowserAliases was never called at module load
+
+
+## [2026.06.30.051] - 2026-06-30
+### fix(Get-DowserMap): Runspace path normalization, markdown root display var, -IncludeSize exclusion-aware stack-walk
+
+What changed:
+- Runspace scriptblock: normalize file.FullName to forward-slash inline before matching against excludePaths (ConvertTo-ForwardSlashPath not available in runspace)
+- Markdown file output: compute $rootDisplay separately from $rootFull -- on Windows converts forward-slash back to backslash for display, leaves $rootFull internal value unchanged
+- Replaced flat Get-ChildItem -Recurse size sum in Get-FolderAnnotation with exclusion-aware stack-walk that respects Test-ExcludeFolder / Test-IncludeFile / Test-ExcludeByPath
+
+Why:
+- Runspace scriptblocks run in isolated contexts without parent-scope helpers, so the normalize-inline pattern is required. $rootFull is now forward-slash internally so markdown output would show wrong separators on Windows without the $rootDisplay conversion. IncludeSize was ignoring -ExcludeFolders just like IncludePsCount was ignoring filters -- same fix pattern applied.
+
+
+## [2026.06.30.050] - 2026-06-30
+### fix(Get-DowserMap): Add ConvertTo-ForwardSlashPath; normalize rootFull and excludePaths so -ExcludePathPatterns works on Linux
+
+What changed:
+- Added ConvertTo-ForwardSlashPath helper function (replaces backslash with forward-slash, platform-agnostic)
+- Changed rootFull normalization from ConvertTo-NativeSeparator to ConvertTo-ForwardSlashPath
+- Changed excludePaths normalization from ConvertTo-NativeSeparator to ConvertTo-ForwardSlashPath
+- Updated ConvertTo-RelativePath to normalize input through ConvertTo-ForwardSlashPath and TrimStart both slash chars
+- Updated Test-ExcludeByPath to normalize item.FullName through ConvertTo-ForwardSlashPath before comparison
+
+Why:
+- On Linux, ConvertTo-NativeSeparator is a no-op for forward-slash paths but excludePaths patterns containing backslash (from user input or Windows paths) would never match. Using forward-slash as canonical comparison form normalizes both sides identically on all platforms.
+
+
+## [2026.06.30.049] - 2026-06-30
+### fix(Get-DowserMap): Rename -IncludePsCount to -IncludeFileCount (alias kept); count reflects active filters via stack-walk
+
+What changed:
+- Renamed param $IncludePsCount to $IncludeFileCount with [Alias('IncludePsCount')] attribute
+- Rewrote Get-FolderAnnotation file count block: stack-walk respecting Test-ExcludeFolder / Test-IncludeFile / Test-ExcludeByPath instead of hardcoded Get-ChildItem -Filter *.ps1
+- Changed annotation label from '[N .ps1]' to '[N files]'
+- Updated both recursive Get-DowserMap calls to pass -IncludeFileCount:$IncludeFileCount
+- Updated comment-based help, .PARAMETER, .EXAMPLE, and synopsis to reflect new param name
+
+Why:
+- Old implementation ignored active extension/pattern/path filters so count was always all .ps1 files regardless of -IncludeExtensions or -ExcludePathPatterns. New stack-walk uses the same predicates as the display tree so the count matches what is shown.
+
+
+## [2026.06.30.048] - 2026-06-30
+### fix(Get-DowserMap): OS-aware directory separators use [System.IO.Path]::DirectorySeparatorChar on Linux
+
+What changed:
+- Changed $folderSuffix else-branch from [string][char]92 to [System.IO.Path]::DirectorySeparatorChar
+- Changed $segmentSlash else-branch from [string][char]92 to [System.IO.Path]::DirectorySeparatorChar
+
+Why:
+- On Linux the platform separator is / so hardcoded char 92 (backslash) produced wrong output -- folder lines showed \\ instead of /
+
+
 ## [2026.06.30.047] - 2026-06-30
 ### test(Tests): Sync the test suite with the opt-in alias model and Get-DowserInfo shape for a clean 0-FAIL run
 
