@@ -2,6 +2,36 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.01.057] - 2026-07-01
+### fix(Dowser.psd1): Fix ProjectUri to match actual repo location kizer88/Dowser
+
+What changed:
+- Changed ProjectUri in Dowser.psd1 line 77 from 'https://github.com/DivergentCortex/Dowser' to 'https://github.com/kizer88/Dowser'
+
+Why:
+- Pre-public scrub: manifest pointed at a non-existent org repo; corrected to the actual publishing location under kizer88
+
+
+## [2026.07.01.056] - 2026-07-01
+### fix(Write-Log): Update Organization field from Divergent Cortex/HP Inc to Divergent Cortex
+
+What changed:
+- Changed .NOTES Organization field in Write-Log.ps1 line 140 from 'Divergent Cortex' to 'Divergent Cortex'
+
+Why:
+- Pre-public scrub: .NOTES block attributed the file to a former employer's internal team (Divergent Cortex); updated to reflect current organization
+
+
+## [2026.07.01.055] - 2026-07-01
+### fix(ConvertTo-DowserIco): Remove corporate UNC path example from comment (pre-public scrub)
+
+What changed:
+- Replaced UNC path comment on line 240 of ConvertTo-DowserIco.ps1 that exposed a former employer's internal infrastructure (server.example.com) with a generic server/share example
+
+Why:
+- Pre-public scrub: comment contained sensitive corporate UNC path referencing internal HP Inc infrastructure, not appropriate for a public repository
+
+
 ## [2026.06.30.054] - 2026-06-30
 ### fix(Aliases): Fix alias export: change Set-Alias scope to Script, add dfast alias for Invoke-DowserFastSearch
 

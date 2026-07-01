@@ -237,5 +237,5 @@ function ConvertTo-DowserIco {
 }
 
 # Usage:
-# ConvertTo-Ico -InputFilePath "\\server.example.com\Root\project\VdiData\appname.jpg" -OutputFile "\\server.example.com\Root\project\VdiData\appname.ico"
+# ConvertTo-Ico -InputFilePath "\\server\share\logo.jpg" -OutputFile "\\server\share\logo.ico"
 
