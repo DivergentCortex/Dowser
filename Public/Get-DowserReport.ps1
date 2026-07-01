@@ -650,7 +650,7 @@ function Get-DowserReport {
             Select-Object -First 10 |
             ForEach-Object { "$($_.Name): $($_.Count)" }
 
-        Write-Log "" -Severity Verbose
+        Write-Log " " -Severity Verbose
         Write-Log "--- Get-DowserReport Summary ---" -Severity Verbose
         Write-Log ("  {0,-22}: {1}" -f "Total Files", $totalFiles) -Severity Verbose
         Write-Log ("  {0,-22}: {1}" -f "Readable Files", $readableFiles) -Severity Verbose
@@ -666,7 +666,7 @@ function Get-DowserReport {
         }
         Write-Log ("  {0,-22}: {1}" -f "Top Extensions", ($extensionBreakdown -join ", ")) -Severity Verbose
         Write-Log ("  {0,-22}: {1:F2}s" -f "Execution Time", $duration.TotalSeconds) -Severity Verbose
-        Write-Log "" -Severity Verbose
+        Write-Log " " -Severity Verbose
 
         if ($ExportCsv) {
             Write-Log "Get-DowserReport exporting CSV to '$ExportCsv'" -Severity Verbose
@@ -988,7 +988,7 @@ function Compare-DowserReport {
         }
 
         Write-Log "Ending Compare-DowserReport"
-        Write-Log "" -Severity Verbose
+        Write-Log " " -Severity Verbose
         Write-Log "--- Compare-DowserReport Summary ---" -Severity Verbose
         Write-Log ("  {0,-18}: {1}" -f "New Files", $newCount) -Severity Verbose
         Write-Log ("  {0,-18}: {1}" -f "Changed Files", $changedCount) -Severity Verbose

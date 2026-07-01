@@ -24,14 +24,14 @@ function Get-DowserMap {
         Markdown output, full-path trunk display, filtering by extension/pattern/folder, parallel
         pre-scan for large trees, WSL/Linux path display mode.
 
-        Optionally annotates each folder with its total size (-IncludeSize) and/or .ps1 file count
-        (-IncludePsCount), inlined directly into the tree branches.
+        Optionally annotates each folder with its total size (-IncludeSize) and/or file count
+        (-IncludeFileCount, alias -IncludePsCount), inlined directly into the tree branches.
     .PARAMETER Path
         Root directory to render. Accepts pipeline input by value and by property name (FullName).
     .PARAMETER IncludeSize
         Append total folder size (e.g., [1.2 GB]) to each folder in the tree.
-    .PARAMETER IncludePsCount
-        Append .ps1 file count (e.g., [14 .ps1]) to each folder in the tree.
+    .PARAMETER IncludeFileCount
+        Append file count (e.g., [14 files]) to each folder in the tree. Alias: -IncludePsCount.
     .PARAMETER IncludeFilePatterns
         File name patterns to include. Bare strings are wrapped as wildcards.
     .PARAMETER IncludeExtensions
@@ -89,15 +89,15 @@ function Get-DowserMap {
     .PARAMETER SizeCache
         Internal recursion cache for folder sizes. Not for direct use.
     .PARAMETER PsCountCache
-        Internal recursion cache for .ps1 counts. Not for direct use.
+        Internal recursion cache for file counts. Not for direct use.
     .EXAMPLE
         Get-DowserMap -Path D:\Projects -MaxDepth 2 -IncludeSize
 
         Renders a two-level tree of D:\Projects with each folder annotated by total size.
     .EXAMPLE
-        Get-DowserMap -Path D:\Scripts -IncludePsCount -FoldersOnly
+        Get-DowserMap -Path D:\Scripts -IncludeFileCount -FoldersOnly
 
-        Renders a folders-only tree of D:\Scripts with .ps1 counts on each folder.
+        Renders a folders-only tree of D:\Scripts with file counts on each folder.
     .INPUTS
         System.String
         You can pipe a root path to this function.
@@ -113,7 +113,8 @@ function Get-DowserMap {
 
         # Data Annotation Switches (from merged scripts)
         [switch]$IncludeSize,             # Append folder size to each branch
-        [switch]$IncludePsCount,          # Append .ps1 file count to each branch
+        [Alias('IncludePsCount')]
+        [switch]$IncludeFileCount,        # Append file count to each branch
 
         # File/Folder Filtering
         [string[]]$IncludeFilePatterns,
@@ -217,21 +218,39 @@ function Get-DowserMap {
             $annotation += " [$formatted]"
         }
 
-        if ($IncludePsCount) {
+        if ($IncludeFileCount) {
             if (-not $PsCountCache.ContainsKey($folderPath)) {
                 $count = 0
                 try {
-                    $counted = Get-ChildItem -LiteralPath $folderPath -Recurse -Filter '*.ps1' -File -Force -ErrorAction SilentlyContinue |
-                        Measure-Object
-                    $count = $counted.Count
+                    $walkStack = New-Object 'System.Collections.Generic.Stack[string]'
+                    $walkStack.Push($folderPath)
+                    while ($walkStack.Count -gt 0) {
+                        $currentDir = $walkStack.Pop()
+                        $dirItems = if ($IncludeHidden) {
+                            Get-ChildItem -LiteralPath $currentDir -Force -ErrorAction SilentlyContinue
+                        } else {
+                            Get-ChildItem -LiteralPath $currentDir -ErrorAction SilentlyContinue
+                        }
+                        foreach ($di in $dirItems) {
+                            if ($di.PSIsContainer) {
+                                if (-not (Test-ExcludeFolder $di)) {
+                                    $walkStack.Push($di.FullName)
+                                }
+                            } else {
+                                if ((Test-IncludeFile $di) -and -not (Test-ExcludeByPath $di)) {
+                                    $count++
+                                }
+                            }
+                        }
+                    }
                 }
                 catch {
-                    Write-Log "PS1 count failed for '$folderPath': $_" -Severity Verbose 
+                    Write-Log "File count failed for '$folderPath': $_" -Severity Verbose 
                 }
                 $PsCountCache[$folderPath] = $count
             }
             $cnt = $PsCountCache[$folderPath]
-            $annotation += " [$cnt .ps1]"
+            $annotation += " [$cnt files]"
         }
 
         return $annotation
@@ -970,7 +989,7 @@ function Get-DowserMap {
         '/' 
     }
     else {
-        [string][char]92 
+        [System.IO.Path]::DirectorySeparatorChar 
     }
 
     function Get-Children {
@@ -1198,7 +1217,7 @@ function Get-DowserMap {
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
                 $TraversalState.FolderCount++
                 if ($CurrentDepth -lt $MaxDepth) {
-                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 }
             }
             else {
@@ -1246,7 +1265,7 @@ function Get-DowserMap {
         '/' 
     }
     else {
-        [string][char]92 
+        [System.IO.Path]::DirectorySeparatorChar 
     }
     for ($i = 0; $i -lt @($segments).Count; $i++) {
         $segmentName = $segments[$i]
@@ -1362,7 +1381,7 @@ function Get-DowserMap {
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
                 $TraversalState.FolderCount++
-                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludePsCount:$IncludePsCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $IncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
             }
             else {
