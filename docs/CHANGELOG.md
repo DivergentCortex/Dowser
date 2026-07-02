@@ -2,6 +2,16 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.02.066] - 2026-07-02
+### fix(Dowser.psd1): Revert ProjectUri to DivergentCortex/Dowser
+
+What changed:
+- Reverted ProjectUri from kizer88/Dowser back to DivergentCortex/Dowser in the module manifest PSData block
+
+Why:
+- Original value was intentional; DivergentCortex/Dowser is the planned org home for this module. The kizer88 value was incorrect.
+
+
 ## [2026.07.01.065] - 2026-07-01
 ### chore(release): P0-4 fix (default branch) and Phase 6 pre-flip hardening
 
