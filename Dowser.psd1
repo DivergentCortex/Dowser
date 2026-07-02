@@ -74,7 +74,7 @@
     PrivateData = @{
         PSData = @{
             Tags = @('filesystem','recon','search','utility','dowser','cross-platform','linux')
-            ProjectUri = 'https://github.com/kizer88/Dowser'
+            ProjectUri = 'https://github.com/DivergentCortex/Dowser'
         }
     }
 }
