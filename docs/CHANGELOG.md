@@ -3,6 +3,34 @@
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
 ## [2026.07.02.066] - 2026-07-02
+
+## [2026.07.02.067] - 2026-07-02
+### chore(github): Flip DivergentCortex/Dowser to public and apply security hardening
+
+What changed:
+- Flipped repo visibility from private to public via PATCH /repos/DivergentCortex/Dowser
+- Enabled Dependabot vulnerability alerts via PUT /repos/.../vulnerability-alerts
+- Enabled Dependabot automated security fixes via PUT /repos/.../automated-security-fixes
+- Enabled secret scanning (status=enabled) via PATCH security_and_analysis
+- Enabled secret scanning push protection (status=enabled) via PATCH security_and_analysis
+- Enabled private vulnerability reporting via PUT /repos/.../private-vulnerability-reporting
+- Set branch protection on main: allow_force_pushes=false, allow_deletions=false
+
+Why:
+- Public release gate requires security hardening before exposure to internet traffic.
+- Branch protection prevents force-push history rewrites and accidental branch deletion.
+- Secret scanning and push protection block credential leaks at commit time.
+
+Verification (Step 6 output):
+- visibility=public, private=false
+- secret_scanning=enabled, push_protection=enabled, dependabot_updates=enabled
+- allow_force_pushes=false, allow_deletions=false
+- private_vulnerability_reporting.enabled=true
+
+Manual follow-up:
+- CodeQL default-setup returned HTTP 404: GitHub Advanced Security is not available on this org plan.
+  Enable CodeQL manually via Settings > Code security and analysis when GHAS is provisioned.
+
 ### fix(Dowser.psd1): Revert ProjectUri to DivergentCortex/Dowser
 
 What changed:
