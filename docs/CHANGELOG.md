@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.05.068] - 2026-07-05
+### feat(Get-DowserMap): Auto-detect archive files (.zip/.7z/.rar/.tar/.gz) and render internal contents as a tree
+
+What changed:
+- Get-DowserMap now auto-detects when -Path resolves to a recognized archive file (.zip, .7z, .rar, .tar, .gz) instead of a directory, and renders the archive's internal contents as the same style of box-drawing tree it already renders for real folders, instead of the previous broken single-line output for a leaf-file path.
+- .zip is read natively via System.IO.Compression.ZipFile (no external dependency). .7z/.rar/.tar/.gz are listed via the 7-Zip CLI (7z l -slt) when installed; if 7-Zip is missing, an ARCHIVE UNREADABLE line is returned instead of throwing.
+- Supports -MaxDepth, -IncludeSize, -IncludeFileCount, -IncludeExtensions/-ExcludeExtensions/-IncludeFilePatterns/-ExcludeFiles/-ExcludeFolders, -Ascii/-AsHtml, -NoDefaultExcludes, -FoldersOnly, -LinuxPaths/-ShowFullPathTree, and the new -SevenZipPath parameter for non-.zip formats.
+- Everything is implemented as nested helper functions inside Get-DowserMap.ps1 itself; no new files were added.
+- Files changed: Public/Get-DowserMap.ps1 -- added -SevenZipPath parameter and archive-mode auto-detection/rendering (commit a56f7d9).
+
+Why:
+- Commit a56f7d9 shipped the archive-mode fix but did not update the changelog; Dowser.psm1 reads its reported version from the newest changelog heading at import time, so the module still reported the stale 2026.07.02.066 version despite the new fix being live.
+
+
 ## [2026.07.02.066] - 2026-07-02
 
 ## [2026.07.02.067] - 2026-07-02
