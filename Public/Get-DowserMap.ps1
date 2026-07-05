@@ -70,6 +70,10 @@ function Get-DowserMap {
         Enable the parallel pre-scan phase for filtered large trees. Default is $true.
     .PARAMETER MaxThreads
         Maximum threads for the pre-scan runspace pool. Defaults to processor count minus one.
+    .PARAMETER SevenZipPath
+        Path to 7z executable, used only when -Path resolves to a non-.zip archive file
+        (.7z/.rar/.tar/.gz). On Windows, defaults to the standard 7-Zip install path.
+        On Linux/macOS, defaults to '7z' (expected on PATH).
     .PARAMETER OutputFile
         Path to write the rendered tree as a text file. Auto-enables HTML for .htm/.html targets.
     .PARAMETER MarkdownFile
@@ -143,6 +147,7 @@ function Get-DowserMap {
         # Performance Options
         [bool]$UseRunspaces = $true,
         [int]$MaxThreads = ([Math]::Max(1, [Environment]::ProcessorCount - 1)),
+        [string]$SevenZipPath,
 
         # Output Options
         [string]$OutputFile,
@@ -178,6 +183,368 @@ function Get-DowserMap {
     if ($AsHtml -and $AsMarkdown) {
         Write-Log "Get-DowserMap called with both -AsHtml and -AsMarkdown; these are mutually exclusive" -Severity Warning
         return
+    }
+
+    function Get-DowserArchiveTreeLines {
+        param(
+            [string]$ArchivePath,
+            [switch]$IncludeSize,
+            [switch]$IncludeFileCount,
+            [string[]]$IncludeExtensions,
+            [string[]]$ExcludeExtensions,
+            [string[]]$ExcludeFolders,
+            [string[]]$ExcludeFiles,
+            [string[]]$IncludeFilePatterns,
+            [switch]$NoDefaultExcludes,
+            [switch]$FoldersOnly,
+            [int]$MaxDepth,
+            [switch]$ShowFullPathTree,
+            [bool]$ShowFullPathTreeBound,
+            [switch]$LinuxPaths,
+            [switch]$Ascii,
+            [switch]$AsHtml,
+            [string]$SevenZipPath
+        )
+
+        if ($Ascii) {
+            $tc = @{ Branch = '+-'; Last = '\-'; Pipe = '| '; Space = '  ' }
+            $fChar = '-'; $dChar = '+'; $eChar = 'X'
+        }
+        else {
+            $tc = @{ Branch = ([string]([char]0x251C) + [char]0x2500); Last = ([string]([char]0x2514) + [char]0x2500); Pipe = ([string]([char]0x2502) + ' '); Space = '  ' }
+            $fChar = [char]0x00B7; $dChar = [char]0x25A0; $eChar = [char]0x00D7
+        }
+
+        $ext = [System.IO.Path]::GetExtension($ArchivePath).ToLowerInvariant()
+        $entries = @()
+        try {
+            if ($ext -eq '.zip') {
+                Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
+                $zip = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+                try {
+                    foreach ($e in $zip.Entries) {
+                        $rel = ($e.FullName -replace '\\', '/')
+                        $isDir = $rel.EndsWith('/')
+                        $entries += [PSCustomObject]@{ RelativePath = $rel.TrimEnd('/'); IsDirectory = $isDir; Size = if ($isDir) { 0 } else { $e.Length } }
+                    }
+                }
+                finally {
+                    $zip.Dispose()
+                }
+            }
+            else {
+                if (-not $SevenZipPath) {
+                    $SevenZipPath = if ($IsWindows -eq $false) { '7z' } else { Join-Path ${env:ProgramFiles} '7-Zip\7z.exe' }
+                }
+                if (-not (Test-Path -LiteralPath $SevenZipPath)) {
+                    throw "7-Zip not found at '$SevenZipPath'. Install 7-Zip or pass -SevenZipPath."
+                }
+                $listing = & $SevenZipPath 'l' '-slt' $ArchivePath 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    throw "7-Zip exited with code $LASTEXITCODE listing '$ArchivePath'."
+                }
+                $blocks = [regex]::Split($listing, '(?:\r?\n){2,}')
+                foreach ($block in $blocks) {
+                    if ($block -notmatch '(?m)^Path\s*=\s*(.+)$') {
+                        continue
+                    }
+                    if ($block -match '(?m)^Type\s*=\s*') {
+                        continue
+                    }
+                    $entryPath = $Matches[1].Trim()
+                    $isDir = ($block -match '(?m)^Folder\s*=\s*\+') -or ($block -match '(?m)^Attributes\s*=\s*D')
+                    $size = 0
+                    if (-not $isDir -and $block -match '(?m)^Size\s*=\s*(\d+)') {
+                        $size = [int64]$Matches[1]
+                    }
+                    $entries += [PSCustomObject]@{ RelativePath = (($entryPath -replace '\\', '/').TrimEnd('/')); IsDirectory = $isDir; Size = $size }
+                }
+            }
+        }
+        catch {
+            Write-Log "Get-DowserMap: failed to list archive '$ArchivePath': $($_.Exception.Message)" -Severity Warning
+            return @("$eChar ARCHIVE UNREADABLE: $ArchivePath ($($_.Exception.Message))")
+        }
+
+        $root = [ordered]@{}
+        foreach ($entry in $entries) {
+            if ([string]::IsNullOrWhiteSpace($entry.RelativePath)) {
+                continue
+            }
+            $segs = $entry.RelativePath -split '/'
+            $cursor = $root
+            for ($i = 0; $i -lt $segs.Count; $i++) {
+                $seg = $segs[$i]
+                if ([string]::IsNullOrEmpty($seg)) {
+                    continue
+                }
+                $isLast = ($i -eq $segs.Count - 1)
+                if (-not $cursor.Contains($seg)) {
+                    $cursor[$seg] = [PSCustomObject]@{
+                        Name        = $seg
+                        IsDirectory = if ($isLast) { $entry.IsDirectory } else { $true }
+                        Size        = if ($isLast) { $entry.Size } else { 0 }
+                        Children    = if ($isLast -and -not $entry.IsDirectory) { $null } else { [ordered]@{} }
+                    }
+                }
+                $node = $cursor[$seg]
+                if (-not $isLast) {
+                    if (-not $node.IsDirectory) {
+                        break
+                    }
+                    $cursor = $node.Children
+                }
+            }
+        }
+
+        function ConvertTo-NormExt($x) {
+            if ([string]::IsNullOrEmpty($x)) {
+                return ''
+            }
+            $x = $x.ToLowerInvariant()
+            if ($x -notmatch '^\.') {
+                return ".$x"
+            }
+            return $x
+        }
+        $normInclude = @()
+        if ($IncludeExtensions) {
+            $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormExt $_ })
+        }
+        $defaultExcludeExts = @('.pyc', '.pyo', '.pyd', '.so', '.dll', '.dylib', '.obj', '.o', '.a', '.lib', '.class', '.jar', '.war', '.ear', '.whl', '.egg', '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar', '.iso', '.dmg', '.pkg', '.deb', '.rpm', '.bak', '.tmp', '.temp', '.log', '.swp', '.swo', '~', '.DS_Store', 'Thumbs.db', '.cache', '.eslintcache', '.parcel-cache')
+        $defaultExcludeFolders = @('__pycache__', 'node_modules', '.git', '.svn', '.hg', '.vs', '.vscode', 'obj', '.idea', 'dist', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv', 'env', '.env', 'Lib', 'lib', 'Include', 'include', 'share', 'man', '.next', '.nuxt', 'target', 'vendor', 'packages', '.angular', '.sass-cache', 'bower_components', 'jspm_packages', '.gradle', '.maven', '.m2', '.cache', '__MACOSX', 'Thumbs.db', '.DS_Store', '.eggs', '*.egg-info', 'htmlcov', 'coverage', '.nyc_output', 'logs', 'log', 'tmp', 'temp', '.tmp', '.temp', 'site-packages', 'dist-info', '.dist-info', '.claude')
+        $defaultExcludeFiles = @('settings.local.json', '.env', 'sccm.code-workspace', '*.code-workspace')
+
+        $allExcludeExts = @()
+        if (-not $NoDefaultExcludes) {
+            $allExcludeExts += $defaultExcludeExts
+        }
+        if ($ExcludeExtensions) {
+            $allExcludeExts += @($ExcludeExtensions)
+        }
+        $normExclude = @($allExcludeExts | Select-Object -Unique | ForEach-Object { ConvertTo-NormExt $_ })
+
+        $allExcludeFolders = @()
+        if (-not $NoDefaultExcludes) {
+            $allExcludeFolders += $defaultExcludeFolders
+        }
+        if ($ExcludeFolders) {
+            $allExcludeFolders += @($ExcludeFolders)
+        }
+        $allExcludeFolders = $allExcludeFolders | Select-Object -Unique
+        $excludeExactFolders = @($allExcludeFolders | Where-Object { $_ -notmatch '[\*\?\[\]]' })
+        $excludeWildFolders = @($allExcludeFolders | Where-Object { $_ -match '[\*\?\[\]]' })
+
+        $allExcludeFiles = @()
+        if (-not $NoDefaultExcludes) {
+            $allExcludeFiles += $defaultExcludeFiles
+        }
+        if ($ExcludeFiles) {
+            $allExcludeFiles += @($ExcludeFiles)
+        }
+        $allExcludeFiles = $allExcludeFiles | Select-Object -Unique
+        $excludeExactFiles = @($allExcludeFiles | Where-Object { $_ -notmatch '[\*\?\[\]]' })
+        $excludeWildFiles = @($allExcludeFiles | Where-Object { $_ -match '[\*\?\[\]]' })
+
+        $effectivePatterns = @()
+        if ($IncludeFilePatterns) {
+            foreach ($p in $IncludeFilePatterns) {
+                if ([string]::IsNullOrWhiteSpace($p)) {
+                    continue
+                }
+                $pp = $p.Trim()
+                if ($pp -notmatch '[\*\?\[\]]') {
+                    $pp = if ($pp.StartsWith('.')) { "*$pp" } else { "*$pp*" }
+                }
+                $effectivePatterns += $pp
+            }
+        }
+        $fileFilterActive = (@($effectivePatterns).Count -gt 0 -or @($IncludeExtensions).Count -gt 0)
+
+        function Test-ArcFile($name) {
+            $e = ConvertTo-NormExt ([System.IO.Path]::GetExtension($name))
+            if ($normInclude -and ($normInclude -notcontains $e)) {
+                return $false
+            }
+            if ($normExclude -and ($normExclude -contains $e)) {
+                return $false
+            }
+            if (@($effectivePatterns).Count -gt 0) {
+                foreach ($p in $effectivePatterns) {
+                    if ($name -like $p) {
+                        return $true
+                    }
+                }
+                return $false
+            }
+            if (@($excludeExactFiles).Count -gt 0 -and ($excludeExactFiles -contains $name)) {
+                return $false
+            }
+            foreach ($p in $excludeWildFiles) {
+                if ($name -like $p) {
+                    return $false
+                }
+            }
+            return $true
+        }
+        function Test-ArcFolderExcluded($name) {
+            if (@($excludeExactFolders).Count -gt 0 -and ($excludeExactFolders -contains $name)) {
+                return $true
+            }
+            foreach ($p in $excludeWildFolders) {
+                if ($name -like $p) {
+                    return $true
+                }
+            }
+            return $false
+        }
+        function Test-ArcFolderHasMatch($node) {
+            if (-not $fileFilterActive) {
+                return $true
+            }
+            if (-not $node.IsDirectory) {
+                return (Test-ArcFile $node.Name)
+            }
+            if ($node.Children) {
+                foreach ($c in $node.Children.Values) {
+                    if (Test-ArcFolderHasMatch $c) {
+                        return $true
+                    }
+                }
+            }
+            return $false
+        }
+        function Get-ArcFolderSize($node) {
+            if (-not $node.IsDirectory) {
+                if ($fileFilterActive -and -not (Test-ArcFile $node.Name)) {
+                    return 0
+                }
+                return $node.Size
+            }
+            $t = 0
+            if ($node.Children) {
+                foreach ($c in $node.Children.Values) {
+                    $t += Get-ArcFolderSize $c
+                }
+            }
+            return $t
+        }
+        function Get-ArcFolderFileCount($node) {
+            if (-not $node.IsDirectory) {
+                if ($fileFilterActive -and -not (Test-ArcFile $node.Name)) {
+                    return 0
+                }
+                return 1
+            }
+            $t = 0
+            if ($node.Children) {
+                foreach ($c in $node.Children.Values) {
+                    $t += Get-ArcFolderFileCount $c
+                }
+            }
+            return $t
+        }
+
+        function Write-ArcNode($node, $indent, $depth) {
+            $lines = @()
+            $kids = @()
+            if ($node.Children) {
+                $kids = @($node.Children.Values)
+            }
+            $folders = @($kids | Where-Object { $_.IsDirectory } | Sort-Object Name)
+            $files = @($kids | Where-Object { -not $_.IsDirectory } | Sort-Object Name)
+
+            $keptFolders = @()
+            foreach ($f in $folders) {
+                if (Test-ArcFolderExcluded $f.Name) {
+                    continue
+                }
+                if (-not (Test-ArcFolderHasMatch $f)) {
+                    continue
+                }
+                $keptFolders += $f
+            }
+            $keptFiles = @()
+            if (-not $FoldersOnly -or $fileFilterActive) {
+                foreach ($fl in $files) {
+                    if (Test-ArcFile $fl.Name) {
+                        $keptFiles += $fl
+                    }
+                }
+            }
+
+            $items = @($keptFolders) + @($keptFiles)
+            $count = @($items).Count
+            for ($i = 0; $i -lt $count; $i++) {
+                $item = $items[$i]
+                $isLast = ($i -eq $count - 1)
+                $conn = if ($isLast) { $tc.Last } else { $tc.Branch }
+                $nextIndent = if ($isLast) { "$indent$($tc.Space)" } else { "$indent$($tc.Pipe)" }
+                if ($item.IsDirectory) {
+                    $ann = ''
+                    if ($IncludeSize) {
+                        $ann += " [$(Format-DowserSize (Get-ArcFolderSize $item))]"
+                    }
+                    if ($IncludeFileCount) {
+                        $ann += " [$(Get-ArcFolderFileCount $item) files]"
+                    }
+                    $lines += "$indent$conn $dChar $($item.Name)/$ann"
+                    if ($depth -lt $MaxDepth) {
+                        $lines += Write-ArcNode $item $nextIndent ($depth + 1)
+                    }
+                }
+                else {
+                    $lines += "$indent$conn $fChar $($item.Name)"
+                }
+            }
+            return $lines
+        }
+
+        $output = @()
+        $baseIndent = ""
+        $showTrunk = if ($ShowFullPathTreeBound) { [bool]$ShowFullPathTree } else { $true }
+        if ($showTrunk) {
+            $trunkPath = if ($LinuxPaths) { ($ArchivePath -replace '\\', '/') } else { $ArchivePath }
+            $segs = @()
+            if ($trunkPath -match '^([a-zA-Z]:)[\\/]*(.*)') {
+                $segs += $matches[1]
+                if ($matches[2]) {
+                    $segs += $matches[2] -split '[\\/]'
+                }
+            }
+            else {
+                $segs += $trunkPath -split '[\\/]'
+            }
+            $segs = $segs | Where-Object { $_ -ne '' }
+            $curIndent = ""
+            foreach ($s in $segs) {
+                $output += "$curIndent$($tc.Last) $dChar $s"
+                $curIndent += "    "
+            }
+            $baseIndent = $curIndent
+        }
+
+        $rootNode = [PSCustomObject]@{ Name = ''; IsDirectory = $true; Size = 0; Children = $root }
+        $output += Write-ArcNode $rootNode $baseIndent 0
+        return $output
+    }
+
+    if ($CurrentDepth -eq 0) {
+        $resolvedLeafPath = $Path
+        try {
+            $resolvedLeafPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
+        }
+        catch {
+        }
+        if (Test-Path -LiteralPath $resolvedLeafPath -PathType Leaf) {
+            $archiveExt = [System.IO.Path]::GetExtension($resolvedLeafPath).ToLowerInvariant()
+            if ($archiveExt -in @('.zip', '.7z', '.rar', '.tar', '.gz')) {
+                Write-Log "Get-DowserMap: '$resolvedLeafPath' is an archive file, rendering internal contents" -Severity Verbose
+                $archiveLines = Get-DowserArchiveTreeLines -ArchivePath $resolvedLeafPath -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -ExcludeFolders $ExcludeFolders -ExcludeFiles $ExcludeFiles -IncludeFilePatterns $IncludeFilePatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -MaxDepth $MaxDepth -ShowFullPathTree:$ShowFullPathTree -ShowFullPathTreeBound $PSBoundParameters.ContainsKey('ShowFullPathTree') -LinuxPaths:$LinuxPaths -Ascii:$Ascii -AsHtml:$AsHtml -SevenZipPath $SevenZipPath
+                Write-Log "Ending Get-DowserMap"
+                return $archiveLines
+            }
+        }
     }
 
     function ConvertTo-NormalizedExtension {
