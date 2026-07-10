@@ -505,7 +505,9 @@ function Find-DowserString {
                 }
                 catch {
                     # emit a row so callers know the search skipped a file
-                    $results.Add([pscustomobject]@{
+                    # [void] is load-bearing: ArrayList.Add returns the insert index,
+                    # and a bare index leaks into the worker's output stream
+                    [void]$results.Add([pscustomobject]@{
                             FilePath   = $FilePath
                             LineNumber = 0
                             Pattern    = '[READ-ERROR]'
@@ -615,7 +617,8 @@ function Find-DowserString {
                 'grouped' {
                     $perFile = $results | Group-Object FilePath | ForEach-Object {
                         $total = [int]($_.Group | Measure-Object -Property Count -Sum).Sum
-                        $lineNums = @($_.Group | Select-Object -ExpandProperty LineNumber -Unique | Sort-Object)
+                        # Sort-Object -Unique is O(n log n); Select-Object -Unique is O(n^2)
+                        $lineNums = @($_.Group.LineNumber | Sort-Object -Unique)
                         [pscustomobject]@{
                             FilePath    = $_.Name
                             Directory   = [System.IO.Path]::GetDirectoryName($_.Name)
@@ -680,7 +683,7 @@ function Find-DowserString {
                 'counts' {
                     $grouped = $results | Group-Object FilePath | ForEach-Object {
                         $total = [int]($_.Group | Measure-Object -Property Count -Sum).Sum
-                        $lineNums = $_.Group | Select-Object -ExpandProperty LineNumber -Unique | Sort-Object
+                        $lineNums = $_.Group.LineNumber | Sort-Object -Unique
                         [pscustomobject]@{
                             FilePath    = $_.Name
                             MatchCount  = $total
@@ -691,8 +694,9 @@ function Find-DowserString {
                     Write-Log "Find-DowserString: $($results.Count) matches across $(@($grouped).Count) files"
                 }
                 'files' {
-                    $results | Select-Object -ExpandProperty FilePath -Unique | Sort-Object | Write-Output
-                    Write-Log "Find-DowserString: $(@($results | Select-Object -ExpandProperty FilePath -Unique).Count) files with matches"
+                    $uniqueFiles = @(Select-DowserUniquePath -Path $results.FilePath | Sort-Object)
+                    $uniqueFiles | Write-Output
+                    Write-Log "Find-DowserString: $($uniqueFiles.Count) files with matches"
                 }
                 'matches' {
                     if ($IncludeLineContent) {
