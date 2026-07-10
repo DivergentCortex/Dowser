@@ -281,8 +281,8 @@ function Find-DowserString {
             $scanTargets = [System.Collections.ArrayList]::new()
             [void]$scanTargets.Add($Path)
 
-            Write-Log "Find-DowserString Phase 1/3: Enumerating directories under '$Path'"
-            Write-Progress -Activity 'Find-DowserString' -Status 'Phase 1/3: Enumerating directories...' -PercentComplete 0
+            Write-Log "Find-DowserString Phase 1/4: Enumerating directories under '$Path'"
+            Write-Progress -Activity 'Find-DowserString' -Status 'Phase 1/4: Enumerating directories...' -PercentComplete 0
             $phase1Start = Get-Date
 
             if ($Recurse) {
@@ -305,7 +305,7 @@ function Find-DowserString {
                             $now = [Environment]::TickCount
                             if (($now - $lastTick) -ge 200) {
                                 Write-Progress -Activity 'Find-DowserString' `
-                                    -Status ("Phase 1/3: Enumerating directories ({0:N0} found, current: {1})" -f $scanTargets.Count, $leaf) `
+                                    -Status ("Phase 1/4: Enumerating directories ({0:N0} found, current: {1})" -f $scanTargets.Count, $leaf) `
                                     -PercentComplete -1
                                 $lastTick = $now
                             }
@@ -319,7 +319,7 @@ function Find-DowserString {
             }
 
             $phase1Duration = (Get-Date) - $phase1Start
-            Write-Log ("Find-DowserString Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds)
+            Write-Log ("Find-DowserString Phase 1/4: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds)
 
             $gatherScriptBlock = {
                 param($DirChunk, $Extensions, $MaxFileSizeBytes, $ExcludeExtensions, $ProgressQueue)
@@ -363,7 +363,7 @@ function Find-DowserString {
                 return $found.ToArray()
             }
 
-            Write-Log ("Find-DowserString Phase 2/3: Gathering files in {0:N0} directories" -f $scanTargets.Count)
+            Write-Log ("Find-DowserString Phase 2/4: Gathering files in {0:N0} directories" -f $scanTargets.Count)
             $phase2Start = Get-Date
 
             $gatherResults = $scanTargets.ToArray() | Invoke-DowserRunspacePool `
@@ -371,14 +371,14 @@ function Find-DowserString {
                 -ArgumentList @($Extensions, $MaxFileSizeBytes, $ExcludeExtensions) `
                 -ThreadCount $ComputedMaxThreads `
                 -ProgressActivity 'Find-DowserString' `
-                -ProgressStatus 'Phase 2/3: Gathering files' `
+                -ProgressStatus 'Phase 2/4: Scanning directories for files' `
                 -UseProgressQueue
 
             # Select-Object -Unique is O(n^2) and stalls for tens of minutes on a
             # quarter-million paths. Select-DowserUniquePath is a single-pass HashSet.
             $allFiles = @(Select-DowserUniquePath -Path $gatherResults)
             $phase2Duration = (Get-Date) - $phase2Start
-            Write-Log ("Find-DowserString Phase 2/3: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds)
+            Write-Log ("Find-DowserString Phase 2/4: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds)
 
         }  # end else (directory mode)
 
@@ -524,7 +524,7 @@ function Find-DowserString {
             return $results.ToArray()
         }
 
-        Write-Log ("Find-DowserString Phase 3/3: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count)
+        Write-Log ("Find-DowserString Phase 3/4: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count)
         $phase3Start = Get-Date
 
         $searchResults = $allFiles | Invoke-DowserRunspacePool `
@@ -532,7 +532,7 @@ function Find-DowserString {
             -ArgumentList @($Patterns, [bool]$UseRegex, [bool]$CaseSensitive, $UseAho, $ahoCode, [bool]$IncludeLineContent) `
             -ThreadCount $ComputedMaxThreads `
             -ProgressActivity 'Find-DowserString' `
-            -ProgressStatus 'Phase 3/3: Searching files' `
+            -ProgressStatus 'Phase 3/4: Searching files' `
             -UseProgressQueue
 
         if ($searchResults) {
@@ -544,11 +544,19 @@ function Find-DowserString {
         }
 
         $phase3Duration = (Get-Date) - $phase3Start
-        Write-Log ("Find-DowserString Phase 3/3: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds)
+        Write-Log ("Find-DowserString Phase 3/4: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds)
     }
 
     end {
         $results = @($allResults)
+
+        # ==================================================================
+        # PHASE 4/4 - OUTPUT FORMATTING
+        # grouping and sorting a large match set is real work, not free
+        # ==================================================================
+        $phase4Start = Get-Date
+        Write-Log ("Find-DowserString Phase 4/4: Formatting {0:N0} match rows as '{1}'" -f $results.Count, $OutputMode)
+        Write-Progress -Activity 'Find-DowserString' -Status ("Phase 4/4: Formatting {0:N0} match rows..." -f $results.Count) -PercentComplete 0
 
         if ($results.Count -gt 0) {
             switch ($OutputMode) {
@@ -615,18 +623,41 @@ function Find-DowserString {
                     }
                 }
                 'grouped' {
-                    $perFile = $results | Group-Object FilePath | ForEach-Object {
-                        $total = [int]($_.Group | Measure-Object -Property Count -Sum).Sum
+                    Write-Progress -Activity 'Find-DowserString' -Status 'Phase 4/4: Grouping match rows by file...' -PercentComplete 0
+                    $fileGroups = @($results | Group-Object FilePath)
+                    $groupTotal = $fileGroups.Count
+                    $groupDone = 0
+                    $lastTick = [Environment]::TickCount
+
+                    $perFile = foreach ($fg in $fileGroups) {
+                        $total = 0
+                        foreach ($row in $fg.Group) {
+                            $total += $row.Count 
+                        }
                         # Sort-Object -Unique is O(n log n); Select-Object -Unique is O(n^2)
-                        $lineNums = @($_.Group.LineNumber | Sort-Object -Unique)
+                        $lineNums = @($fg.Group.LineNumber | Sort-Object -Unique)
+
+                        # throttle to ~5/sec, same as the phase 1 enumeration loop
+                        $groupDone++
+                        $now = [Environment]::TickCount
+                        if (($now - $lastTick) -ge 200) {
+                            Write-Progress -Activity 'Find-DowserString' `
+                                -Status ("Phase 4/4: Formatting ({0:N0} / {1:N0} files)" -f $groupDone, $groupTotal) `
+                                -PercentComplete ([Math]::Min(100, [int](($groupDone / $groupTotal) * 100)))
+                            $lastTick = $now
+                        }
+
                         [pscustomobject]@{
-                            FilePath    = $_.Name
-                            Directory   = [System.IO.Path]::GetDirectoryName($_.Name)
-                            FileName    = [System.IO.Path]::GetFileName($_.Name)
+                            FilePath    = $fg.Name
+                            Directory   = [System.IO.Path]::GetDirectoryName($fg.Name)
+                            FileName    = [System.IO.Path]::GetFileName($fg.Name)
                             MatchCount  = $total
                             LineNumbers = $lineNums
                         }
-                    } | Sort-Object Directory, FileName
+                    }
+
+                    Write-Progress -Activity 'Find-DowserString' -Status ("Phase 4/4: Sorting {0:N0} files..." -f $groupTotal) -PercentComplete 100
+                    $perFile = @($perFile | Sort-Object Directory, FileName)
 
                     $byDir = $perFile | Group-Object Directory
                     $first = $true
@@ -729,6 +760,9 @@ function Find-DowserString {
         else {
             Write-Output 'No matches found'
         }
+
+        Write-Progress -Activity 'Find-DowserString' -Completed
+        Write-Log ("Find-DowserString Phase 4/4: Formatted output in {0:N1}s" -f ((Get-Date) - $phase4Start).TotalSeconds)
 
         $duration = New-TimeSpan -Start $startTime -End (Get-Date)
         Write-Log "Find-DowserString completed in $([Math]::Round($duration.TotalSeconds, 2))s"
