@@ -2,6 +2,21 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.10.071] - 2026-07-10
+### feat(Find-DowserString): Promote output formatting to a first-class Phase 4/4 with progress, and relink README into the repo root
+
+What changed:
+- Renumbered all phase labels from x/3 to x/4 in both Write-Log and Write-Progress calls.
+- Added Phase 4/4 (output formatting): an Info log on entry stating the row count and OutputMode, a Write-Progress bar, and an Info log on exit stating the elapsed format time.
+- Instrumented the grouped formatter with a throttled per-file progress counter (~5 updates/sec, same cadence as the Phase 1 enumeration loop).
+- Replaced the per-group `Measure-Object -Property Count -Sum` cmdlet call with an inline accumulator loop.
+- Fixed the Phase 2 progress mislabel: the bar counts directories, so its status text now reads 'Scanning directories for files' instead of 'Gathering files'.
+- Created README.md in the repo root as a symlink to docs/README.md, matching the existing docs/CHANGELOG.md root-symlink convention.
+
+Why:
+- Output formatting was never counted as a phase, so the function announced 'Phase 3/3: Done' and then went completely silent while Group-Object, Sort-Object and the per-file reduction chewed through the match set. On a 161,135-row result that silence was indistinguishable from the O(n^2) hang it had just been fixed for. If the work is slow enough to notice, it is a phase, and a phase announces itself: name it, count it, show progress through it, and report how long it took. The Phase 2 bar was separately lying about its unit, reporting directory counts under a 'Gathering files' label. Root README.md had been moved to docs/ leaving the repo root with no readme at all; a symlink keeps docs/ as the single source while GitHub and any tool that looks for ./README.md still find it.
+
+
 ## [2026.07.10.070] - 2026-07-10
 ### fix(Find-DowserString): Stop ArrayList.Add index leaking into worker output, and drop O(n^2) -Unique from the output formatters
 
