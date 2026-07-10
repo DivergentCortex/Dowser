@@ -319,7 +319,7 @@ function Find-DowserString {
             }
 
             $phase1Duration = (Get-Date) - $phase1Start
-            Write-Log ("Find-DowserString Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds) -Severity Verbose
+            Write-Log ("Find-DowserString Phase 1/3: Found {0:N0} directories in {1:N1}s" -f $scanTargets.Count, $phase1Duration.TotalSeconds)
 
             $gatherScriptBlock = {
                 param($DirChunk, $Extensions, $MaxFileSizeBytes, $ExcludeExtensions, $ProgressQueue)
@@ -374,9 +374,11 @@ function Find-DowserString {
                 -ProgressStatus 'Phase 2/3: Gathering files' `
                 -UseProgressQueue
 
-            $allFiles = @($gatherResults | Select-Object -Unique)
+            # Select-Object -Unique is O(n^2) and stalls for tens of minutes on a
+            # quarter-million paths. Select-DowserUniquePath is a single-pass HashSet.
+            $allFiles = @(Select-DowserUniquePath -Path $gatherResults)
             $phase2Duration = (Get-Date) - $phase2Start
-            Write-Log ("Find-DowserString Phase 2/3: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds) -Severity Verbose
+            Write-Log ("Find-DowserString Phase 2/3: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds)
 
         }  # end else (directory mode)
 
@@ -520,7 +522,7 @@ function Find-DowserString {
             return $results.ToArray()
         }
 
-        Write-Log ("Find-DowserString Phase 3/3: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count) -Severity Verbose
+        Write-Log ("Find-DowserString Phase 3/3: Searching {0:N0} files for {1} pattern(s)" -f $allFiles.Count, @($Patterns).Count)
         $phase3Start = Get-Date
 
         $searchResults = $allFiles | Invoke-DowserRunspacePool `
@@ -540,7 +542,7 @@ function Find-DowserString {
         }
 
         $phase3Duration = (Get-Date) - $phase3Start
-        Write-Log ("Find-DowserString Phase 3/3: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds) -Severity Verbose
+        Write-Log ("Find-DowserString Phase 3/3: Done. {0:N0} match rows from {1:N0} files in {2:N1}s" -f $allResults.Count, $allFiles.Count, $phase3Duration.TotalSeconds)
     }
 
     end {
