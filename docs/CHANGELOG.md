@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.10.070] - 2026-07-10
+### fix(Find-DowserString): Stop ArrayList.Add index leaking into worker output, and drop O(n^2) -Unique from the output formatters
+
+What changed:
+- Added the missing [void] to the $results.Add(...) call in the search worker's catch{} block (Public/Find-DowserString.ps1, read-error path).
+- grouped and counts formatters now use `$_.Group.LineNumber | Sort-Object -Unique` instead of `Select-Object -ExpandProperty LineNumber -Unique | Sort-Object`.
+- files formatter now uses Select-DowserUniquePath instead of `Select-Object -ExpandProperty FilePath -Unique`.
+- Verified all four OutputModes (grouped, counts, files, matches) against a tree containing an unreadable file.
+
+Why:
+- ArrayList.Add returns the index of the inserted element. In the search scriptblock's catch{} branch the call was not voided, so for every file that failed to read, a bare Int32 was emitted into the runspace worker's output stream and collected alongside the real match rows. Group-Object FilePath then bucketed those integers under a null key and the grouped formatter died with 'Property LineNumber cannot be found' at line 618, discarding the entire result set after a 390-second Phase 3. This never fired on clean trees (the Dowser repo smoke test passed) because no file threw; it fires reliably on ~/projects/ where permission-denied and special files exist. Every other .Add() in the file was already voided; this one was the outlier. Separately, the end{} formatters carried the same O(n^2) Select-Object -Unique that was removed from Phase 2, applied per file group over 161,135 match rows, and end{} has no Write-Progress at all, so that stage was both slow and completely silent. Sort-Object -Unique is O(n log n) and preserves the prior semantics (unique-then-sort produces the same ordered set). Known remaining: end{} still emits no progress; Phase 2's progress bar counts directories while its label says 'Gathering files'; the O(n^2) dedup persists in Find-DowserFile.ps1:216 and Get-DowserReport.ps1:349; and other public functions have not been audited for either the Add-leak or the Verbose-gated counts.
+
+
 ## [2026.07.10.069] - 2026-07-10
 ### fix(Find-DowserString): Replace O(n^2) Select-Object -Unique dedup that read as a hang, and stop hiding status counts behind -Verbose
 
