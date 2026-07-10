@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.07.10.069] - 2026-07-10
+### fix(Find-DowserString): Replace O(n^2) Select-Object -Unique dedup that read as a hang, and stop hiding status counts behind -Verbose
+
+What changed:
+- Added Private/Select-DowserUniquePath.ps1: single-pass HashSet dedup for path lists, preserving first-seen order.
+- Find-DowserString Phase 2/3 now calls it instead of `$gatherResults | Select-Object -Unique`.
+- Promoted every phase status line and count in Find-DowserString from -Severity Verbose to Info. Only the per-directory 'skipped inaccessible directory' line remains Verbose.
+- Added Tests/Select-DowserUniquePath.Tests.ps1 (5 tests), including a regression guard asserting 50,000 paths dedup in under 5 seconds.
+- Files changed: Public/Find-DowserString.ps1, Private/Select-DowserUniquePath.ps1 (new), Tests/Select-DowserUniquePath.Tests.ps1 (new).
+
+Why:
+- Select-Object -Unique compares each incoming item against every item it has already kept, which is O(n^2). Measured on this box: 10k paths 2.2s, 20k 9.4s, 40k 37.3s. `Find-DowserString ~/projects/ -Patterns MyelinDrite -Recurse` yields 251,874 files past the exclude/size filters, extrapolating to ~25 minutes burned on that single line. Because the phase-2 runspace pool had already called `Write-Progress -Completed`, the console sat blank the whole time and the command was indistinguishable from a deadlock. Dedup exists only to absorb symlink cycles re-enumerating a directory; the enumerator otherwise visits each directory once. A HashSet gets the same answer in one pass (50k paths: 191ms vs ~58s). The comparer is Ordinal, NOT OrdinalIgnoreCase: Select-Object -Unique is case-sensitive on PowerShell 7 (verified on 7.6.3, '/b/File.txt' and '/b/file.txt' both survive), and on Linux those are two different files that must both be searched. Do not 'simplify' this to OrdinalIgnoreCase. Severity doctrine for this module: Verbose is for per-item actions you only want when debugging (every file checked, every directory skipped). Status changes and counts -- how many directories found, how many files to scan, how many matched -- are Info and must be on screen by default. They were all Verbose, so Write-Log returned early at the Verbose gate and the operator got no dialogue at all. Known remaining: the same O(n^2) dedup is still present on large file lists in Public/Find-DowserFile.ps1:216 and Public/Get-DowserReport.ps1:349; the Select-Object -Unique calls in Get-DowserMap.ps1 and ConvertTo-DowserIco.ps1 operate on small exclude lists and are harmless.
+
+
 ## [2026.07.05.068] - 2026-07-05
 ### feat(Get-DowserMap): Auto-detect archive files (.zip/.7z/.rar/.tar/.gz) and render internal contents as a tree
 
