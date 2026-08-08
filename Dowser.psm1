@@ -30,11 +30,13 @@
 
 # Platform compat: PS 5.1 lacks $IsWindows/$IsLinux/$IsMacOS automatic variables.
 # Set at module scope so dot-sourced functions can read them via scope resolution.
-# On pwsh 7+ these are engine automatic variables and this block is skipped.
-if (-not (Get-Variable -Name 'IsWindows' -ErrorAction SilentlyContinue)) {
-    $IsWindows = $true
-    $IsLinux = $false
-    $IsMacOS = $false
+# On pwsh 6+ they are read-only engine automatics: direct assignment fails there and
+# the analyzer flags the statement even inside a guard, so gate on version and set
+# them through Set-Variable instead.
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    Set-Variable -Name 'IsWindows' -Value $true  -Scope Script
+    Set-Variable -Name 'IsLinux'   -Value $false -Scope Script
+    Set-Variable -Name 'IsMacOS'   -Value $false -Scope Script
 }
 
 # Write-Log FATAL-throws when $LogFilePath is empty. Set a module-root default
