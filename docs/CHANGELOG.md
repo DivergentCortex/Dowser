@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.08.072] - 2026-08-08
+### fix(params): Default-on booleans become real switches, and stop assigning the read-only platform automatics
+
+What changed:
+- [bool]$Recurse = $true -> [switch]$Recurse = $true in Find-DowserFile, Find-DowserRecentLog, Find-DowserModified, Find-DowserScript.
+- [bool]$UseRunspaces = $true -> [switch]$UseRunspaces = $true in Find-DowserFile, Get-DowserMap, Get-DowserReport.
+- Dowser.psm1 platform shim: replaced the Get-Variable probe plus direct $IsWindows/$IsLinux/$IsMacOS assignments with a $PSVersionTable.PSVersion.Major -lt 6 gate that sets the three names through Set-Variable -Scope Script.
+- Verified on pwsh 7.6.4: all seven parameters report SwitchParameter; bare -Recurse recurses, -Recurse:$false does not, omitting it still recurses (default-on behaviour preserved); module imports clean.
+
+Why:
+- Find-DowserFile -Path X -Pattern *.jsonl -Recurse failed with "Missing an argument for parameter 'Recurse'. Specify a parameter of type 'System.Boolean'". A [bool] parameter is a value parameter: the binder demands an argument, so the one spelling every PowerShell user reaches for first was the one spelling that did not work. The CBH already documented switch semantics ("Default is $true. Pass -Recurse:$false to disable"), so the type was contradicting the help text. [switch] with a $true default keeps default-on behaviour while making bare -Recurse legal and -Recurse:$false the documented off-switch. No call site in the repo used the -Recurse $true space form, so nothing internal broke; only that space form is retired. Separately, the platform shim assigned $IsWindows, $IsLinux and $IsMacOS directly. Those are read-only engine automatics on pwsh 6+, and the analyzer flags the assignment statically even though the Get-Variable guard meant it never executed there, so the file carried three permanent editor warnings. Set-Variable behind a version gate says the same thing without touching the automatics on any host that owns those names.
+
+
 ## [2026.07.10.071] - 2026-07-10
 ### feat(Find-DowserString): Promote output formatting to a first-class Phase 4/4 with progress, and relink README into the repo root
 
