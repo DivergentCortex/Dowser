@@ -21,8 +21,10 @@ function Find-DowserFile {
         The directory path(s) to search.
 
     .PARAMETER Pattern
-        Wildcard pattern to match file names (e.g., "*.ps1", "log_?.txt").
-        Partial strings are auto-wrapped in wildcards: "cortex" becomes "*cortex*".
+        Wildcard pattern(s) to match file names (e.g., "*.ps1", "log_?.txt").
+        Accepts a comma-separated list; a file matching any pattern is returned:
+        -Pattern *.md,*.json. Partial strings are auto-wrapped in wildcards:
+        "cortex" becomes "*cortex*". Each element is wrapped independently.
 
     .PARAMETER Recurse
         Search subdirectories recursively. Default is $true. Pass -Recurse:$false to disable.
@@ -54,6 +56,11 @@ function Find-DowserFile {
         Recursively finds all PowerShell scripts under D:\Repos using runspaces.
 
     .EXAMPLE
+        Find-DowserFile -Path ~/projects/ClauDesk -Pattern *.md,*.json
+
+        Returns every markdown and json file under the ClauDesk tree in one pass.
+
+    .EXAMPLE
         Find-DowserFile -Path "D:\Logs" -Pattern "error" -ModifiedAfter (Get-Date).AddDays(-1) -MinSize 1MB
 
         Finds files whose name contains "error", modified in the last day, at least 1MB.
@@ -73,7 +80,7 @@ function Find-DowserFile {
         [string[]]$Path,
 
         [Parameter(Position = 1)]
-        [string]$Pattern = "*",
+        [string[]]$Pattern = @("*"),
 
         [switch]$Recurse = $true,
 
@@ -103,10 +110,22 @@ function Find-DowserFile {
         }
 
         # bare strings get wrapped, already-wildcarded left alone
-        if ($Pattern -ne "*" -and $Pattern -notmatch '[*?]') {
-            $Pattern = "*$Pattern*"
-            Write-Log "Pattern auto-wrapped to: $Pattern" -Severity Verbose
-        }
+        $Pattern = @(
+            foreach ($pat in $Pattern) {
+                if ($pat -ne "*" -and $pat -notmatch '[*?]') {
+                    Write-Log "Pattern auto-wrapped to: *$pat*" -Severity Verbose
+                    "*$pat*"
+                }
+                else {
+                    $pat
+                }
+            }
+        )
+
+        # -Filter is a filesystem-level filter and takes exactly one pattern, so it stays
+        # the fast path for the single-pattern case. Multiple patterns enumerate once and
+        # test names in-process; one pass, no cross-pattern duplicates.
+        $nameTest = $Pattern.Count -gt 1
     }
 
     process {
@@ -122,9 +141,12 @@ function Find-DowserFile {
             $filesFound = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
             
             if ($UseRunspaces) {
-                # partition by top-level dirs to spread across threads
-                $topLevelItems = Get-ChildItem -Path $p -Directory -ErrorAction SilentlyContinue
-                if ($Recurse) {
+                # partition by top-level dirs to spread across threads. @() around the
+                # enumeration matters: on a flat directory Get-ChildItem returns nothing,
+                # $null.FullName is $null, and @($p) + @($null) hands the pool a target
+                # list with a null in it, which its mandatory -InputObject rejects.
+                $topLevelItems = @(Get-ChildItem -Path $p -Directory -ErrorAction SilentlyContinue)
+                if ($Recurse -and $topLevelItems.Count -gt 0) {
                     $scanTargets = @($p) + @($topLevelItems.FullName)
                 }
                 else {
@@ -132,7 +154,7 @@ function Find-DowserFile {
                 }
 
                 $scriptBlock = {
-                    param($chunk, $pattern, $recurse, $min, $max, $after, $before)
+                    param($chunk, $patterns, $nameTest, $recurse, $min, $max, $after, $before)
                     $res = @()
                     foreach ($targetPath in $chunk) {
                         $params = @{
@@ -144,22 +166,31 @@ function Find-DowserFile {
                         if ($recurse) {
                             $params['Recurse'] = $true 
                         }
-                        if ($pattern -ne "*") {
-                            $params['Filter'] = $pattern 
+                        if (-not $nameTest -and $patterns[0] -ne "*") {
+                            $params['Filter'] = $patterns[0] 
                         }
 
                         Get-ChildItem @params | ForEach-Object {
                             $ok = $true
-                            if ($min -and $_.Length -lt $min) {
+                            if ($nameTest) {
+                                $ok = $false
+                                foreach ($pat in $patterns) {
+                                    if ($_.Name -like $pat) {
+                                        $ok = $true
+                                        break 
+                                    }
+                                }
+                            }
+                            if ($ok -and $min -and $_.Length -lt $min) {
                                 $ok = $false 
                             }
-                            if ($max -and $_.Length -gt $max) {
+                            if ($ok -and $max -and $_.Length -gt $max) {
                                 $ok = $false 
                             }
-                            if ($after -and $_.LastWriteTime -lt $after) {
+                            if ($ok -and $after -and $_.LastWriteTime -lt $after) {
                                 $ok = $false 
                             }
-                            if ($before -and $_.LastWriteTime -gt $before) {
+                            if ($ok -and $before -and $_.LastWriteTime -gt $before) {
                                 $ok = $false 
                             }
 
@@ -171,7 +202,7 @@ function Find-DowserFile {
                     return $res
                 }
 
-                $results = Invoke-DowserRunspacePool -InputObject $scanTargets -ScriptBlock $scriptBlock -ArgumentList @($Pattern, $Recurse, $minBytes, $maxBytes, $ModifiedAfter, $ModifiedBefore) -ThreadCount $ThreadCount -ProgressActivity "Scanning Files" -ProgressStatus "Scanning targets..."
+                $results = Invoke-DowserRunspacePool -InputObject $scanTargets -ScriptBlock $scriptBlock -ArgumentList @($Pattern, $nameTest, $Recurse, $minBytes, $maxBytes, $ModifiedAfter, $ModifiedBefore) -ThreadCount $ThreadCount -ProgressActivity "Scanning Files" -ProgressStatus "Scanning targets..."
                 
                 foreach ($r in $results) {
                     $filesFound.Add($r) 
@@ -185,22 +216,31 @@ function Find-DowserFile {
                     ErrorAction = 'SilentlyContinue'
                     Force       = $true
                 }
-                if ($Pattern -ne "*") {
-                    $params['Filter'] = $Pattern 
+                if (-not $nameTest -and $Pattern[0] -ne "*") {
+                    $params['Filter'] = $Pattern[0] 
                 }
                 
                 Get-ChildItem @params | ForEach-Object {
                     $ok = $true
-                    if ($minBytes -and $_.Length -lt $minBytes) {
+                    if ($nameTest) {
+                        $ok = $false
+                        foreach ($pat in $Pattern) {
+                            if ($_.Name -like $pat) {
+                                $ok = $true
+                                break 
+                            }
+                        }
+                    }
+                    if ($ok -and $minBytes -and $_.Length -lt $minBytes) {
                         $ok = $false 
                     }
-                    if ($maxBytes -and $_.Length -gt $maxBytes) {
+                    if ($ok -and $maxBytes -and $_.Length -gt $maxBytes) {
                         $ok = $false 
                     }
-                    if ($ModifiedAfter -and $_.LastWriteTime -lt $ModifiedAfter) {
+                    if ($ok -and $ModifiedAfter -and $_.LastWriteTime -lt $ModifiedAfter) {
                         $ok = $false 
                     }
-                    if ($ModifiedBefore -and $_.LastWriteTime -gt $ModifiedBefore) {
+                    if ($ok -and $ModifiedBefore -and $_.LastWriteTime -gt $ModifiedBefore) {
                         $ok = $false 
                     }
 
@@ -213,7 +253,9 @@ function Find-DowserFile {
                 }
             }
 
-            $allPaths = $filesFound.ToArray() | Select-Object -Unique
+            # @() keeps an empty result an empty array. Unwrapped, no matches leaves $allPaths
+            # $null, @($null).Count is 1, and the formatter below emits one row of nulls.
+            $allPaths = @(Select-DowserUniquePath -Path $filesFound.ToArray())
             $count = @($allPaths).Count
             Write-Log "Found $count files matching basic criteria." -Severity Verbose
             
@@ -221,18 +263,26 @@ function Find-DowserFile {
                 Write-Progress -Activity "Find-DowserFile" -Status "Retrieving file objects..." -PercentComplete -1
                 if ($StopOnFirstMatch) {
                     $firstFile = Get-Item -LiteralPath $allPaths[0] -ErrorAction SilentlyContinue
-                    [PSCustomObject]@{
-                        FullName      = $firstFile.FullName
-                        Name          = $firstFile.Name
-                        Directory     = $firstFile.DirectoryName
-                        Size          = $firstFile.Length
-                        LastWriteTime = $firstFile.LastWriteTime
-                        CreationTime  = $firstFile.CreationTime
+                    if ($firstFile) {
+                        [PSCustomObject]@{
+                            FullName      = $firstFile.FullName
+                            Name          = $firstFile.Name
+                            Directory     = $firstFile.DirectoryName
+                            Size          = $firstFile.Length
+                            LastWriteTime = $firstFile.LastWriteTime
+                            CreationTime  = $firstFile.CreationTime
+                        }
                     }
                 }
                 else {
                     $allPaths | ForEach-Object {
                         $f = Get-Item -LiteralPath $_ -ErrorAction SilentlyContinue
+                        if (-not $f) {
+                            # path was enumerated but will not resolve: dangling symlink, or it
+                            # was deleted mid-scan. Emitting it yields a row of null properties.
+                            Write-Log "Skipping unresolvable path: $_" -Severity Verbose
+                            return
+                        }
                         [PSCustomObject]@{
                             FullName      = $f.FullName
                             Name          = $f.Name
