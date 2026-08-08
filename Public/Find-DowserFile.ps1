@@ -75,7 +75,7 @@ function Find-DowserFile {
         [Parameter(Position = 1)]
         [string]$Pattern = "*",
 
-        [bool]$Recurse = $true,
+        [switch]$Recurse = $true,
 
         [string]$MinSize,
         [string]$MaxSize,
@@ -85,7 +85,7 @@ function Find-DowserFile {
 
         [switch]$StopOnFirstMatch,
 
-        [bool]$UseRunspaces = $true,
+        [switch]$UseRunspaces = $true,
         [int]$ThreadCount = [Environment]::ProcessorCount
     )
 

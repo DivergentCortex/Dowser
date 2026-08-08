@@ -54,7 +54,7 @@ function Find-DowserModified {
         [Parameter(Position = 1)]
         [DateTime]$Date = (Get-Date).Date,
 
-        [bool]$Recurse = $true
+        [switch]$Recurse = $true
     )
 
     process {

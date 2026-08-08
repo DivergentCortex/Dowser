@@ -70,7 +70,7 @@ function Find-DowserScript {
 
         [int]$ModifiedWithin,
 
-        [bool]$Recurse = $true
+        [switch]$Recurse = $true
     )
 
     begin {

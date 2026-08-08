@@ -105,7 +105,7 @@ function Get-DowserReport {
 
         [string]$MaxSize,
 
-        [bool]$UseRunspaces = $true,
+        [switch]$UseRunspaces = $true,
 
         [int]$ThreadCount = [Environment]::ProcessorCount,
 

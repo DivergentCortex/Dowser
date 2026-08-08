@@ -145,7 +145,7 @@ function Get-DowserMap {
         [switch]$FollowReparse,
 
         # Performance Options
-        [bool]$UseRunspaces = $true,
+        [switch]$UseRunspaces = $true,
         [int]$MaxThreads = ([Math]::Max(1, [Environment]::ProcessorCount - 1)),
         [string]$SevenZipPath,
 

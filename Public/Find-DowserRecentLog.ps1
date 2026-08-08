@@ -70,7 +70,7 @@ function Find-DowserRecentLog {
 
         [switch]$All,
 
-        [bool]$Recurse = $true
+        [switch]$Recurse = $true
     )
 
     begin {
