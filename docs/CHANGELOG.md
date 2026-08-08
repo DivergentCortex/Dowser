@@ -2,6 +2,23 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.08.073] - 2026-08-08
+### fix(Find-DowserFile): Accept multiple -Pattern values, and stop emitting null rows on empty and unresolvable results
+
+What changed:
+- -Pattern is now [string[]]$Pattern = @('*'), so -Pattern *.md,*.json works. Each element is wildcard-wrapped independently in begin{}, so -Pattern cortex,*.json wraps only the bare token.
+- Added $nameTest = $Pattern.Count -gt 1. Single pattern keeps the Get-ChildItem -Filter fast path; multiple patterns enumerate once and test $_.Name -like against the set, short-circuiting on first hit. The size and date predicates are now chained behind -and $ok so a name rejection skips them.
+- $nameTest is threaded into the runspace scriptblock as a new second argument (param($chunk, $patterns, $nameTest, ...)) and the ArgumentList order updated to match.
+- Swapped the O(n^2) Select-Object -Unique dedup for Select-DowserUniquePath (the HashSet helper), closing the last of the three sites the 2026.07.10.070 entry listed as outstanding.
+- Wrapped the dedup result in @(): no matches previously left $allPaths $null, @($null).Count is 1, and the formatter then emitted one row of null properties and logged 'Found 1 files'.
+- Guarded both formatter branches on a null Get-Item result, logging the skip at Verbose. An enumerated path that will not resolve produced a row of nulls instead of being dropped.
+- Wrapped the top-level directory enumeration in @() and gated the partition on $topLevelItems.Count -gt 0.
+- CBH: rewrote .PARAMETER Pattern for the list form and added an example.
+
+Why:
+- -Pattern took one string, so -Pattern *.md,*.json failed with "Cannot process argument transformation on parameter 'Pattern'" and there was no way to ask for two extensions in one pass. -Filter is a filesystem-level filter that accepts exactly one pattern, which is why it could not simply be handed the array; it stays the fast path for the single-pattern case and the multi-pattern case moves the test in-process, one enumeration, no cross-pattern duplicates. Three latent defects surfaced while testing the change and are fixed with it. First, a search that matched nothing returned one PSCustomObject with every property null, because an empty pipeline result collapses to $null and @($null).Count is 1; the Verbose count log said 1 for the same reason. Second, a path that enumerated but would not resolve on the Get-Item pass (dangling symlink, deleted mid-scan) also produced a row of nulls: a real ~/projects/ClauDesk scan returned 863 rows of which 3 were null garbage, now 860 clean. Third, on a directory with no subdirectories Get-ChildItem -Directory returns nothing, $null.FullName is $null, and @($p) + @($null) handed Invoke-DowserRunspacePool a target list containing a null, which its mandatory -InputObject rejected: Find-DowserFile crashed on any flat directory under its own default -UseRunspaces path. Verified on pwsh 7.6.4 across both the runspace and single-threaded paths: multi-pattern, mixed bare-plus-glob, single-pattern, default '*', no-recurse, size-filtered, StopOnFirstMatch, dangling symlink, flat directory, and zero-match all behave; full test suite 140 tests, 137 pass, 0 fail, 3 platform skips.
+
+
 ## [2026.08.08.072] - 2026-08-08
 ### fix(params): Default-on booleans become real switches, and stop assigning the read-only platform automatics
 
