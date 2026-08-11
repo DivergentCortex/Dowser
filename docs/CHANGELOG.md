@@ -2,6 +2,190 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.11.091] - 2026-08-11
+### docs(index): Record the JSON CSV alias
+
+What changed:
+- Added the Export-JsonCsv opt-in alias to the Export-DowserJsonCsv index entry.
+
+Why:
+- The command inventory should show the complete public interactive surface.
+
+
+## [2026.08.11.090] - 2026-08-11
+### docs(index): Record the JSON key alias
+
+What changed:
+- Added the Get-JsonKey opt-in alias to the Get-DowserJsonKey index entry.
+
+Why:
+- The command inventory should show the complete public interactive surface.
+
+
+## [2026.08.11.089] - 2026-08-11
+### feat(aliases): Add the opt-in JSON key alias
+
+What changed:
+- Added Get-JsonKey as an Enable-DowserAliases mapping for Get-DowserJsonKey.
+
+Why:
+- Alias coverage requires every exported command to have a short opt-in name.
+
+
+## [2026.08.11.088] - 2026-08-11
+### feat(aliases): Add the opt-in JSON CSV alias
+
+What changed:
+- Added Export-JsonCsv as an Enable-DowserAliases mapping for Export-DowserJsonCsv.
+
+Why:
+- Alias coverage requires every exported command to have a short opt-in name.
+
+
+## [2026.08.11.087] - 2026-08-11
+### docs(architecture): Describe JSON streaming and sequential processing
+
+What changed:
+- Documented the JsonTextReader token stream and intentional sequential execution.
+
+Why:
+- Large-file memory bounds and the choice not to add runspace readers are architectural behavior.
+
+
+## [2026.08.11.086] - 2026-08-11
+### docs(index): Document the JSON command contracts
+
+What changed:
+- Added complete INDEX.md entries for streamed key inspection and CSV export.
+- Recorded parameters, output shapes, and the relationship between the commands.
+
+Why:
+- The project index is the authoritative command map for module consumers.
+
+
+## [2026.08.11.085] - 2026-08-11
+### docs(readme): Update the documented command count
+
+What changed:
+- Changed the README command count from 27 to 29.
+
+Why:
+- The module now exposes two additional JSON commands.
+
+
+## [2026.08.11.084] - 2026-08-11
+### docs(readme): Add JSON inspection and CSV export examples
+
+What changed:
+- Added quick-start examples for key comparison and Excel-compatible CSV export.
+
+Why:
+- Users need direct command examples for the new JSON workflow.
+
+
+## [2026.08.11.083] - 2026-08-11
+### docs(architecture): Correct the default-on switch design note
+
+What changed:
+- Replaced the stale bool-parameter guidance with the current default-on switch pattern.
+
+Why:
+- Architecture documentation contradicted the module behavior recorded in the recent switch fix.
+
+
+## [2026.08.11.082] - 2026-08-11
+### docs(architecture): Update the exported command count
+
+What changed:
+- Updated ARCHITECTURE.md to list 28 public basenames and 29 exported functions.
+
+Why:
+- The manifest now exports two additional JSON commands.
+
+
+## [2026.08.11.081] - 2026-08-11
+### docs(architecture): Update public module file count for JSON commands
+
+What changed:
+- Updated the Public directory count from 26 to 28 files in ARCHITECTURE.md.
+
+Why:
+- The architecture map must reflect the two new JSON command files.
+
+
+## [2026.08.11.080] - 2026-08-11
+### fix(json): Format CSV rows before calling StreamWriter
+
+What changed:
+- Constructed the complete CSV row before passing it to StreamWriter.WriteLine.
+
+Why:
+- PowerShell method-call parsing treated the format arguments as WriteLine arguments instead of a single formatted row.
+
+
+## [2026.08.11.079] - 2026-08-11
+### fix(json): Resolve CSV destination paths without invalid parameter binding
+
+What changed:
+- Replaced the incompatible Split-Path LiteralPath and Parent call with System.IO path resolution.
+
+Why:
+- PowerShell rejects that parameter combination, preventing CSV output from being created.
+
+
+## [2026.08.11.078] - 2026-08-11
+### test(json): Cover JSON inspection and CSV export
+
+What changed:
+- Added Pester fixtures for nested JSON, JSONL comparison, and CSV export.
+- Covers exported command discovery plus key, document, and value counts.
+
+Why:
+- The new streamed commands need regression coverage for nested and line-delimited input.
+
+
+## [2026.08.11.077] - 2026-08-11
+### feat(module): Expose JSON key inspection from the Dowser manifest
+
+What changed:
+- Added Get-DowserJsonKey to FunctionsToExport in Dowser.psd1.
+
+Why:
+- The streamed inspection command must be available when consumers import the module manifest.
+
+
+## [2026.08.11.076] - 2026-08-11
+### feat(module): Expose JSON CSV export from the Dowser manifest
+
+What changed:
+- Added Export-DowserJsonCsv to FunctionsToExport in Dowser.psd1.
+
+Why:
+- The new CSV converter must be available when consumers import the module manifest.
+
+
+## [2026.08.11.075] - 2026-08-11
+### feat(json): Export streamed JSON values as Excel-compatible CSV
+
+What changed:
+- Added Export-DowserJsonCsv for JSON and JSONL source files.
+- Writes long-form CSV rows with source file, document number, JSON key path, and value.
+
+Why:
+- Large nested JSON needs a spreadsheet-friendly export without materializing documents in memory.
+
+
+## [2026.08.11.074] - 2026-08-11
+### feat(json): Add streamed JSON and JSONL key inspection
+
+What changed:
+- Added Get-DowserJsonKey for per-file key-path counts and directory-wide comparison.
+- Uses Newtonsoft.Json.JsonTextReader so full documents are not deserialized into memory.
+
+Why:
+- Large JSON and JSONL files need schema inspection without whole-file memory pressure.
+
+
 ## [2026.08.08.073] - 2026-08-08
 ### fix(Find-DowserFile): Accept multiple -Pattern values, and stop emitting null rows on empty and unresolvable results
 

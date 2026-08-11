@@ -178,6 +178,24 @@ These functions emit a warning and return `$null` on non-Windows:
 - Related: None
 - Source: Original to Dowser (not ported)
 
+### Get-DowserJsonKey
+
+- Purpose: Streams JSON and JSONL tokens to report key paths and per-file occurrence counts. With `-Compare`, reports which scanned files contain or omit each path.
+- Inputs: `Path` (JSON or JSONL file, or directory; pipeline), `Recurse` (default true), `Compare`.
+- Outputs: Default rows contain FilePath, Format, Documents, KeyPath, and OccurrenceCount. Compare rows contain KeyPath, FileCount, TotalOccurrences, PresentInFiles, and MissingFromFiles.
+- Related: `Export-DowserJsonCsv` for spreadsheet output.
+- Source: `Get-DowserJsonKey.ps1`
+- Alias: `Get-JsonKey` after `Enable-DowserAliases`.
+
+### Export-DowserJsonCsv
+
+- Purpose: Writes JSON or JSONL scalar values as a long-form, Excel-compatible CSV without loading the full document.
+- Inputs: `Path` (JSON or JSONL file; pipeline), `OutputPath`, `Force`.
+- Outputs: PSCustomObject with SourcePath, OutputPath, Documents, and ValuesWritten. CSV rows contain SourceFile, DocumentNumber, KeyPath, and Value.
+- Related: `Get-DowserJsonKey` for key-only inspection and comparison.
+- Source: `Export-DowserJsonCsv.ps1`
+- Alias: `Export-JsonCsv` after `Enable-DowserAliases`.
+
 ### Get-DowserMap
 
 - Purpose: Visual tree renderer for directory structures. Renders folder/file hierarchy using Unicode box-drawing characters with optional size (-IncludeSize) and file count (-IncludeFileCount, alias: -IncludePsCount) annotations. Supports HTML, Markdown, and full-path trunk display modes. Symlinks are shown in place without traversal by default (two-line block: a name line marked U+2192 and a target line marked U+21B3); use -FollowReparse to descend into them.

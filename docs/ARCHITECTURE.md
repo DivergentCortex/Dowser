@@ -12,11 +12,11 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 Dowser.psd1  -->  Dowser.psm1
                     |
                     +-- Private/*.ps1    (6 helpers, not exported)
-                    +-- Public/*.ps1     (26 files, one function each, exported)
+                    +-- Public/*.ps1     (28 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  (Set-Alias calls, sourced last)
 ```
 
-The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 26 Public/ basenames plus `Compare-DowserReport` (the 27th public function, which lives inside Get-DowserReport.ps1 and so is named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 27-name list, not a wildcard.
+The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 28 Public/ basenames plus `Compare-DowserReport` (the 29th public function, which lives inside Get-DowserReport.ps1 and so is named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 29-name list, not a wildcard.
 
 One function per file in Public. This keeps diffs clean, prevents agents from stomping each other's work, and makes `Get-ChildItem Public` read like a table of contents.
 
@@ -45,6 +45,8 @@ Functions fall into five verb buckets:
 - **Test-Dowser\***: Validation (EXE extractability classification, file integrity/corruption detection).
 - **Expand-Dowser\***: Extraction (EXE archive extraction via 7-Zip).
 - **New-Dowser\***: Creation (hidden folder attribute setting).
+
+`Get-DowserJsonKey` and `Export-DowserJsonCsv` use `Newtonsoft.Json.JsonTextReader` over a file stream. They process one token at a time and deliberately do not join the runspace pool: whole-document deserialization and parallel readers would make large-file memory use harder to bound.
 
 ### Alias layer
 
@@ -86,7 +88,7 @@ Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) 
 
 **Pattern parameters auto-wrap.** Bare strings passed to `-Pattern` or `-Filter` parameters that lack wildcard characters get wrapped in `*...*` before being passed to `Get-ChildItem -Filter`. This prevents the silent "zero results" failure when users pass a substring expecting a contains-match but the underlying API requires exact wildcard syntax.
 
-**Switch vs Bool for defaults-true.** PowerShell `[switch]` parameters ignore `= $true` defaults. Parameters that should default to true (like `-Recurse` on search functions and `-UseRunspaces` on parallel functions) use `[bool]$Param = $true` instead of `[switch]`.
+**Default-on switches.** Parameters that should default to true use `[switch]$Param = $true`, preserving normal switch syntax while allowing callers to disable them with `-Param:$false`.
 
 **Tilde path resolution.** All functions that pass paths to .NET static methods (System.IO.File, System.IO.Directory, System.IO.Path) resolve PowerShell tilde paths first using `Resolve-Path` or `GetUnresolvedProviderPathFromPSPath`. .NET methods do not expand `~`.
 

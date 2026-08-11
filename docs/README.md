@@ -35,11 +35,17 @@ Test-DowserIntegrity -Path ./release -Recurse
 
 # pull one file apart: version info, PE headers, hashes
 Get-DowserProperty -Path ./bin/app.exe
+
+# compare the fields present across a JSON or JSONL export
+Get-DowserJsonKey -Path ./exports -Compare
+
+# write nested scalar values to an Excel-compatible CSV
+Export-DowserJsonCsv -Path ./exports/events.jsonl -OutputPath ./events.csv
 ```
 
 ## What it does
 
-Twenty-seven functions, grouped by the question they answer.
+Twenty-nine functions, grouped by the question they answer.
 
 **Find things.** `Find-DowserFile` is a multi-threaded search by attribute, size, and date. `Find-DowserString` runs multi-pattern text search with Aho-Corasick matching; `Invoke-DowserFastSearch` is the single-pattern parallel variant. `Find-DowserDuplicate` catches duplicates by name, size, or chunked hash. `Find-DowserModified` pulls files changed on a given date, `Find-DowserRecentLog` grabs the newest log in a directory, and `Find-DowserScript` walks a tree for script files by type.
 
