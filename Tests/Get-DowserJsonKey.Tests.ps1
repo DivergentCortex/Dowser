@@ -45,13 +45,50 @@ Describe 'Get-DowserJsonKey' {
     }
 
     It 'compares keys across JSON and JSONL files' {
-        $rows = @(Get-DowserJsonKey -Path $script:WorkDir -Compare)
+        $rows = @(Get-DowserJsonKey -Path $script:WorkDir -Compare -ShowKeyComparison -IncludeFiles)
         $name = $rows | Where-Object { $_.KeyPath -eq '$.name' }
         $extra = $rows | Where-Object { $_.KeyPath -eq '$.extra' }
 
         $name.FileCount | Should -Be 2
         $extra.FileCount | Should -Be 1
         $extra.MissingFromFiles | Should -Match 'records\.json'
+    }
+
+    It 'reports file schemas and their differences from the dominant schema' {
+        $rows = @(Get-DowserJsonKey -Path $script:WorkDir -Compare -Validation)
+        $global:DowserJsonLastComparison.Count | Should -Be $rows.Count
+        $global:DowserJsonLastValidation.Count | Should -Be 5
+        ($global:DowserJsonLastValidation | Where-Object { $_.KeyPath -eq '$.name' }).Classification | Should -Be 'AlwaysPresent'
+        $summary = $rows | Where-Object { $_.ResultType -eq 'DirectorySummary' }
+        $dominant = $rows | Where-Object { $_.ResultType -eq 'SchemaProfile' -and $_.Role -eq 'Dominant' }
+        $variant = $rows | Where-Object { $_.ResultType -eq 'SchemaProfile' -and $_.Role -eq 'Variant' }
+
+        $summary.FilesScanned | Should -Be 2
+        $summary.DistinctSchemas | Should -Be 2
+        $summary.FilesDifferentFromDominant | Should -Be 1
+        $summary.DistinctKeyPaths | Should -Be 5
+        $dominant.FileCount | Should -Be 1
+        $variant.FileCount | Should -Be 1
+        ($rows | Where-Object { $_.ResultType -eq 'KeyComparison' }) | Should -BeNullOrEmpty
+    }
+
+    It 'uses one bounded JSON worker when requested' {
+        $rows = @(Get-DowserJsonKey -Path $script:WorkDir -Compare -ThreadCount 1)
+        $summary = $rows | Where-Object { $_.ResultType -eq 'DirectorySummary' }
+
+        $summary.FilesScanned | Should -Be 2
+        $summary.DistinctKeyPaths | Should -Be 5
+    }
+}
+
+Describe 'Export-DowserJsonAssessment' {
+    It 'writes an assessment report with all key validation rows' {
+        $reportDirectory = Join-Path $script:WorkDir 'assessment'
+        $result = Export-DowserJsonAssessment -Path $script:WorkDir -OutputDirectory $reportDirectory
+
+        Test-Path -LiteralPath $result.SummaryPath | Should -BeTrue
+        Test-Path -LiteralPath $result.SchemaProfilesPath | Should -BeTrue
+        (Import-Csv -LiteralPath $result.KeyValidationPath).Count | Should -Be 5
     }
 }
 

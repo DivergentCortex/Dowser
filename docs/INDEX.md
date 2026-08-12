@@ -180,9 +180,9 @@ These functions emit a warning and return `$null` on non-Windows:
 
 ### Get-DowserJsonKey
 
-- Purpose: Streams JSON and JSONL tokens to report key paths and per-file occurrence counts. With `-Compare`, reports which scanned files contain or omit each path.
-- Inputs: `Path` (JSON or JSONL file, or directory; pipeline), `Recurse` (default true), `Compare`.
-- Outputs: Default rows contain FilePath, Format, Documents, KeyPath, and OccurrenceCount. Compare rows contain KeyPath, FileCount, TotalOccurrences, PresentInFiles, and MissingFromFiles.
+- Purpose: Streams JSON and JSONL tokens to report key paths and per-file occurrence counts. With `-Compare`, groups files by complete key layout and shows the dominant layout with representative variants.
+- Inputs: `Path` (JSON or JSONL file, or directory; pipeline), `Recurse` (default true), `Compare`, `ShowKeyComparison`, `IncludeFiles` (opt-in path lists), `ProfileLimit` (default 10), `ThreadCount` (maximum readers; default is the lower of 8 or processor count).
+- Outputs: Default rows contain FilePath, Format, Documents, KeyPath, and OccurrenceCount. Compare emits DirectorySummary and SchemaProfile rows including sample files and capped key-difference previews. `ShowKeyComparison` adds individual key-path rows. `IncludeFiles` adds full path lists for drill-down.
 - Related: `Export-DowserJsonCsv` for spreadsheet output.
 - Source: `Get-DowserJsonKey.ps1`
 - Alias: `Get-JsonKey` after `Enable-DowserAliases`.

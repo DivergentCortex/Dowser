@@ -11,7 +11,7 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 ```
 Dowser.psd1  -->  Dowser.psm1
                     |
-                    +-- Private/*.ps1    (6 helpers, not exported)
+                    +-- Private/*.ps1    (9 helpers, not exported)
                     +-- Public/*.ps1     (28 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  (Set-Alias calls, sourced last)
 ```
@@ -30,6 +30,9 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | Format-DowserSize.ps1         | Formats byte counts into human-readable strings (e.g., "1.5 GB")                                          |
 | Get-DowserSortKey.ps1         | Generates sort keys for natural numeric ordering                                                          |
 | Invoke-DowserRunspacePool.ps1 | Generic RunspacePool executor used by Find-DowserFile, Find-DowserString, Get-DowserMap, Get-DowserReport |
+| Invoke-DowserJsonKeyScan.ps1  | Bounded MTA runspace coordinator for JSON directory scans                                                  |
+| Invoke-DowserJsonKeyWorker.ps1 | Queue-consuming JSON scan worker                                                                          |
+| Read-DowserJsonKeyFile.ps1    | Token-streaming JSON and JSONL reader                                                                     |
 | Test-DowserHelpers.ps1        | Validation helpers shared across test functions                                                           |
 | Write-Log.ps1                 | CMTrace-compatible logging with file output and rotation                                                  |
 
@@ -46,7 +49,7 @@ Functions fall into five verb buckets:
 - **Expand-Dowser\***: Extraction (EXE archive extraction via 7-Zip).
 - **New-Dowser\***: Creation (hidden folder attribute setting).
 
-`Get-DowserJsonKey` and `Export-DowserJsonCsv` use `Newtonsoft.Json.JsonTextReader` over a file stream. They process one token at a time and deliberately do not join the runspace pool: whole-document deserialization and parallel readers would make large-file memory use harder to bound.
+`Get-DowserJsonKey` and `Export-DowserJsonCsv` use `Newtonsoft.Json.JsonTextReader` over a file stream. Each JSON reader processes one token at a time. Directory scans use a dedicated MTA runspace pool with a synchronized pending-path queue and a default maximum of eight readers. Workers return results and log messages through synchronized queues; the caller emits logs and progress, preserving a bounded memory and output model.
 
 ### Alias layer
 

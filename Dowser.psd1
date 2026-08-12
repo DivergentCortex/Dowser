@@ -44,6 +44,7 @@
         'ConvertTo-DowserExe'
         'ConvertTo-DowserIco'
         'Enable-DowserAliases'
+        'Export-DowserJsonAssessment'
         'Export-DowserJsonCsv'
         'Expand-DowserExe'
         'Find-DowserDependency'

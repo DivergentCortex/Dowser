@@ -2,6 +2,529 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.11.142] - 2026-08-11
+### docs(json): Correct JSON comparison help descriptions
+
+What changed:
+- Replaced stale key-count wording for -Compare and -IncludeFiles.
+- Documented validation output in the command output contract.
+
+Why:
+- The current help must describe schema assessment and ingestion validation accurately.
+
+
+## [2026.08.11.141] - 2026-08-11
+### docs(json): Complete assessment report export help
+
+What changed:
+- Added assessment boundary notes, output contract, example behavior, and related command link to Export-DowserJsonAssessment help.
+
+Why:
+- The new public export command needs full in-command guidance consistent with the module surface.
+
+
+## [2026.08.11.140] - 2026-08-11
+### docs(json): Document retained JSON comparison state
+
+What changed:
+- Added Get-DowserJsonKey help notes for file-level validation and retained comparison variables.
+
+Why:
+- Full help must explain the assessment boundary and how callers reuse results.
+
+
+## [2026.08.11.139] - 2026-08-11
+### test(json): Cover JSON assessment report export
+
+What changed:
+- Added an integration test that writes all three assessment CSV reports and verifies full key validation output.
+
+Why:
+- The assessment export is only useful if its files are complete and readable by downstream tools.
+
+
+## [2026.08.11.138] - 2026-08-11
+### feat(module): Export JSON assessment report command
+
+What changed:
+- Added Export-DowserJsonAssessment to the module's explicit public command manifest.
+
+Why:
+- The new assessment exporter must be available after a normal module import.
+
+
+## [2026.08.11.137] - 2026-08-11
+### feat(json): Add JSON assessment report export
+
+What changed:
+- Added Export-DowserJsonAssessment to write directory summary, schema profile, and key validation CSV reports from one scan.
+
+Why:
+- Assessment results must be portable for database design and review without retaining full source documents.
+
+
+## [2026.08.11.136] - 2026-08-11
+### docs(json): Document retained JSON validation results
+
+What changed:
+- Added help for -Validation and $global:DowserJsonLastValidation.
+
+Why:
+- Users need to access coverage evidence without running the same large comparison again.
+
+
+## [2026.08.11.135] - 2026-08-11
+### test(json): Verify retained JSON key validation data
+
+What changed:
+- Assert that validation output retains every discovered path and identifies an all-file key as AlwaysPresent.
+
+Why:
+- Validation categories must be reliable before they guide database field requirements.
+
+
+## [2026.08.11.134] - 2026-08-11
+### feat(json): Classify JSON key coverage for ingestion validation
+
+What changed:
+- Build a retained per-key validation dataset for every comparison.
+- Classify paths as AlwaysPresent, Common, Occasional, or Rare.
+- Emit validation rows when -Validation is supplied.
+
+Why:
+- Database parsers need evidence of which paths are mandatory, broadly available, or exceptional.
+
+
+## [2026.08.11.133] - 2026-08-11
+### feat(json): Add JSON key validation switch
+
+What changed:
+- Added -Validation to request per-key coverage classifications from a comparison scan.
+
+Why:
+- Database ingestion needs a deliberate validation view of reliable and variable JSON paths.
+
+
+## [2026.08.11.132] - 2026-08-11
+### test(json): Verify retained JSON comparison results
+
+What changed:
+- Added an assertion that the global last-comparison variable contains every comparison row returned by the command.
+
+Why:
+- The retained result must be trustworthy before downstream validation and export workflows use it.
+
+
+## [2026.08.11.131] - 2026-08-11
+### feat(json): Retain the last JSON comparison in a global variable
+
+What changed:
+- Capture comparison result rows before pipeline output.
+- Store them in $global:DowserJsonLastComparison while preserving normal command output.
+
+Why:
+- Users need to inspect, filter, export, or compare the completed report without rerunning a large directory scan.
+
+
+## [2026.08.11.130] - 2026-08-11
+### docs(index): Document schema-based JSON directory reports
+
+What changed:
+- Updated the JSON command index entry with schema layouts, profile limit, samples, and capped difference previews.
+
+Why:
+- The index must point users to the file-level comparison report rather than obsolete key-count buckets.
+
+
+## [2026.08.11.129] - 2026-08-11
+### docs(json): Correct JSON comparison output help
+
+What changed:
+- Replaced obsolete key-count and scan-summary result types in command help with schema-profile result types.
+
+Why:
+- The output contract changed from aggregate key counts to actual file-layout profiles.
+
+
+## [2026.08.11.128] - 2026-08-11
+### docs(json): Document schema profile report limit
+
+What changed:
+- Added help for the -ProfileLimit parameter.
+
+Why:
+- Large directories can contain many one-off schemas, so report size must be controllable.
+
+
+## [2026.08.11.127] - 2026-08-11
+### docs(json): Describe schema profile comparison output
+
+What changed:
+- Updated Get-DowserJsonKey help to describe dominant layouts, variants, key differences, and sample files.
+
+Why:
+- The command help must explain the comparison report users receive from large directories.
+
+
+## [2026.08.11.126] - 2026-08-11
+### fix(json): Cap schema difference output to useful previews
+
+What changed:
+- Replaced full missing and additional key lists with counts and five-key previews in schema profile rows.
+
+Why:
+- Schema variants with unrelated layouts must remain readable in an interactive console.
+
+
+## [2026.08.11.125] - 2026-08-11
+### test(json): Cover directory schema profile output
+
+What changed:
+- Replaced key-count distribution assertions with dominant and variant schema profile assertions.
+
+Why:
+- Tests must verify the report that identifies actual file layouts and their differences.
+
+
+## [2026.08.11.124] - 2026-08-11
+### fix(json): Fix schema profile ordering syntax
+
+What changed:
+- Corrected the PowerShell sort expression for descending schema profile frequency.
+
+Why:
+- The first schema-profile implementation could not import because its multi-property sort syntax was invalid.
+
+
+## [2026.08.11.123] - 2026-08-11
+### fix(json): Replace key-count dump with JSON schema profiles
+
+What changed:
+- Group compared files by their complete key-path set.
+- Report the dominant schema, representative variants, sample files, and key additions or omissions.
+- Avoid materializing per-key file rows unless detailed key comparison is requested.
+
+Why:
+- A directory report must identify real file shapes and their differences, not merely count unrelated key-count buckets.
+
+
+## [2026.08.11.122] - 2026-08-11
+### feat(json): Add bounded schema-profile report size
+
+What changed:
+- Added -ProfileLimit to control the number of distinct JSON file schemas shown in comparison output.
+
+Why:
+- Large directories need a readable set of representative file shapes rather than an unbounded profile dump.
+
+
+## [2026.08.11.121] - 2026-08-11
+### docs(architecture): List JSON scan private helpers
+
+What changed:
+- Corrected the private-helper count and added the JSON coordinator, queue worker, and streaming reader to the architecture inventory.
+
+Why:
+- The architecture map must expose the components that implement parallel JSON directory scanning.
+
+
+## [2026.08.11.120] - 2026-08-11
+### docs(architecture): Record bounded parallel JSON scan design
+
+What changed:
+- Documented the dedicated MTA pool, synchronized queues, token streaming readers, and caller-owned progress and logging.
+
+Why:
+- The parallel JSON scan is a new architectural boundary with explicit memory and observability constraints.
+
+
+## [2026.08.11.119] - 2026-08-11
+### docs(index): Document JSON scan reporting and reader controls
+
+What changed:
+- Updated the Get-DowserJsonKey index entry with compact output types, detailed-row switch, and bounded reader default.
+
+Why:
+- The index must match the command's scalable directory scan interface.
+
+
+## [2026.08.11.118] - 2026-08-11
+### perf(json): Align internal JSON worker default
+
+What changed:
+- Set the private JSON scan coordinator default reader count to the same eight-reader ceiling.
+
+Why:
+- Direct internal use must preserve the public command's tested storage-conscious concurrency behavior.
+
+
+## [2026.08.11.117] - 2026-08-11
+### perf(json): Cap default JSON scan readers at eight
+
+What changed:
+- Set Get-DowserJsonKey default -ThreadCount to the lower of eight or the processor count.
+
+Why:
+- Eight readers was faster than one and twenty-four readers in the representative large-directory benchmark.
+
+
+## [2026.08.11.116] - 2026-08-11
+### docs(json): Document bounded JSON reader default
+
+What changed:
+- Updated Get-DowserJsonKey help to state that its reader default is capped at eight.
+
+Why:
+- Users need to know the default avoids needless storage oversubscription on large scans.
+
+
+## [2026.08.11.115] - 2026-08-11
+### perf(json): Batch JSON file work per runspace
+
+What changed:
+- Queued all paths in synchronized shared state.
+- Changed the runspace pool from one invocation per file to one queue-draining invocation per worker.
+- Retained main-thread progress, result collection, and log emission.
+
+Why:
+- This removes per-file runspace startup overhead that made a 2,363-file scan slower despite parallel readers.
+
+
+## [2026.08.11.114] - 2026-08-11
+### perf(json): Add queue-consuming JSON scan workers
+
+What changed:
+- Added a private worker that drains shared JSON file paths and invokes the streaming reader for each file.
+
+Why:
+- One long-lived invocation per reader avoids runspace dispatch overhead for every file in large directories.
+
+
+## [2026.08.11.113] - 2026-08-11
+### test(json): Verify compact JSON comparison report
+
+What changed:
+- Assert that default comparison output omits detailed rows and reports common and differing key-path totals.
+
+Why:
+- The console report must remain concise while accurately describing cross-file key coverage.
+
+
+## [2026.08.11.112] - 2026-08-11
+### test(json): Request detailed rows in key comparison test
+
+What changed:
+- Updated the per-key comparison test to pass -ShowKeyComparison explicitly.
+
+Why:
+- The default comparison output is intentionally compact, so detailed rows must be requested.
+
+
+## [2026.08.11.111] - 2026-08-11
+### fix(json): Make directory comparison reports compact by default
+
+What changed:
+- Emit key-coverage, key-count distribution, and scan-summary rows by default.
+- Emit individual KeyComparison rows only with -ShowKeyComparison or -IncludeFiles.
+
+Why:
+- A large directory comparison should show progress and a readable report instead of hundreds of raw key rows.
+
+
+## [2026.08.11.110] - 2026-08-11
+### feat(json): Add opt-in detailed key comparisons
+
+What changed:
+- Added the -ShowKeyComparison switch to Get-DowserJsonKey.
+
+Why:
+- Large comparison scans need a concise default while retaining complete key-path data on demand.
+
+
+## [2026.08.11.109] - 2026-08-11
+### docs(json): Document detailed JSON comparison switch
+
+What changed:
+- Added help for -ShowKeyComparison and clarified that -IncludeFiles enables detailed comparison rows.
+
+Why:
+- Users need a clear route from the compact console report to file-level key details.
+
+
+## [2026.08.11.108] - 2026-08-11
+### docs(json): Describe compact JSON comparison output
+
+What changed:
+- Updated Get-DowserJsonKey help to describe the compact -Compare report and opt-in detailed key rows.
+
+Why:
+- Interactive directory scans need a concise default report without obscuring the available detail.
+
+
+## [2026.08.11.107] - 2026-08-11
+### test(json): Cover single-worker JSON directory scans
+
+What changed:
+- Added a comparison test using -ThreadCount 1 and verified the expected scan totals.
+
+Why:
+- The bounded worker option needs a regression test for the intentional single-reader path.
+
+
+## [2026.08.11.106] - 2026-08-11
+### fix(json): Prevent stale worker disposal after a dispatch failure
+
+What changed:
+- Reset the per-dispatch PowerShell instance reference before starting each JSON scan worker.
+
+Why:
+- A failed worker creation must not dispose a completed worker from an earlier dispatch attempt.
+
+
+## [2026.08.11.105] - 2026-08-11
+### perf(json): Parallelize JSON file token scans
+
+What changed:
+- Get-DowserJsonKey now delegates each file to the bounded JSON runspace scanner.
+- Keeps aggregation and console output on the main runspace.
+
+Why:
+- Sequential parsing cannot handle directories containing tens or hundreds of thousands of JSON files efficiently.
+
+
+## [2026.08.11.104] - 2026-08-11
+### feat(json): Add JSON scanner thread-count control
+
+What changed:
+- Added ThreadCount to Get-DowserJsonKey with a processor-count default.
+
+Why:
+- Operators need a bounded way to tune scanning concurrency for large file trees.
+
+
+## [2026.08.11.103] - 2026-08-11
+### feat(json): Document JSON reader concurrency control
+
+What changed:
+- Added ThreadCount help to Get-DowserJsonKey.
+
+Why:
+- Large scans need a bounded concurrency control suited to their storage throughput.
+
+
+## [2026.08.11.102] - 2026-08-11
+### feat(json): Add bounded ISS runspace orchestration for JSON scans
+
+What changed:
+- Added Invoke-DowserJsonKeyScan with a bounded MTA runspace pool.
+- Registers the JSON worker through InitialSessionState and drains synchronized result and log queues on the main thread.
+
+Why:
+- Large directory scans need parallel file reads without violating runspace state or logging rules.
+
+
+## [2026.08.11.101] - 2026-08-11
+### feat(json): Add a token-streaming JSON worker
+
+What changed:
+- Added Read-DowserJsonKeyFile to scan one JSON or JSONL file and enqueue its result and diagnostics through SyncHash queues.
+
+Why:
+- Parallel directory scans need isolated parser state and thread-safe result delivery.
+
+
+## [2026.08.11.100] - 2026-08-11
+### docs(index): Document concise JSON comparison output
+
+What changed:
+- Added IncludeFiles and the concise comparison row shapes to the JSON command index entry.
+
+Why:
+- Operators need to know that path lists are opt-in for large directory scans.
+
+
+## [2026.08.11.099] - 2026-08-11
+### test(json): Verify concise default comparison rows
+
+What changed:
+- Added coverage that normal KeyComparison rows omit MissingFromFiles.
+
+Why:
+- The console report must not regress to dumping every matching path.
+
+
+## [2026.08.11.098] - 2026-08-11
+### test(json): Request file lists explicitly in comparison coverage
+
+What changed:
+- Updated the detailed missing-file assertion to use IncludeFiles.
+
+Why:
+- Normal comparison output now exposes counts instead of unbounded path lists.
+
+
+## [2026.08.11.097] - 2026-08-11
+### fix(json): Keep default comparison output concise
+
+What changed:
+- Replaced unbounded present and missing path lists with MissingFileCount.
+- Moved present, missing, and bucket file lists behind IncludeFiles.
+
+Why:
+- Large directory comparisons were producing unreadable console output with thousands of file paths.
+
+
+## [2026.08.11.096] - 2026-08-11
+### feat(json): Add opt-in file lists to JSON comparisons
+
+What changed:
+- Added the IncludeFiles switch to Get-DowserJsonKey.
+
+Why:
+- Detailed file paths are useful for investigation but overwhelm normal directory reports.
+
+
+## [2026.08.11.095] - 2026-08-11
+### feat(json): Document opt-in file-list detail for compare reports
+
+What changed:
+- Added IncludeFiles help to Get-DowserJsonKey.
+
+Why:
+- Normal comparison output needs to remain compact when directories contain many files.
+
+
+## [2026.08.11.094] - 2026-08-11
+### docs(index): Document the comparison distribution report
+
+What changed:
+- Updated the Get-DowserJsonKey output contract with key-count buckets and the final scan summary.
+
+Why:
+- The command index must describe the report rows emitted by -Compare.
+
+
+## [2026.08.11.093] - 2026-08-11
+### test(json): Cover comparison key-count report rows
+
+What changed:
+- Added Pester assertions for KeyCountDistribution and final ScanSummary output.
+
+Why:
+- The new directory-level report must retain its expected flat output shape and totals.
+
+
+## [2026.08.11.092] - 2026-08-11
+### feat(json): Add key-count buckets to compare output
+
+What changed:
+- Get-DowserJsonKey -Compare now emits one KeyCountDistribution row per file key-count bucket.
+- Compare output ends with a ScanSummary row containing scanned-file and key-path totals.
+
+Why:
+- Directory comparisons need a flat report showing how many files share each key count.
+
+
 ## [2026.08.11.091] - 2026-08-11
 ### docs(index): Record the JSON CSV alias
 
