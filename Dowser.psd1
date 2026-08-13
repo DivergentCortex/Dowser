@@ -68,8 +68,10 @@
         'Measure-DowserDirectory'
         'Measure-DowserDiskUsage'
         'New-DowserHiddenFolder'
+        'Repair-DowserJson'
         'Test-DowserExtractable'
         'Test-DowserIntegrity'
+        'Test-DowserJson'
     )
     AliasesToExport   = @('*')
     CmdletsToExport   = @()

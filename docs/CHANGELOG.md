@@ -2,6 +2,860 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.13.222] - 2026-08-13
+### test(json-repair): Classify sequence fixture before source triage
+
+What changed:
+- Run the pretty-printed JSON sequence classification assertion before repair moves the source into JSON-Triage.
+
+Why:
+- The new workflow deliberately removes malformed input from its original location after producing a valid copy.
+
+
+## [2026.08.13.221] - 2026-08-13
+### test(json-repair): Classify array fixture before source triage
+
+What changed:
+- Run the outer-array classification assertion before repair moves the malformed array export into JSON-Triage.
+
+Why:
+- The source path is intentionally absent after successful repair and triage.
+
+
+## [2026.08.13.220] - 2026-08-13
+### test(json-repair): Cover cleanup of existing repaired copies
+
+What changed:
+- Add a test that restores a malformed source after its first repair, then verifies a second run triages it without rewriting the valid repaired copy.
+
+Why:
+- The operator needs a safe rerun to clean the original malformed files already paired with repaired copies.
+
+
+## [2026.08.13.219] - 2026-08-13
+### test(json-repair): Classify fragment fixture before source triage
+
+What changed:
+- Run the unstructured-fragment diagnosis before Repair-DowserJson moves the malformed fixture to JSON-Triage.
+
+Why:
+- This preserves the intended classification assertion under the new source-separation workflow.
+
+
+## [2026.08.13.218] - 2026-08-13
+### test(json-repair): Classify bracketed fixture before source triage
+
+What changed:
+- Run the bracket-led source diagnosis before Repair-DowserJson moves the source into JSON-Triage.
+
+Why:
+- Repair now intentionally removes malformed originals from the active fixture path after successful output validation.
+
+
+## [2026.08.13.217] - 2026-08-13
+### test(json-repair): Verify parallel repair triages original sources
+
+What changed:
+- Assert that each parallel repair reports SourceMoved and produces a triage copy.
+- Restore isolated test fixtures from JSON-Triage before later repair cases.
+
+Why:
+- The test suite must verify the new source-separation contract without contaminating subsequent cases.
+
+
+## [2026.08.13.216] - 2026-08-13
+### fix(json-repair): Move repaired sources into JSON-Triage
+
+What changed:
+- Validate each repaired copy before moving its malformed source into a sibling JSON-Triage directory.
+- On rerun, validate an existing repaired copy and triage its lingering source without rewriting it.
+- Return OutputPath, TriagePath, and SourceMoved so triage state is visible.
+
+Why:
+- Keeps malformed originals separate from valid inputs while preserving both the original and its parseable repaired copy.
+
+
+## [2026.08.13.215] - 2026-08-13
+### fix(json-repair): Assign a triage destination for each repair task
+
+What changed:
+- Each repair task now carries a sibling JSON-Triage destination that preserves the original filename.
+
+Why:
+- Successful repairs need a recoverable original copy outside the active input corpus.
+
+
+## [2026.08.13.214] - 2026-08-13
+### fix(json-repair): Exclude repaired and triaged directories from repeat scans
+
+What changed:
+- Directory repair enumeration now excludes JSON-Repaired and JSON-Triage children.
+
+Why:
+- A rerun must process only the active source corpus, not repaired output or already-triaged originals.
+
+
+## [2026.08.13.213] - 2026-08-13
+### fix(json-repair): Document triage movement after successful repair
+
+What changed:
+- Updated Repair-DowserJson help to state that malformed sources move into JSON-Triage after their repaired copy validates.
+
+Why:
+- The repair workflow must leave the active corpus free of known malformed source files.
+
+
+## [2026.08.13.212] - 2026-08-13
+### fix(json-assessment): Prevent exports from reusing stale validation rows
+
+What changed:
+- Cleared prior validation state before each assessment scan.
+- Suppress report writes when the requested path has no parseable JSON files.
+
+Why:
+- A missing input directory previously produced CSV output containing rows from an earlier unrelated assessment.
+
+
+## [2026.08.13.211] - 2026-08-13
+### test(json-repair): Cover bracket-led source text
+
+What changed:
+- Added a regression fixture for bracket-led code and verifies it is preserved as complete structured source text.
+
+Why:
+- Real transcript fragments beginning with [area] were misclassified as supported role-tag transcripts.
+
+
+## [2026.08.13.210] - 2026-08-13
+### test(json-repair): Cover leading blank lines in formatted exports
+
+What changed:
+- Updated the RECORD banner fixture to begin with a blank line before the first banner.
+
+Why:
+- The reported formatted export begins this way and must not leave a separator in parsed JSON.
+
+
+## [2026.08.13.209] - 2026-08-13
+### fix(json-repair): Restrict tagged transcript classification to supported roles
+
+What changed:
+- Classify tagged transcript text only when the first nonblank line is USER, ASSISTANT, or SYSTEM, the three roles the writer supports.
+
+Why:
+- Bracketed code such as [area] was incorrectly routed to the tagged-transcript writer and produced no records.
+
+
+## [2026.08.13.208] - 2026-08-13
+### fix(json-repair): Find RECORD headers after leading text
+
+What changed:
+- Changed RECORD banner repair to locate validated banner triples instead of discarding the first three physical lines.
+
+Why:
+- Formatted exports can begin with a blank line, which previously left a separator in the first JSON record.
+
+
+## [2026.08.13.207] - 2026-08-13
+### test(json-repair): Isolate parallel repair fixture outputs
+
+What changed:
+- Removed temporary parallel-test outputs after the assertion so later single-file tests keep their original no-output precondition.
+
+Why:
+- The new multi-worker test intentionally writes the same temporary fixture destinations used by later tests.
+
+
+## [2026.08.13.206] - 2026-08-13
+### test(json-repair): Cover multi-worker JSON repair
+
+What changed:
+- Added a repair test that dispatches three independent inputs through three bounded workers and verifies every repaired copy exists.
+
+Why:
+- The new repair pool needs a direct regression test rather than relying on single-file repair tests.
+
+
+## [2026.08.13.205] - 2026-08-13
+### perf(json-repair): Run JSON repair through bounded worker pool
+
+What changed:
+- Replaced sequential diagnose and repair processing with bounded queue-driven workers.
+- Kept original files read-only, retained structured per-file results, and protected same-output writes.
+- Changed confirmation to one batch-level operation so parallel workers cannot prompt from background runspaces.
+
+Why:
+- The previous one-file-at-a-time loop makes a 9,000-file transcript repair batch take far longer than necessary.
+
+
+## [2026.08.13.204] - 2026-08-13
+### perf(json-repair): Add ThreadCount to repair command
+
+What changed:
+- Added a validated ThreadCount parameter to Repair-DowserJson with a processor-bounded default.
+
+Why:
+- Large repair batches need bounded parallelism that operators can tune.
+
+
+## [2026.08.13.203] - 2026-08-13
+### perf(json-repair): Document bounded repair worker count
+
+What changed:
+- Documented the ThreadCount control for Repair-DowserJson.
+
+Why:
+- Operators need a visible way to tune a large repair batch without changing code.
+
+
+## [2026.08.13.202] - 2026-08-13
+### perf(json-repair): Add structured JSON repair worker
+
+What changed:
+- Added a queue-driven repair worker that diagnoses one file, protects colliding output paths, and returns a result for every file.
+- Worker reports progress and diagnostics only through synchronized queues.
+
+Why:
+- Repairing thousands of transcript files needs bounded parallel work without racing writes or losing failure details.
+
+
+## [2026.08.13.201] - 2026-08-13
+### perf(json-repair): Route repair directory logging through worker queue
+
+What changed:
+- Routed output-directory creation logging through the synchronized queue when repair runs in a worker.
+
+Why:
+- The worker must not directly write to the shared logger.
+
+
+## [2026.08.13.200] - 2026-08-13
+### perf(json-repair): Queue repair worker logs through synchronized state
+
+What changed:
+- Added an optional synchronized log queue to Write-DowserJsonRepair so workers do not write directly to the host logger.
+
+Why:
+- Parallel repair workers need one safe main-thread logging path.
+
+
+## [2026.08.12.199] - 2026-08-12
+### docs(json-repair): document loss-preserving fragment repair behavior
+
+What changed:
+- Updated Repair-DowserJson help to state that tagged blocks are role-aware records and unstructured fragments retain their complete original text in provenance-bearing JSONL.
+
+Why:
+- The former help incorrectly said malformed or tagged content remained unchanged, even though the repairer now preserves it in separate parseable output files.
+
+
+## [2026.08.12.198] - 2026-08-12
+### fix(json-repair): preserve every unstructured transcript fragment as JSONL
+
+What changed:
+- Made NonJsonText and JsonSyntaxError candidates repairable by wrapping complete source text in a provenance-bearing JSONL record.
+- Retained tagged-block conversion for transcripts with explicit roles.
+- Relaxed RECORD banner handling so an equals-sign line is treated as content unless it is a complete verified banner.
+- Added a no-text-loss regression test for untagged fragments.
+
+Why:
+- Bulk repair revealed important split transcript fragments without role markers. Skipping them would lose ingestible source material.
+
+
+## [2026.08.12.197] - 2026-08-12
+### test(json-repair): verify multi-block tagged transcripts produce JSONL
+
+What changed:
+- Changed the tagged-transcript fixture to include user and assistant blocks.
+- Asserted two separate JSONL records, roles, and preserved block content.
+
+Why:
+- A single repaired block is valid JSON but cannot demonstrate the one-record-per-line JSONL contract.
+
+
+## [2026.08.12.196] - 2026-08-12
+### feat(json-repair): prepare structured conversion for tagged transcript text
+
+What changed:
+- Classified USER, ASSISTANT, and SYSTEM tagged transcript files as repairable source-specific inputs.
+- Added a conversion path that writes one JSONL record per tagged block with role, content, sequence, source path, and source format.
+- Added a regression test for tagged transcript conversion.
+
+Why:
+- Tagged transcript exports are important source material and must be converted into parseable records without dropping their text or role boundaries.
+
+
+## [2026.08.12.195] - 2026-08-12
+### fix(json-scan): replace invalid-file warning flood with one summary
+
+What changed:
+- Stopped JSON scan workers from emitting one warning per unreadable or unparsable candidate.
+- Retained each failure path and parser error in $global:DowserJsonLastParseFailures.
+- Added one consolidated warning with the skipped-file count and three sample paths.
+
+Why:
+- Large mixed transcript directories contain thousands of files with JSON-like extensions but non-JSON content; per-file warnings drown out scan progress and results.
+
+
+## [2026.08.12.194] - 2026-08-12
+### test(json-assessment): update assessment fixture key-count expectation
+
+What changed:
+- Updated the JSON assessment test from 10 to 12 validation rows after adding the JsonSequence fixture.
+
+Why:
+- The fixture intentionally introduces two new paths, id and content, and the assessment output now correctly includes them.
+
+
+## [2026.08.12.193] - 2026-08-12
+### feat(json-repair): normalize multi-line JSON document sequences into JSONL
+
+What changed:
+- Added JsonSequence diagnosis for multiple root JSON documents that span physical lines.
+- Made JsonSequence repairable by streaming each complete root document to one compact JSONL line.
+- Added a regression fixture and test for a property line that line-oriented validators otherwise reject.
+- Updated Repair-DowserJson help to describe root arrays and JSON sequences.
+
+Why:
+- The supplied Cody history file is a valid multi-document JSON stream, but it is not physical JSONL and editor validators reject property lines inside its pretty-printed records.
+
+
+## [2026.08.12.192] - 2026-08-12
+### fix(json-diagnosis): separate transcript prose from JSON syntax failures
+
+What changed:
+- Restricted JSON literal detection to complete true, false, and null tokens instead of any line beginning with t, f, or n.
+- Classifies malformed transcript fragments with JSON-looking extensions as NonJsonText rather than JsonSyntaxError.
+
+Why:
+- Many exported Cortex transcript fragments begin with prose such as 'fer' or 'false ...'; those are not repairable JSON syntax errors.
+
+
+## [2026.08.12.191] - 2026-08-12
+### fix(json-diagnosis): classify root JSON arrays regardless of element count
+
+What changed:
+- Changed root-array classification to rely on the first JSON token instead of the number of top-level records counted by JsonTextReader.
+- Preserved the existing conversion action that writes each root-array element as one JSONL record.
+
+Why:
+- Newtonsoft can count root-array elements as documents, which previously hid valid array-wrapped JSON from the repair command.
+
+
+## [2026.08.12.190] - 2026-08-12
+### fix(json): Track the first JSON token for root diagnosis
+
+What changed:
+- Added state for first-token detection in the JSON diagnosis reader.
+
+Why:
+- Reader depth is not a reliable way to distinguish a root array from its array elements.
+
+
+## [2026.08.12.189] - 2026-08-12
+### test(json): Update assessment fixture key count
+
+What changed:
+- Updated the full-workspace assessment fixture expectation to include the new root-array export keys.
+
+Why:
+- The root-array fixture is valid JSON and is intentionally included when the assessment test scans its shared workspace.
+
+
+## [2026.08.12.188] - 2026-08-12
+### test(json): Verify outer-array-only JSONL conversion
+
+What changed:
+- Added a regression test that converts a root JSON array to two JSONL records.
+- Verifies nested interactions and contextFiles arrays survive the conversion unchanged.
+
+Why:
+- The repair must remove only the root brackets and preserve all internal JSON structure.
+
+
+## [2026.08.12.187] - 2026-08-12
+### test(json): Add nested root-array conversion fixture
+
+What changed:
+- Added a root JSON array with nested interactions and contextFiles arrays to the test workspace.
+
+Why:
+- The test must prove conversion preserves inner arrays while removing only the outer array wrapper.
+
+
+## [2026.08.12.186] - 2026-08-12
+### test(json): Prepare root-array JSON conversion fixture
+
+What changed:
+- Added the root-array export fixture path to the JSON repair test setup.
+
+Why:
+- Root-array conversion needs a regression test that proves only the outer delimiters are removed.
+
+
+## [2026.08.12.185] - 2026-08-12
+### feat(json): Convert root JSON arrays to JSONL safely
+
+What changed:
+- Added streamed OuterArrayJson conversion that reads one top-level array item at a time.
+- Writes each root-array item as one JSONL line.
+- Leaves every nested array and object inside each item unchanged.
+
+Why:
+- The requested repair removes only the outer document brackets without loading large files or altering internal JSON structure.
+
+
+## [2026.08.12.184] - 2026-08-12
+### feat(json): Classify root-array JSON as JSONL conversion input
+
+What changed:
+- Added the OuterArrayJson classification.
+- Marks it repairable with the explicit action to remove only the root array wrapper and write JSONL.
+
+Why:
+- The requested conversion preserves all nested arrays and objects while removing only the document-level brackets.
+
+
+## [2026.08.12.183] - 2026-08-12
+### fix(json): Detect a root JSON array during streaming
+
+What changed:
+- Marks a diagnosis as root-array input only when its first top-level token is StartArray.
+
+Why:
+- Only the document-level array brackets may be removed during conversion; nested arrays must remain intact.
+
+
+## [2026.08.12.182] - 2026-08-12
+### fix(json): Track top-level JSON arrays for JSONL conversion
+
+What changed:
+- Added root-array state to JSON diagnosis.
+
+Why:
+- A top-level array must be identified separately so repair can remove only its outer delimiters.
+
+
+## [2026.08.12.181] - 2026-08-12
+### fix(json): Recognize bracket-tagged transcript exports
+
+What changed:
+- Expanded tagged-transcript detection from four speaker names to bracketed alphabetic tags.
+- Keeps valid JSON arrays distinct because they begin with a JSON value, not a bare text tag.
+
+Why:
+- The raw inventory includes bracket-prefixed transcript exports beyond the initially observed speaker tags.
+
+
+## [2026.08.12.180] - 2026-08-12
+### fix(json): Separate non-JSON text from syntax errors
+
+What changed:
+- Parser failures whose first nonblank character cannot begin JSON now classify as NonJsonText.
+- NonJsonText results state that a source-specific parser is required instead of presenting a misleading JSON syntax error.
+
+Why:
+- The raw transcript inventory contains several text-export families mislabeled with JSON extensions.
+
+
+## [2026.08.12.179] - 2026-08-12
+### fix(json): Capture JSON diagnosis leading text
+
+What changed:
+- Captured the first nonblank source line for diagnosis classification.
+
+Why:
+- Top-level parser failures must be distinguished between non-JSON text and malformed JSON syntax.
+
+
+## [2026.08.12.178] - 2026-08-12
+### fix(json): Collapse JSON diagnosis warning floods
+
+What changed:
+- Removed per-file warning logs from Test-DowserJson.
+- Emits one final classification-count summary after the scan while preserving one diagnostic object per file on the pipeline.
+
+Why:
+- Thousands of mislabeled transcript files should produce useful progress and a compact diagnosis summary, not terminal noise.
+
+
+## [2026.08.12.177] - 2026-08-12
+### fix(json): Prepare compact JSON diagnosis logging
+
+What changed:
+- Added per-classification aggregation state to Test-DowserJson.
+
+Why:
+- Large diagnosis scans need one useful outcome summary rather than one log message per invalid file.
+
+
+## [2026.08.12.176] - 2026-08-12
+### docs(json): Document JSON diagnosis and repair workflow
+
+What changed:
+- Added INDEX entries for Test-DowserJson and Repair-DowserJson.
+- Documented classifications, safe-repair boundary, default JSON-Repaired destination, and related assessment command.
+
+Why:
+- The public JSON workflow must be discoverable without guessing command names or output locations.
+
+
+## [2026.08.12.175] - 2026-08-12
+### test(json): Keep single-worker fixture scope stable
+
+What changed:
+- Changed the bounded-worker test to pass only its two intended valid fixtures.
+
+Why:
+- Malformed-input fixtures must not change the worker-count regression expectations.
+
+
+## [2026.08.12.174] - 2026-08-12
+### test(json): Keep schema fixture scope stable
+
+What changed:
+- Changed the schema-profile test to use only its two intended valid fixtures.
+
+Why:
+- The test validates schema comparison behavior independently from malformed-input diagnosis coverage.
+
+
+## [2026.08.12.173] - 2026-08-12
+### test(json): Isolate JSON comparison fixtures
+
+What changed:
+- Changed the key-comparison test to pass only its two intended valid fixtures.
+
+Why:
+- Diagnostic fixtures intentionally include malformed input and must not alter the preexisting comparison contract test.
+
+
+## [2026.08.12.172] - 2026-08-12
+### fix(json): Base JSON coverage on parseable files
+
+What changed:
+- Key coverage, missing-file counts, and detailed comparisons now use only successfully parsed files.
+- DirectorySummary now separates candidate files, parsed files, and invalid files skipped.
+
+Why:
+- Coverage percentages and schema differences must not treat malformed files as missing every JSON key.
+
+
+## [2026.08.12.171] - 2026-08-12
+### fix(json): Exclude failed parses from JSON schema reports
+
+What changed:
+- Get-DowserJsonKey now skips failed parser results when building key coverage and schema profiles.
+- Retains failed scan records in $global:DowserJsonLastParseFailures.
+- Returns a clear warning when no candidate file can be parsed.
+
+Why:
+- Malformed or mislabeled files must not appear as empty schemas and distort directory assessment results.
+
+
+## [2026.08.12.170] - 2026-08-12
+### test(json): Cover diagnosis-first JSON repair
+
+What changed:
+- Added tests for RECORD banner classification, tagged transcript rejection, default JSON-Repaired output, and repaired JSONL validation.
+
+Why:
+- The repair path needs proof that it repairs only the recognized format and leaves source classification visible.
+
+
+## [2026.08.12.169] - 2026-08-12
+### test(json): Add malformed JSON fixture content
+
+What changed:
+- Added a RECORD banner export, tagged transcript text, and comment-bearing JSON to the JSON test workspace.
+
+Why:
+- Tests must exercise the actual input patterns that the diagnosis-driven repair path classifies.
+
+
+## [2026.08.12.168] - 2026-08-12
+### test(json): Prepare JSON diagnosis fixtures
+
+What changed:
+- Added record-banner, tagged-transcript, and comment-bearing JSON fixture paths to the JSON test setup.
+
+Why:
+- The diagnosis and repair behavior needs concrete inputs matching the observed malformed transcript formats.
+
+
+## [2026.08.12.167] - 2026-08-12
+### feat(module): Export JSON diagnosis and repair commands
+
+What changed:
+- Added Repair-DowserJson and Test-DowserJson to the manifest command surface.
+
+Why:
+- The new diagnosis-first workflow must be available after a normal Dowser module import.
+
+
+## [2026.08.12.166] - 2026-08-12
+### refactor(json): Make JSON repair diagnosis-driven
+
+What changed:
+- Repair-DowserJson now accepts a file or directory and classifies every file before writing.
+- The default destination is a JSON-Repaired folder beside each source, with OutputDirectory as an override.
+- Unrecognized, invalid, and tagged transcript inputs are returned as skipped with the diagnosis instead of being guessed into JSON.
+
+Why:
+- The repair operation must follow actual file evidence rather than applying one observed transcript fix to every JSON file.
+
+
+## [2026.08.12.165] - 2026-08-12
+### feat(json): Isolate safe JSON repair writers
+
+What changed:
+- Added the repair writer for only diagnosis-approved transformations.
+- Writes repaired content to a temporary file before publishing it.
+- Supports RECORD banner conversion and comment removal without touching source files.
+
+Why:
+- Repair output must be produced only after a known classification and must not leave partial destination files.
+
+
+## [2026.08.12.164] - 2026-08-12
+### feat(json): Add JSON diagnosis command
+
+What changed:
+- Added Test-DowserJson for file or directory diagnostics with visible progress.
+- Reports the classification, exact parser failure location, repair eligibility, and intended safe action.
+- Leaves source files unchanged.
+
+Why:
+- Operators need evidence about each malformed file before deciding whether a repair is appropriate.
+
+
+## [2026.08.12.163] - 2026-08-12
+### feat(json): Classify JSON parse failures before repair
+
+What changed:
+- Added a streaming JSON diagnosis helper that identifies unreadable input, RECORD banner exports, tagged transcript text, comments, valid JSONL, and parser syntax failures.
+- Returns parser line, position, and message for syntax failures.
+- Marks only deterministic transformations as repairable.
+
+Why:
+- A repair command must identify the actual input problem before selecting a safe transformation.
+
+
+## [2026.08.12.162] - 2026-08-12
+### feat(json): Add safe JSON repair command
+
+What changed:
+- Added Repair-DowserJson for canonical JSON token output without changing source files.
+- Supports JSON comments and trailing commas accepted by Newtonsoft.Json.
+- Converts Dowser RECORD banner exports into standard JSONL and rejects unrelated tagged transcripts.
+
+Why:
+- Assessment scans need a safe repair path for common syntax damage and formatted record exports.
+
+
+## [2026.08.12.161] - 2026-08-12
+### test(duplicates): Verify duplicate report hash evidence labels
+
+What changed:
+- Extended the HTML export regression test to assert the SHA256 proof and per-set hash-algorithm labels.
+
+Why:
+- The report's evidence labels are part of the operator-facing duplicate verification contract.
+
+
+## [2026.08.12.160] - 2026-08-12
+### fix(duplicates): Correct the duplicate report hash labels
+
+What changed:
+- Changed duplicate-set metadata to label the hash algorithm and hash value separately.
+- Removed the repeated SHA prefix from the report proof header.
+
+Why:
+- A cleanup report must state its SHA-256 evidence accurately and without misleading duplicated text.
+
+
+## [2026.08.12.159] - 2026-08-12
+### test(duplicates): Cover empty filtered duplicate reports
+
+What changed:
+- Added Pester coverage for an HTML export requested with a MinSize that excludes every file.
+
+Why:
+- The no-eligible-files path must still produce a readable report at the requested destination.
+
+
+## [2026.08.12.158] - 2026-08-12
+### fix(duplicates): Write an empty report when filters match no files
+
+What changed:
+- Find-DowserDuplicate now writes the requested HTML report before returning when MinSize or other filters leave no eligible files.
+- The report records zero files scanned and no byte-identical duplicate sets.
+
+Why:
+- An explicit report destination must receive an evidence record even when a scan produces no eligible candidates.
+
+
+## [2026.08.12.157] - 2026-08-12
+### fix(duplicates): Refresh enumeration progress from the first file
+
+What changed:
+- Changed duplicate-file enumeration progress from a 250-file threshold to the first file and then a 750 ms cadence.
+- Uses a visible zero-percent indeterminate stage rather than an unsupported negative progress value.
+
+Why:
+- The first scan stage must visibly refresh even when the tree enumerates slowly or contains fewer than 250 files.
+
+
+## [2026.08.12.156] - 2026-08-12
+### fix(duplicates): Resolve duplicate report destination path correctly
+
+What changed:
+- Replaced an incompatible Split-Path parameter combination with System.IO.Path.GetDirectoryName for report-parent resolution.
+
+Why:
+- The previous parameter set failed when the report export attempted to create its destination directory.
+
+
+## [2026.08.12.155] - 2026-08-12
+### fix(duplicates): Fix duplicate report PowerShell interpolation
+
+What changed:
+- Delimited the HashAlgorithm variable before a literal colon in the generated HTML metadata line.
+
+Why:
+- PowerShell parsed the colon as part of the variable reference, preventing the private report helper from loading.
+
+
+## [2026.08.12.154] - 2026-08-12
+### docs(duplicates): Document duplicate evidence and report behavior
+
+What changed:
+- Expanded the command index with detection modes, progress behavior, output locations, and the Content versus Chunk safety boundary.
+
+Why:
+- Disk cleanup needs a clear distinction between proof of duplication and candidate-only matches.
+
+
+## [2026.08.12.153] - 2026-08-12
+### fix(duplicates): Keep the duplicate report static and display-only
+
+What changed:
+- Removed CSS custom properties and calculation-based layout from the generated report.
+- Kept the report's values fully precomputed in PowerShell and its browser behavior limited to native expandable sections.
+
+Why:
+- The report must render supplied evidence without browser-side calculations or avoidable display machinery.
+
+
+## [2026.08.12.152] - 2026-08-12
+### test(duplicates): Cover exact duplicate detection and HTML export
+
+What changed:
+- Added Pester coverage for SHA content matches and the detailed duplicate object.
+- Added an export test that verifies parent-directory creation and expandable HTML report content.
+
+Why:
+- The new cleanup report and exact-content proof need regression coverage before use on large disk scans.
+
+
+## [2026.08.12.151] - 2026-08-12
+### fix(duplicates): Close duplicate scan progress on completion
+
+What changed:
+- Find-DowserDuplicate now explicitly completes its progress record before returning results or a no-duplicate outcome.
+
+Why:
+- A completed scan must clear the active progress display instead of leaving stale work visible.
+
+
+## [2026.08.12.150] - 2026-08-12
+### feat(duplicates): Wire duplicate scans to the HTML report
+
+What changed:
+- Find-DowserDuplicate now invokes the private HTML report writer when ExportHtml is supplied.
+- The export consumes only complete Content hash sets and does not add report objects to the command pipeline.
+
+Why:
+- The opt-in report must reflect exact duplicate evidence without disrupting existing script consumers.
+
+
+## [2026.08.12.149] - 2026-08-12
+### feat(duplicates): Expose the duplicate HTML report option
+
+What changed:
+- Added Find-DowserDuplicate ExportHtml parameter for the new expandable exact-content report.
+
+Why:
+- The report writer must be explicitly requested without changing existing CSV or pipeline output.
+
+
+## [2026.08.12.148] - 2026-08-12
+### docs(duplicates): Document the exact-duplicate HTML export
+
+What changed:
+- Added Find-DowserDuplicate comment-based help for the ExportHtml parameter and automatic report-directory creation.
+
+Why:
+- Operators need the report's proof boundary and destination behavior in Get-Help.
+
+
+## [2026.08.12.147] - 2026-08-12
+### feat(duplicates): Add an expandable exact-duplicate HTML report
+
+What changed:
+- Added private Export-DowserDuplicateHtml to create a self-contained report from full-content hash sets.
+- The report ranks reclaimable space, exposes hash evidence, and keeps each set's full file paths inside expandable sections.
+- The report writer creates a requested parent directory when it does not exist.
+
+Why:
+- Cleanup decisions need readable evidence, not a terminal dump or a flat list that obscures duplicate sets.
+
+
+## [2026.08.12.146] - 2026-08-12
+### fix(duplicates): Show progress while comparing file chunks
+
+What changed:
+- Find-DowserDuplicate now reports chunk-comparison progress by processed file.
+- The Chunk stage announces its scope at Info level before reading file blocks.
+
+Why:
+- Chunk comparison can take longer than full-file hashing and must not appear stalled.
+
+
+## [2026.08.12.145] - 2026-08-12
+### perf(duplicates): Hash only same-size exact-duplicate candidates
+
+What changed:
+- Find-DowserDuplicate now groups files by byte length before full-content hashing.
+- Added per-file progress for the exact-content SHA hash stage.
+- Preserved SHA-256 as the default exact-duplicate proof.
+
+Why:
+- Files with different lengths cannot be byte-for-byte duplicates, so excluding them from full hashing reduces large scan time while preserving exact results.
+
+
+## [2026.08.12.144] - 2026-08-12
+### fix(duplicates): Show duplicate scan enumeration progress
+
+What changed:
+- Find-DowserDuplicate now emits an on-screen progress record while it enumerates files.
+- Promoted scan start and eligible-file count to Info logging so normal runs identify the active stage.
+
+Why:
+- Large duplicate scans must visibly show active work before the hash stage begins.
+
+
+## [2026.08.12.143] - 2026-08-12
+### chore(disk-usage): Restore the existing disk-usage command contract
+
+What changed:
+- Removed the unreviewed PassThru parameter and restored Measure-DowserDiskUsage to its prior parameter surface.
+- Left the structured pipeline output, console logging, and ExportHtml behavior unchanged.
+
+Why:
+- The existing report is already a public command contract and may have callers that rely on its emitted objects.
+
+
 ## [2026.08.11.142] - 2026-08-11
 ### docs(json): Correct JSON comparison help descriptions
 
