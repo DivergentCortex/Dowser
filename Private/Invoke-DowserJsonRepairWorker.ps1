@@ -106,7 +106,11 @@ function Invoke-DowserJsonRepairWorker {
 
                 [System.Threading.Monitor]::Enter($outputLock)
                 try {
-                    if ((Test-Path -LiteralPath $task.OutputPath) -and -not $task.Force) {
+                    if (
+                        (Test-Path -LiteralPath $task.OutputPath) -and
+                        -not $task.Force -and
+                        ((Get-DowserJsonDiagnosis -FilePath $task.OutputPath).Classification -in 'ValidJson', 'ValidJsonl')
+                    ) {
                         $triageResult = & $moveSourceToTriage $task $Sync
                         $result = [pscustomobject]@{
                             FilePath       = $diagnosis.FilePath

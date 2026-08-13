@@ -247,6 +247,24 @@ Describe 'Test-DowserJson and Repair-DowserJson' {
         Test-Path -LiteralPath $pendingPath | Should -BeFalse
     }
 
+    It 'replaces a stale root-array repair output before triaging the source' {
+        $stalePath = Join-Path $script:WorkDir 'stale-array.json'
+        $sourceText = '[{"id":1},{"id":2}]'
+        [System.IO.File]::WriteAllText($stalePath, $sourceText, [System.Text.UTF8Encoding]::new($false))
+
+        $initial = Repair-DowserJson -Path $stalePath
+        Move-Item -LiteralPath $initial.TriagePath -Destination $stalePath -ErrorAction Stop
+        [System.IO.File]::WriteAllText($initial.OutputPath, $sourceText, [System.Text.UTF8Encoding]::new($false))
+        $result = Repair-DowserJson -Path $stalePath
+        $rows = @(Get-Content -LiteralPath $result.OutputPath | ConvertFrom-Json)
+
+        $result.Result | Should -Be 'Repaired'
+        $result.SourceMoved | Should -BeTrue
+        $rows.Count | Should -Be 2
+        (Test-DowserJson -Path $result.OutputPath).Classification | Should -Be 'ValidJsonl'
+        Test-Path -LiteralPath $result.TriagePath | Should -BeTrue
+    }
+
     It 'normalizes a pretty-printed JSON sequence into physical JSONL records' {
         (Test-DowserJson -Path $script:JsonSequencePath).Classification | Should -Be 'JsonSequence'
         $result = Repair-DowserJson -Path $script:JsonSequencePath

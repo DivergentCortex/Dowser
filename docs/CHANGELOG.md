@@ -2,6 +2,27 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.13.224] - 2026-08-13
+### test(json-repair): Cover stale root-array repair output
+
+What changed:
+- Add a repair test that replaces a valid JSONL output with a stale root array, reruns repair, and verifies normalized JSONL plus source triage.
+
+Why:
+- This recreates the exact three-file failure reported from the transcript inventory.
+
+
+## [2026.08.13.223] - 2026-08-13
+### fix(json-repair): Rewrite stale array-shaped repair output
+
+What changed:
+- Treat an existing repair output as reusable only when it is valid JSON or JSONL in the expected single-document or JSONL form.
+- Rewrite an existing root-array output from the preserved original, then triage that original after validation.
+
+Why:
+- Three prior repaired files retained their outer array despite a JSONL filename, so the originals could not safely be triaged.
+
+
 ## [2026.08.13.222] - 2026-08-13
 ### test(json-repair): Classify sequence fixture before source triage
 
