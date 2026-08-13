@@ -14,7 +14,23 @@ function Invoke-DowserJsonRepairWorker {
         )
 
         $outputDiagnosis = Get-DowserJsonDiagnosis -FilePath $Task.OutputPath
-        if ($outputDiagnosis.Classification -notin 'ValidJson', 'ValidJsonl') {
+        $preservedNestedArray = $false
+        if ($outputDiagnosis.Classification -eq 'OuterArrayJson') {
+            $sourceReader = $null
+            try {
+                $sourceReader = [System.IO.StreamReader]::new($Task.FilePath)
+                $firstToken = $sourceReader.Read()
+                $secondToken = $sourceReader.Read()
+                $preservedNestedArray = ($firstToken -eq [int][char]'[' -and $secondToken -eq [int][char]'[')
+            }
+            finally {
+                if ($null -ne $sourceReader) {
+                    $sourceReader.Dispose()
+                }
+            }
+        }
+
+        if ($outputDiagnosis.Classification -notin 'ValidJson', 'ValidJsonl' -and -not $preservedNestedArray) {
             return [pscustomobject]@{
                 Success      = $false
                 ErrorMessage = "Repaired copy is not parseable: $($outputDiagnosis.Classification)."

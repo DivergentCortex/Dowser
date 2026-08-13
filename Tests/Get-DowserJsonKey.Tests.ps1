@@ -265,6 +265,20 @@ Describe 'Test-DowserJson and Repair-DowserJson' {
         Test-Path -LiteralPath $result.TriagePath | Should -BeTrue
     }
 
+    It 'triages a source after preserving one nested-array JSONL record' {
+        $nestedPath = Join-Path $script:WorkDir 'nested-array.json'
+        [System.IO.File]::WriteAllText($nestedPath, '[[{"id":1}]]', [System.Text.UTF8Encoding]::new($false))
+
+        $result = Repair-DowserJson -Path $nestedPath
+        $outputText = [System.IO.File]::ReadAllText($result.OutputPath)
+
+        $result.Result | Should -Be 'Repaired'
+        $result.SourceMoved | Should -BeTrue
+        $outputText.Trim() | Should -Be '[{"id":1}]'
+        (Test-DowserJson -Path $result.OutputPath).Classification | Should -Be 'OuterArrayJson'
+        Test-Path -LiteralPath $result.TriagePath | Should -BeTrue
+    }
+
     It 'normalizes a pretty-printed JSON sequence into physical JSONL records' {
         (Test-DowserJson -Path $script:JsonSequencePath).Classification | Should -Be 'JsonSequence'
         $result = Repair-DowserJson -Path $script:JsonSequencePath

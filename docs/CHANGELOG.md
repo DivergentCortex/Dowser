@@ -2,6 +2,27 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.08.13.226] - 2026-08-13
+### test(json-repair): Cover nested-array source triage
+
+What changed:
+- Add a test for a double-wrapped array export that verifies only the outer wrapper is removed and the original enters JSON-Triage.
+
+Why:
+- This is the exact AnythingLLM structure that produced the three remaining repair failures.
+
+
+## [2026.08.13.225] - 2026-08-13
+### fix(json-repair): Accept one preserved nested-array JSONL record
+
+What changed:
+- Accept a repaired root-array record only when its source begins with a nested root array, proving repair removed exactly one outer wrapper.
+- Continue rejecting a plain root-array output that indicates a repair was not normalized.
+
+Why:
+- AnythingLLM exports contain nested arrays, where the retained inner array is the correct single JSONL record.
+
+
 ## [2026.08.13.224] - 2026-08-13
 ### test(json-repair): Cover stale root-array repair output
 
