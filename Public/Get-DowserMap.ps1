@@ -82,9 +82,14 @@ function Get-DowserMap {
         Append a scan-parameter/folder/file/skip/symlink summary to the output. Auto-enables
         when the output is Markdown (-AsMarkdown, -MarkdownFile, or an -OutputFile ending in
         .md) unless explicitly passed, including -EmitSummary:$false, which always wins over
-        the auto-enable. When -IncludeSize is active, the summary also reports total size and
-        the largest measured folders, drawn from the folder-size cache the tree walk already
-        builds (no extra filesystem traversal).
+        the auto-enable. When -IncludeSize is active, the summary also reports total size
+        (every top-level folder plus any files sitting loose at the scan root) and the largest
+        top-level folders by size, drawn from the folder-size cache the tree walk already
+        builds plus one bounded, non-recursive listing of the root's own files -- no traversal
+        of any subtree beyond what the tree walk already did. Top-level folders rejected by
+        exclusion (default excludes or -ExcludeFolders) never contribute to the total; when
+        that happens, the summary names them so a suspiciously small total is not mistaken for
+        a complete one.
     .PARAMETER Indent
         Internal recursion state. Not for direct use.
     .PARAMETER CurrentDepth
@@ -859,11 +864,12 @@ function Get-DowserMap {
     }
     if (-not $TraversalState) {
         $TraversalState = @{
-            FolderCount    = 0
-            FileCount      = 0
-            SkippedFolders = 0
-            SkippedFiles   = 0
-            LinkCount      = 0
+            FolderCount           = 0
+            FileCount             = 0
+            SkippedFolders        = 0
+            SkippedFiles          = 0
+            LinkCount             = 0
+            ExcludedTopLevelNames = @()
         }
     }
 
@@ -1452,29 +1458,67 @@ function Get-DowserMap {
             }
 
             # Size rollup reuses $SizeCache, which Get-FolderAnnotation already populated for
-            # every annotated folder during the tree walk above. No extra filesystem traversal.
+            # every top-level and rendered nested folder during the tree walk above -- no extra
+            # traversal of any subtree. Ranking and the total both use ONLY the depth-1 (direct
+            # child of root) entries: a depth-1 folder's cached size already includes every byte
+            # under it, so ranking deeper entries alongside it double-lists the same bytes under
+            # two labels (e.g. "A" and "A/Nested" both large because Nested's bytes are inside
+            # A's total). One bounded, non-recursive listing of the root's OWN files is added on
+            # top, because Get-FolderAnnotation is only ever called on subfolders, never on the
+            # scan root itself -- without it, files sitting loose at the root vanish from the
+            # total with no signal that anything was dropped.
             if ($IncludeSize) {
                 $summaryTopFolderCount = 10
                 $sizedFolders = @()
                 if ($SizeCache -and $SizeCache.Count -gt 0) {
                     foreach ($cachedPath in $SizeCache.Keys) {
                         $relPath = ConvertTo-RelativePath $cachedPath
-                        if ([string]::IsNullOrEmpty($relPath)) {
+                        if ([string]::IsNullOrEmpty($relPath) -or $relPath -match '[\\/]') {
                             continue
                         }
                         $sizedFolders += [PSCustomObject]@{
                             RelativePath = $relPath
                             Bytes        = [int64]$SizeCache[$cachedPath]
-                            IsTopLevel   = ($relPath -notmatch '[\\/]')
                         }
                     }
                 }
-                $totalBytes = ($sizedFolders | Where-Object { $_.IsTopLevel } | Measure-Object -Property Bytes -Sum).Sum
+                $rootFileBytes = 0
+                try {
+                    $rootFileItems = if ($IncludeHidden) {
+                        Get-ChildItem -LiteralPath $Path -File -Force -ErrorAction SilentlyContinue
+                    } else {
+                        Get-ChildItem -LiteralPath $Path -File -ErrorAction SilentlyContinue
+                    }
+                    foreach ($rootFileItem in $rootFileItems) {
+                        if ((Test-IncludeFile $rootFileItem) -and -not (Test-ExcludeByPath $rootFileItem)) {
+                            $rootFileBytes += $rootFileItem.Length
+                        }
+                    }
+                }
+                catch {
+                    Write-Log "Get-DowserMap: root-level file size scan failed for '$Path': $_" -Severity Verbose
+                }
+                $totalBytes = ($sizedFolders | Measure-Object -Property Bytes -Sum).Sum
                 if (-not $totalBytes) {
                     $totalBytes = 0
                 }
+                $totalBytes += $rootFileBytes
                 $summaryLines += "  Total size: $(Format-DowserSize $totalBytes)"
                 $summaryBullets += "- Total size: $(Format-DowserSize $totalBytes)"
+
+                # Excluded top-level folders (default excludes or -ExcludeFolders) never reach
+                # Get-FolderAnnotation, so they contribute nothing to the total above and would
+                # otherwise vanish behind a bare "Skipped: N folders" count with no name and no
+                # size. Naming them here costs nothing extra -- the name was already in hand at
+                # the point Test-ExcludeFolder rejected it -- and lets a reader who sees a
+                # suspiciously small total go check one of these by name (-NoDefaultExcludes or
+                # -IncludeFolders) instead of trusting a number that silently left something out.
+                $excludedTopLevel = @($TraversalState.ExcludedTopLevelNames)
+                if ($excludedTopLevel.Count -gt 0) {
+                    $excludedTopLevelJoined = $excludedTopLevel -join ', '
+                    $summaryLines += "  Total size excludes filtered top-level folders: $excludedTopLevelJoined"
+                    $summaryBullets += "- Total size excludes filtered top-level folders: $excludedTopLevelJoined"
+                }
 
                 $topSized = @($sizedFolders | Sort-Object -Property Bytes -Descending | Select-Object -First $summaryTopFolderCount)
                 if ($topSized.Count -gt 0) {
@@ -1621,7 +1665,11 @@ function Get-DowserMap {
                     }
                 }
                 if (Test-ExcludeFolder $item) {
-                    $TraversalState.SkippedFolders++; continue 
+                    $TraversalState.SkippedFolders++
+                    if ($CurrentDepth -eq 0) {
+                        $TraversalState.ExcludedTopLevelNames += $item.Name
+                    }
+                    continue
                 }
                 if (-not (Test-IncludeFolder $item)) {
                     $TraversalState.SkippedFolders++; continue 
@@ -1775,7 +1823,11 @@ function Get-DowserMap {
             }
         }
         if (Test-ExcludeFolder $child) {
-            $TraversalState.SkippedFolders++; continue 
+            $TraversalState.SkippedFolders++
+            if ($CurrentDepth -eq 0) {
+                $TraversalState.ExcludedTopLevelNames += $child.Name
+            }
+            continue
         }
         if (-not (Test-IncludeFolder $child)) {
             $TraversalState.SkippedFolders++; continue 

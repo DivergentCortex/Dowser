@@ -141,20 +141,39 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryRoot'
         Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
         $dirA = Join-Path $tmpRoot 'A'
+        $dirANested = Join-Path $dirA 'Nested'
         $dirB = Join-Path $tmpRoot 'B'
         $null = New-Item -ItemType Directory -Path $dirA -Force
+        $null = New-Item -ItemType Directory -Path $dirANested -Force
         $null = New-Item -ItemType Directory -Path $dirB -Force
 
-        # known byte counts so the size math below is a real assertion, not a smell test
-        [System.IO.File]::WriteAllBytes((Join-Path $dirA 'a1.txt'), [byte[]](1..100))
-        [System.IO.File]::WriteAllBytes((Join-Path $dirB 'b1.txt'), [byte[]](1..50))
+        # Known byte counts, real assertions, not a smell test. Shape matters: a file
+        # sitting loose at the scan root, a top-level folder with its own file plus a
+        # nested subfolder (so its cached size is inclusive of the nested bytes), and a
+        # second plain top-level folder. This is the exact shape that surfaced both the
+        # total-size undercount (loose root files were never counted) and the Top-N
+        # double-count (a nested folder's bytes are already inside its parent's total).
+        [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'rootloose.txt'), (New-Object byte[] 300))
+        [System.IO.File]::WriteAllBytes((Join-Path $dirA 'a1.txt'), (New-Object byte[] 100))
+        [System.IO.File]::WriteAllBytes((Join-Path $dirANested 'n1.txt'), (New-Object byte[] 400))
+        [System.IO.File]::WriteAllBytes((Join-Path $dirB 'b1.txt'), (New-Object byte[] 50))
 
         $script:tmpRoot = $tmpRoot
+
+        # Report-file writes below go here, NEVER inside $tmpRoot -- a .md report written into
+        # the scanned tree would become a new loose root file for the next test's size totals.
+        $outDir = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryOutputs'
+        Remove-Item -LiteralPath $outDir -Recurse -Force -ErrorAction SilentlyContinue
+        $null = New-Item -ItemType Directory -Path $outDir -Force
+        $script:outDir = $outDir
     }
 
     AfterAll {
         if ($script:tmpRoot -and (Test-Path -LiteralPath $script:tmpRoot)) {
             Remove-Item -LiteralPath $script:tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        if ($script:outDir -and (Test-Path -LiteralPath $script:outDir)) {
+            Remove-Item -LiteralPath $script:outDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -170,7 +189,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
 
         It 'Auto-enables the summary for an -OutputFile ending .md' {
-            $mdPath = Join-Path $script:tmpRoot 'auto.md'
+            $mdPath = Join-Path $script:outDir 'auto.md'
             $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -AsMarkdown -OutputFile $mdPath
             (Get-Content -LiteralPath $mdPath -Raw) | Should -Match '#### Summary'
         }
@@ -195,14 +214,19 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             $script:out | Where-Object { $_ -match '^\s*Scan: MaxDepth=1, DefaultExcludes=False, FoldersOnly=True$' } | Should -Not -BeNullOrEmpty
         }
 
-        It 'Reports total size as the sum of top-level folder sizes' {
-            $script:out | Where-Object { $_ -match '^\s*Total size: 150\.0B$' } | Should -Not -BeNullOrEmpty
+        It 'Reports total size including nested-folder bytes and the loose root file' {
+            # A (100) + A/Nested (400) + B (50) + rootloose.txt (300) = 850
+            $script:out | Where-Object { $_ -match '^\s*Total size: 850\.0B$' } | Should -Not -BeNullOrEmpty
         }
 
-        It 'Lists both known folders at their correct sizes in the largest-folders section' {
-            $joined = $script:out -join "`n"
-            $joined | Should -Match '100\.0B\s+A'
-            $joined | Should -Match '50\.0B\s+B'
+        It 'Ranks only top-level folders, never double-listing a nested folder inside its parent' {
+            # A's cached size (500) is inclusive of A/Nested (400) plus its own a1.txt (100).
+            # "Nested" legitimately appears as its own bare tree line -- what must NOT appear
+            # is a ranked "A/Nested" row in the summary (the relative-path form only the
+            # largest-folders section ever produces).
+            $script:out | Where-Object { $_ -match '500\.0B\s+A$' } | Should -Not -BeNullOrEmpty
+            $script:out | Where-Object { $_ -match '50\.0B\s+B$' } | Should -Not -BeNullOrEmpty
+            $script:out | Where-Object { $_ -match 'A[\\/]Nested' } | Should -BeNullOrEmpty
         }
 
         It 'Omits the size rollup when -IncludeSize is not set' {
@@ -211,9 +235,42 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
     }
 
+    Context 'Default-excluded top-level folders are named, not silently dropped' {
+        BeforeAll {
+            # 'logs' is one of the built-in default-excluded folder names. Give it more bytes
+            # than the folder that IS counted, so a total that silently omitted it would be
+            # obviously, provably wrong rather than just slightly off.
+            $excludeRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryExcludeRoot'
+            Remove-Item -LiteralPath $excludeRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $logsDir = Join-Path $excludeRoot 'logs'
+            $normalDir = Join-Path $excludeRoot 'NormalFolder'
+            $null = New-Item -ItemType Directory -Path $logsDir -Force
+            $null = New-Item -ItemType Directory -Path $normalDir -Force
+            [System.IO.File]::WriteAllBytes((Join-Path $logsDir 'big.log'), (New-Object byte[] 9000))
+            [System.IO.File]::WriteAllBytes((Join-Path $normalDir 'small.txt'), (New-Object byte[] 100))
+
+            $script:excludeRoot = $excludeRoot
+            $script:excludeOut = Get-DowserMap -Path $excludeRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
+        }
+
+        AfterAll {
+            if ($script:excludeRoot -and (Test-Path -LiteralPath $script:excludeRoot)) {
+                Remove-Item -LiteralPath $script:excludeRoot -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It 'Total size reflects only the non-excluded folder, not the excluded one' {
+            $script:excludeOut | Where-Object { $_ -match '^\s*Total size: 100\.0B$' } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Names the excluded top-level folder next to the total so the gap is not silent' {
+            $script:excludeOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:.*logs' } | Should -Not -BeNullOrEmpty
+        }
+    }
+
     Context 'Markdown summary placement' {
         It 'Places Summary before the fenced tree block and renders the size table' {
-            $mdPath = Join-Path $script:tmpRoot 'placement.md'
+            $mdPath = Join-Path $script:outDir 'placement.md'
             $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -AsMarkdown -MarkdownFile $mdPath
             $content = Get-Content -LiteralPath $mdPath
 
@@ -224,7 +281,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
             $raw = $content -join "`n"
             $raw | Should -Match '\| Size \| Folder \|'
-            $raw | Should -Match '\| 100\.0B \| `A` \|'
+            $raw | Should -Match '\| 500\.0B \| `A` \|'
             $raw | Should -Match '\| 50\.0B \| `B` \|'
         }
     }

@@ -2,6 +2,20 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.09.09.242] - 2026-09-09
+### fix(Get-DowserMap): Fix three review-found defects in the markdown summary size rollup
+
+What changed:
+- Total size now includes files sitting loose at the scan root via one bounded, non-recursive Get-ChildItem -File pass filtered through the existing Test-IncludeFile/Test-ExcludeByPath predicates -- previously these bytes were silently dropped because Get-FolderAnnotation is only ever called on subfolders, never the root itself (Huginn finding: 850B tree undercounted to 550B)
+- Top-N largest-folders table now ranks only depth-1 (top-level) $SizeCache entries, the same population used for Total size, instead of ranking every cached depth -- a nested folder's bytes are already inside its parent's cached total, so ranking both produced redundant double-listed entries (Huginn finding: A and A/Nested both appeared, same physical bytes counted twice under two labels)
+- Top-level folders rejected by exclusion (default excludes or -ExcludeFolders) are now named in a new summary line ('Total size excludes filtered top-level folders: ...') using $TraversalState.ExcludedTopLevelNames, populated at zero extra cost at the same two call sites that already increment SkippedFolders -- previously an excluded folder (e.g. a folder literally named 'logs', a default-excluded name) vanished from the total with only a byteless 'Skipped: N folders' count as any signal (Muninn finding, reproduced: an 8.8KB 'logs' folder next to a 100B folder produced Total size: 100.0B with no indication anything was left out)
+- CBH and docs/INDEX.md updated to describe total size precisely (top-level folders plus loose root files, filtered-out folders named) instead of the prior unqualified 'total size' claim
+- Extended Tests/Get-DowserMap.Tests.ps1 with the exact reproduction shapes from both review findings (nested folder plus loose root file; a default-excluded-named top-level folder outweighing a counted one) plus a test-isolation fix (report files written during earlier tests must never land inside the scanned fixture tree, or they become new loose-root-file bytes for later assertions)
+
+Why:
+- Huginn+Muninn court review (Synapse tasks 1444/1446) rejected the first pass with REWORK: two defects (Huginn) reproduced by direct execution against a real tree shape, plus one additional defect (Muninn) reproduced independently, all three in the same fault class the operator's original bug report was about -- a total that silently omits real bytes with no signal anything was left out. Fixed all three, extended tests to cover the exact reproduction shapes so they cannot regress silently, and confirmed no breakage via the full Invoke-DowserTestSuite.ps1 (144/144 PASS).
+
+
 ## [2026.09.09.241] - 2026-09-09
 ### feat(Get-DowserMap): Markdown reports auto-emit a summary with size rollup and scan parameters
 
