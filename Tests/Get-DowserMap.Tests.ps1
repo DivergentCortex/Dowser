@@ -268,6 +268,50 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
     }
 
+    Context 'Path-pattern-excluded top-level folders are also named' {
+        BeforeAll {
+            # Mirrors the Huginn/Muninn court-review repro exactly: a top-level folder excluded
+            # via -ExcludePathPatterns (not a default-excluded name) reproduced the identical
+            # silent-undercount failure the 'logs' fix above was meant to close, because only
+            # Test-ExcludeFolder rejections were tracked -- Test-ExcludeByPath rejections were not.
+            $pathExcludeRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryPathExcludeRoot'
+            Remove-Item -LiteralPath $pathExcludeRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $normalDir2 = Join-Path $pathExcludeRoot 'NormalFolder2'
+            $secretDir = Join-Path $pathExcludeRoot 'secretstuff'
+            $null = New-Item -ItemType Directory -Path $normalDir2 -Force
+            $null = New-Item -ItemType Directory -Path $secretDir -Force
+            [System.IO.File]::WriteAllBytes((Join-Path $normalDir2 'n2.txt'), (New-Object byte[] 20))
+            [System.IO.File]::WriteAllBytes((Join-Path $secretDir 's1.txt'), (New-Object byte[] 5000))
+
+            $script:pathExcludeRoot = $pathExcludeRoot
+            $script:pathExcludeOut = Get-DowserMap -Path $pathExcludeRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secretstuff*'
+        }
+
+        AfterAll {
+            if ($script:pathExcludeRoot -and (Test-Path -LiteralPath $script:pathExcludeRoot)) {
+                Remove-Item -LiteralPath $script:pathExcludeRoot -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        It 'Total size reflects only the non-excluded folder, not the path-excluded one' {
+            $script:pathExcludeOut | Where-Object { $_ -match '^\s*Total size: 20\.0B$' } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Names the -ExcludePathPatterns-excluded folder next to the total' {
+            $script:pathExcludeOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:.*secretstuff' } | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Decision D-1: -IncludeFolders allowlist mismatches are not named' {
+        It 'Does not treat an -IncludeFolders allowlist as an exclusion worth naming' {
+            # Deliberate scope boundary (Synapse decision_id 175): -IncludeFolders is an opt-in
+            # allowlist, so everything outside it is expected, declared absence, not a surprise
+            # the summary needs to flag the way a default-exclude or -ExcludeFolders carve-out is.
+            $allowlistOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -IncludeFolders 'A'
+            $allowlistOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:' } | Should -BeNullOrEmpty
+        }
+    }
+
     Context 'Markdown summary placement' {
         It 'Places Summary before the fenced tree block and renders the size table' {
             $mdPath = Join-Path $script:outDir 'placement.md'

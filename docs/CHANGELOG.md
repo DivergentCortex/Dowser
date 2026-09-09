@@ -2,6 +2,19 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.09.09.243] - 2026-09-09
+### fix(Get-DowserMap): Extend exclusion-naming to -ExcludePathPatterns; lock D-1 scope decision
+
+What changed:
+- ExcludedTopLevelNames now also captures top-level folders rejected by Test-ExcludeByPath (-ExcludePathPatterns), not just Test-ExcludeFolder (default excludes / -ExcludeFolders) -- closes the gap both Huginn and Muninn independently reproduced by execution in the Forseti court verdict on tasks 1444/1446: a folder excluded via -ExcludePathPatterns silently vanished from Total size with only a byteless Skipped count, the identical failure class the whole feature exists to close
+- Decided and recorded D-1 (Synapse decision_id 175): Test-IncludeFolder allowlist mismatches stay unnamed, deliberately -- an -IncludeFolders allowlist is opt-in scope-narrowing the caller declared, not a surprise omission, unlike default/explicit excludes. No code change was needed to enforce this (the code paths were already separate); a Pester test now locks it in as an intentional contract
+- Added Tests/Get-DowserMap.Tests.ps1 coverage: the exact -ExcludePathPatterns repro from the court review (NormalFolder2=20B counted, secretstuff=5000B excluded and named), plus a control test proving -IncludeFolders mismatches are never named
+- CBH and docs/INDEX.md updated to state the full exclusion surface (default excludes, -ExcludeFolders, -ExcludePathPatterns) and the explicit -IncludeFolders carve-out
+
+Why:
+- Forseti's court verdict on the REWORK pass (Synapse tasks 1444/1446, both already resolved dual-PASS) required deciding this explicitly rather than leaving it to chance, and both ravens independently reproduced the same residual gap by execution. Closing it now, while the exact pattern is already reviewed and fresh, is cheaper and safer than leaving a known, cheap-to-fix instance of the operator's original incident class sitting in shipped code.
+
+
 ## [2026.09.09.242] - 2026-09-09
 ### fix(Get-DowserMap): Fix three review-found defects in the markdown summary size rollup
 
