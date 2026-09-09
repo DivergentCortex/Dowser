@@ -87,9 +87,11 @@ function Get-DowserMap {
         top-level folders by size, drawn from the folder-size cache the tree walk already
         builds plus one bounded, non-recursive listing of the root's own files -- no traversal
         of any subtree beyond what the tree walk already did. Top-level folders rejected by
-        exclusion (default excludes or -ExcludeFolders) never contribute to the total; when
-        that happens, the summary names them so a suspiciously small total is not mistaken for
-        a complete one.
+        exclusion (default excludes, -ExcludeFolders, or -ExcludePathPatterns) never contribute
+        to the total; when that happens, the summary names them so a suspiciously small total
+        is not mistaken for a complete one. A folder left out only because it does not match an
+        active -IncludeFolders allowlist is not named this way -- that is deliberate, declared
+        scope-narrowing the caller asked for, not a surprise.
     .PARAMETER Indent
         Internal recursion state. Not for direct use.
     .PARAMETER CurrentDepth
@@ -1651,7 +1653,10 @@ function Get-DowserMap {
             }
             if (Test-ExcludeByPath $item) {
                 if ($item.PSIsContainer) {
-                    $TraversalState.SkippedFolders++ 
+                    $TraversalState.SkippedFolders++
+                    if ($CurrentDepth -eq 0) {
+                        $TraversalState.ExcludedTopLevelNames += $item.Name
+                    }
                 }
                 else {
                     $TraversalState.SkippedFiles++ 
@@ -1815,7 +1820,11 @@ function Get-DowserMap {
             $links += $child; continue 
         }
         if (Test-ExcludeByPath $child) {
-            $TraversalState.SkippedFolders++; continue 
+            $TraversalState.SkippedFolders++
+            if ($CurrentDepth -eq 0) {
+                $TraversalState.ExcludedTopLevelNames += $child.Name
+            }
+            continue
         }
         if (($effectiveIncludePatterns -or $IncludeExtensions)) {
             if (-not (Test-FolderContainsMatchingFiles $child.FullName)) {
