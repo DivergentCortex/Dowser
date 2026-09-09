@@ -79,7 +79,12 @@ function Get-DowserMap {
     .PARAMETER MarkdownFile
         Path to write a Markdown document. Implies -AsMarkdown.
     .PARAMETER EmitSummary
-        Append a folder/file/skip/symlink summary to the output.
+        Append a scan-parameter/folder/file/skip/symlink summary to the output. Auto-enables
+        when the output is Markdown (-AsMarkdown, -MarkdownFile, or an -OutputFile ending in
+        .md) unless explicitly passed, including -EmitSummary:$false, which always wins over
+        the auto-enable. When -IncludeSize is active, the summary also reports total size and
+        the largest measured folders, drawn from the folder-size cache the tree walk already
+        builds (no extra filesystem traversal).
     .PARAMETER Indent
         Internal recursion state. Not for direct use.
     .PARAMETER CurrentDepth
@@ -183,6 +188,17 @@ function Get-DowserMap {
     if ($AsHtml -and $AsMarkdown) {
         Write-Log "Get-DowserMap called with both -AsHtml and -AsMarkdown; these are mutually exclusive" -Severity Warning
         return
+    }
+
+    # Summary auto-enables for markdown output (-AsMarkdown, -MarkdownFile, or an -OutputFile
+    # ending in .md) so a report file is never generated without one. An explicit -EmitSummary
+    # (true or false) always wins over this default. Only evaluated at the top-level call;
+    # recursive calls already receive the resolved value via -EmitSummary:$EmitSummary.
+    if ($CurrentDepth -eq 0 -and -not $PSBoundParameters.ContainsKey('EmitSummary')) {
+        $markdownOutputRequested = $AsMarkdown -or [bool]$MarkdownFile -or ($OutputFile -and $OutputFile -match '\.md$')
+        if ($markdownOutputRequested) {
+            $EmitSummary = $true
+        }
     }
 
     function Get-DowserArchiveTreeLines {
@@ -1413,6 +1429,7 @@ function Get-DowserMap {
         $summaryLines = @(); $summaryBullets = @()
         if ($CurrentDepth -eq 0 -and $EmitSummary) {
             $summaryLines += 'Summary:'
+            $summaryLines += "  Scan: MaxDepth=$MaxDepth, DefaultExcludes=$(-not $NoDefaultExcludes), FoldersOnly=$([bool]$FoldersOnly)"
             $summaryLines += "  Folders: $($TraversalState.FolderCount)"
             $summaryLines += "  Files: $($TraversalState.FileCount)"
             $skippedFolderCount = [int]$TraversalState.SkippedFolders
@@ -1424,6 +1441,7 @@ function Get-DowserMap {
             if ($linkCount -gt 0) {
                 $summaryLines += "  Symlinks: $linkCount" 
             }
+            $summaryBullets += "- Scan: MaxDepth=$MaxDepth, DefaultExcludes=$(-not $NoDefaultExcludes), FoldersOnly=$([bool]$FoldersOnly)"
             $summaryBullets += "- Folders: $($TraversalState.FolderCount)"
             $summaryBullets += "- Files: $($TraversalState.FileCount)"
             if ($skippedFolderCount -gt 0 -or $skippedFileCount -gt 0) {
@@ -1431,6 +1449,48 @@ function Get-DowserMap {
             }
             if ($linkCount -gt 0) {
                 $summaryBullets += "- Symlinks: $linkCount" 
+            }
+
+            # Size rollup reuses $SizeCache, which Get-FolderAnnotation already populated for
+            # every annotated folder during the tree walk above. No extra filesystem traversal.
+            if ($IncludeSize) {
+                $summaryTopFolderCount = 10
+                $sizedFolders = @()
+                if ($SizeCache -and $SizeCache.Count -gt 0) {
+                    foreach ($cachedPath in $SizeCache.Keys) {
+                        $relPath = ConvertTo-RelativePath $cachedPath
+                        if ([string]::IsNullOrEmpty($relPath)) {
+                            continue
+                        }
+                        $sizedFolders += [PSCustomObject]@{
+                            RelativePath = $relPath
+                            Bytes        = [int64]$SizeCache[$cachedPath]
+                            IsTopLevel   = ($relPath -notmatch '[\\/]')
+                        }
+                    }
+                }
+                $totalBytes = ($sizedFolders | Where-Object { $_.IsTopLevel } | Measure-Object -Property Bytes -Sum).Sum
+                if (-not $totalBytes) {
+                    $totalBytes = 0
+                }
+                $summaryLines += "  Total size: $(Format-DowserSize $totalBytes)"
+                $summaryBullets += "- Total size: $(Format-DowserSize $totalBytes)"
+
+                $topSized = @($sizedFolders | Sort-Object -Property Bytes -Descending | Select-Object -First $summaryTopFolderCount)
+                if ($topSized.Count -gt 0) {
+                    $summaryLines += '  Largest folders:'
+                    foreach ($sizedFolder in $topSized) {
+                        $summaryLines += ('    {0}  {1}' -f (Format-DowserSize $sizedFolder.Bytes), $sizedFolder.RelativePath)
+                    }
+                    $summaryBullets += ''
+                    $summaryBullets += '**Largest folders:**'
+                    $summaryBullets += ''
+                    $summaryBullets += '| Size | Folder |'
+                    $summaryBullets += '|---|---|'
+                    foreach ($sizedFolder in $topSized) {
+                        $summaryBullets += ('| {0} | `{1}` |' -f (Format-DowserSize $sizedFolder.Bytes), $sizedFolder.RelativePath)
+                    }
+                }
             }
         }
         $finalLines = if ($summaryLines.Count -gt 0) {

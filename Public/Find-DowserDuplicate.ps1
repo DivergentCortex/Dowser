@@ -47,6 +47,10 @@ function Find-DowserDuplicate {
     .PARAMETER ReportPath
         Export full results to CSV at this path.
 
+    .PARAMETER ExportHtml
+        Write an expandable HTML report of byte-identical Content duplicate sets.
+        The report parent directory is created when necessary.
+
     .PARAMETER AutoRemove
         Automatically delete duplicates (keeps first file in each set).
 
@@ -97,6 +101,8 @@ function Find-DowserDuplicate {
 
         [string]$ReportPath,
 
+        [string]$ExportHtml,
+
         [Switch]$AutoRemove,
 
         [Switch]$ReviewBeforeDelete,
@@ -112,30 +118,47 @@ function Find-DowserDuplicate {
         throw "Path '$Path' not found."
     }
 
-    Write-Log "Scanning '$Path'..." -Severity Verbose
+    Write-Log "Find-DowserDuplicate scanning '$Path'" -Severity Info
+    Write-Progress -Activity 'Find-DowserDuplicate' -Status 'Enumerating files' -PercentComplete 0
 
-    $files = Get-ChildItem -Path $Path -File -Recurse |
-        Where-Object {
-            if ($_.Length -lt $MinSize) {
-                return $false 
+    $files = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+    $enumeratedFiles = 0
+    $enumerationStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        foreach ($candidate in Get-ChildItem -Path $Path -File -Recurse -ErrorAction SilentlyContinue) {
+            $enumeratedFiles++
+            if ($candidate.Length -ge $MinSize -and -not ($Exclude -and ($Exclude | Where-Object { $candidate.FullName -like $_ }))) {
+                [void]$files.Add($candidate)
             }
-            if ($Exclude) {
-                foreach ($pattern in $Exclude) {
-                    if ($_.FullName -like $pattern) {
-                        return $false 
-                    }
-                }
+            if ($enumeratedFiles -eq 1 -or $enumerationStopwatch.ElapsedMilliseconds -ge 750) {
+                Write-Progress -Activity 'Find-DowserDuplicate' `
+                    -Status "Enumerating files: $enumeratedFiles found, $($files.Count) eligible" -PercentComplete 0
+                $enumerationStopwatch.Restart()
             }
-            return $true
         }
-
-    if (-not $files) {
-        Write-Log "No files matched the filters." -Severity Verbose
-        Write-Log "Ending Find-DowserDuplicate"
+    }
+    catch {
+        Write-Progress -Activity 'Find-DowserDuplicate' -Completed
+        Write-Log "Find-DowserDuplicate could not enumerate '$Path': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
         return
     }
 
-    Write-Log "Found $(@($files).Count) files. Analyzing..." -Severity Verbose
+    if ($files.Count -eq 0) {
+        if ($ExportHtml) {
+            [void](Export-DowserDuplicateHtml `
+                -ReportPath $ExportHtml `
+                -DuplicateSets @() `
+                -FilesScanned 0 `
+                -RootPath $Path `
+                -HashAlgorithm $HashAlgorithm)
+        }
+        Write-Progress -Activity 'Find-DowserDuplicate' -Completed
+        Write-Log 'Find-DowserDuplicate found no files matching the filters.' -Severity Info
+        Write-Log 'Ending Find-DowserDuplicate'
+        return
+    }
+
+    Write-Log "Find-DowserDuplicate found $($files.Count) eligible file(s)." -Severity Info
 
     function Get-NormalizedStem {
         param([string]$FileName)
@@ -257,11 +280,14 @@ function Find-DowserDuplicate {
     }
 
     if ($runContent) {
+        # Different byte lengths cannot have an identical full-file hash.
+        $contentCandidates = @($files | Group-Object Length | Where-Object Count -gt 1 | ForEach-Object Group)
         $hashGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new()
-        foreach ($file in $files) {
-            if (-not (Test-Path -LiteralPath $file.FullName)) {
-                continue 
-            }
+        $hashedFiles = 0
+        $candidateCount = $contentCandidates.Count
+        Write-Log "Find-DowserDuplicate hashing $candidateCount content candidate file(s) with $HashAlgorithm." -Severity Info
+
+        foreach ($file in $contentCandidates) {
             try {
                 $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm $HashAlgorithm -ErrorAction Stop).Hash
             }
@@ -269,13 +295,19 @@ function Find-DowserDuplicate {
                 Write-Log "Find-DowserDuplicate failed hashing '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 continue
             }
+            finally {
+                $hashedFiles++
+                $percentComplete = if ($candidateCount -gt 0) { [int][Math]::Floor(($hashedFiles / $candidateCount) * 100) } else { 100 }
+                Write-Progress -Activity 'Find-DowserDuplicate' `
+                    -Status "Hashing exact content: $hashedFiles of $candidateCount files" -PercentComplete $percentComplete
+            }
             if (-not $hash) {
-                continue 
+                continue
             }
             if (-not $hashGroups.ContainsKey($hash)) {
                 $hashGroups[$hash] = [System.Collections.Generic.List[object]]::new()
             }
-            $hashGroups[$hash].Add([PSCustomObject]@{ Path = $file.FullName; Size = $file.Length })
+            [void]$hashGroups[$hash].Add([PSCustomObject]@{ Path = $file.FullName; Size = $file.Length })
         }
 
         foreach ($hash in $hashGroups.Keys) {
@@ -296,16 +328,22 @@ function Find-DowserDuplicate {
 
     if ($runChunk) {
         $chunkGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new()
+        $chunkedFiles = 0
+        $chunkCandidateCount = $files.Count
+        Write-Log "Find-DowserDuplicate examining shared $ChunkSize-byte chunks in $chunkCandidateCount file(s)." -Severity Info
         foreach ($file in $files) {
-            if (-not (Test-Path -LiteralPath $file.FullName)) {
-                continue 
-            }
             try {
                 $chunks = Get-ChunkHashes -File $file -Size $ChunkSize -Overlap $ChunkOverlap -Algorithm $HashAlgorithm
             }
             catch {
                 Write-Log "Find-DowserDuplicate failed chunking '$($file.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 continue
+            }
+            finally {
+                $chunkedFiles++
+                $percentComplete = if ($chunkCandidateCount -gt 0) { [int][Math]::Floor(($chunkedFiles / $chunkCandidateCount) * 100) } else { 100 }
+                Write-Progress -Activity 'Find-DowserDuplicate' `
+                    -Status "Comparing shared chunks: $chunkedFiles of $chunkCandidateCount files" -PercentComplete $percentComplete
             }
             foreach ($entry in $chunks) {
                 if (-not $entry.Hash) {
@@ -381,6 +419,15 @@ function Find-DowserDuplicate {
 
     $global:dupObjects = $dupSets
 
+    if ($ExportHtml) {
+        [void](Export-DowserDuplicateHtml `
+            -ReportPath $ExportHtml `
+            -DuplicateSets $dupSets `
+            -FilesScanned $files.Count `
+            -RootPath $Path `
+            -HashAlgorithm $HashAlgorithm)
+    }
+
     if ($ReportPath) {
         $exportRows = foreach ($set in $dupSets) {
             foreach ($f in $set.Files) {
@@ -404,8 +451,10 @@ function Find-DowserDuplicate {
         }
     }
 
+    Write-Progress -Activity 'Find-DowserDuplicate' -Completed
+
     if ($dupSets.Count -eq 0) {
-        Write-Log "No duplicates found." -Severity Verbose
+        Write-Log 'Find-DowserDuplicate found no duplicate sets.' -Severity Info
         Write-Log "Ending Find-DowserDuplicate"
         return
     }

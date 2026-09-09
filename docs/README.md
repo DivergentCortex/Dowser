@@ -2,7 +2,7 @@
 
 > Every folder is a grave pretending to be a drawer.
 
-Filesystem recon for PowerShell. Point Dowser at a path and it tells you what is actually down there: what is duplicated, what changed, what got orphaned, who owns it, how much space it eats, what depends on what, and whether anything is corrupt. It reads and it reports. It does not move your files. The only four functions that write anything are ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, and Expand-DowserExe.
+Filesystem recon for PowerShell. Point Dowser at a path and it tells you what is actually down there: what is duplicated, what changed, what got orphaned, who owns it, how much space it eats, what depends on what, and whether anything is corrupt. Most of it only reads and reports. The functions that write anything are ConvertTo-DowserExe, ConvertTo-DowserIco, New-DowserHiddenFolder, Expand-DowserExe, and the hash-verified transfer pair Start-DowserTransfer / Remove-DowserTransferSource.
 
 Runs on Windows PowerShell 5.1 and PowerShell 7+, across Windows, Linux, and macOS. The handful of functions that lean on Windows-only facilities warn and step aside on other platforms instead of crashing. See [Platform support](#platform-support).
 
@@ -45,7 +45,7 @@ Export-DowserJsonCsv -Path ./exports/events.jsonl -OutputPath ./events.csv
 
 ## What it does
 
-Twenty-nine functions, grouped by the question they answer.
+Thirty-five functions, grouped by the question they answer.
 
 **Find things.** `Find-DowserFile` is a multi-threaded search by attribute, size, and date. `Find-DowserString` runs multi-pattern text search with Aho-Corasick matching; `Invoke-DowserFastSearch` is the single-pattern parallel variant. `Find-DowserDuplicate` catches duplicates by name, size, or chunked hash. `Find-DowserModified` pulls files changed on a given date, `Find-DowserRecentLog` grabs the newest log in a directory, and `Find-DowserScript` walks a tree for script files by type.
 
@@ -56,6 +56,8 @@ Twenty-nine functions, grouped by the question they answer.
 **Inspect a single file.** `Get-DowserProperty` is the deep inspector: VersionInfo, PE structure, hashes. `Get-DowserOwnership` reports ownership and metadata. `Test-DowserIntegrity` runs layered corruption and hygiene detection, and `Test-DowserExtractable` classifies an EXE as extractable versus decompile-required.
 
 **Convert and tuck away.** `ConvertTo-DowserBase64` moves images to and from Base64. `ConvertTo-DowserExe` wraps a PowerShell script in a C# EXE, `ConvertTo-DowserIco` builds .ico files from images, and `Expand-DowserExe` pulls files out of extractable EXE archives. `New-DowserHiddenFolder` hides a directory the right way per platform (NTFS Hidden plus System on Windows, a leading-dot rename on Linux and macOS). `Invoke-DowserNumericSort` sorts naturally, so Item-2 lands before Item-10. `Get-DowserInfo` reports the module version and latest changelog entry; `Get-DowserTemplate` reads Explorer folder-template configs on Windows.
+
+**Move files safely.** `Start-DowserTransfer` copies files or directories to a destination, hashing every file before and after the copy and reporting it migrated only on a match; a real run writes a JSON verification manifest, though ManifestPath comes back $null if that write itself fails (disk full, permissions). `Remove-DowserTransferSource` takes that manifest and deletes only the entries it verified, re-hashing the destination immediately before each delete -- it never runs on its own as a side effect of the transfer.
 
 ## Platform support
 

@@ -131,3 +131,101 @@ Describe 'Get-DowserMap symlink rendering' {
         }
     }
 }
+
+Describe 'Get-DowserMap summary auto-enable and size rollup' {
+    BeforeAll {
+        $modulePath = Split-Path $PSScriptRoot -Parent
+        Remove-Module Dowser -Force -ErrorAction SilentlyContinue
+        Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
+
+        $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryRoot'
+        Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+        $dirA = Join-Path $tmpRoot 'A'
+        $dirB = Join-Path $tmpRoot 'B'
+        $null = New-Item -ItemType Directory -Path $dirA -Force
+        $null = New-Item -ItemType Directory -Path $dirB -Force
+
+        # known byte counts so the size math below is a real assertion, not a smell test
+        [System.IO.File]::WriteAllBytes((Join-Path $dirA 'a1.txt'), [byte[]](1..100))
+        [System.IO.File]::WriteAllBytes((Join-Path $dirB 'b1.txt'), [byte[]](1..50))
+
+        $script:tmpRoot = $tmpRoot
+    }
+
+    AfterAll {
+        if ($script:tmpRoot -and (Test-Path -LiteralPath $script:tmpRoot)) {
+            Remove-Item -LiteralPath $script:tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Context 'Auto-enable rules' {
+        It 'Emits no summary when neither markdown output nor -EmitSummary is requested' {
+            $out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1
+            $out | Where-Object { $_ -eq 'Summary:' } | Should -BeNullOrEmpty
+        }
+
+        It 'Auto-enables the summary for -AsMarkdown even with no -OutputFile' {
+            $out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -AsMarkdown
+            $out | Where-Object { $_ -eq 'Summary:' } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Auto-enables the summary for an -OutputFile ending .md' {
+            $mdPath = Join-Path $script:tmpRoot 'auto.md'
+            $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -AsMarkdown -OutputFile $mdPath
+            (Get-Content -LiteralPath $mdPath -Raw) | Should -Match '#### Summary'
+        }
+
+        It 'Explicit -EmitSummary:$false wins over markdown auto-enable' {
+            $out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -AsMarkdown -EmitSummary:$false
+            $out | Where-Object { $_ -eq 'Summary:' } | Should -BeNullOrEmpty
+        }
+
+        It 'Explicit -EmitSummary still works without markdown output' {
+            $out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -EmitSummary
+            $out | Where-Object { $_ -eq 'Summary:' } | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Scan parameters and size rollup' {
+        BeforeAll {
+            $script:out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -NoDefaultExcludes
+        }
+
+        It 'Declares MaxDepth, DefaultExcludes, and FoldersOnly' {
+            $script:out | Where-Object { $_ -match '^\s*Scan: MaxDepth=1, DefaultExcludes=False, FoldersOnly=True$' } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Reports total size as the sum of top-level folder sizes' {
+            $script:out | Where-Object { $_ -match '^\s*Total size: 150\.0B$' } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Lists both known folders at their correct sizes in the largest-folders section' {
+            $joined = $script:out -join "`n"
+            $joined | Should -Match '100\.0B\s+A'
+            $joined | Should -Match '50\.0B\s+B'
+        }
+
+        It 'Omits the size rollup when -IncludeSize is not set' {
+            $noSizeOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -EmitSummary
+            $noSizeOut | Where-Object { $_ -match 'Total size:' } | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Markdown summary placement' {
+        It 'Places Summary before the fenced tree block and renders the size table' {
+            $mdPath = Join-Path $script:tmpRoot 'placement.md'
+            $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -AsMarkdown -MarkdownFile $mdPath
+            $content = Get-Content -LiteralPath $mdPath
+
+            $summaryIndex = [array]::IndexOf($content, '#### Summary')
+            $fenceIndex = [array]::IndexOf($content, '```text')
+            $summaryIndex | Should -BeGreaterThan -1
+            $fenceIndex | Should -BeGreaterThan $summaryIndex
+
+            $raw = $content -join "`n"
+            $raw | Should -Match '\| Size \| Folder \|'
+            $raw | Should -Match '\| 100\.0B \| `A` \|'
+            $raw | Should -Match '\| 50\.0B \| `B` \|'
+        }
+    }
+}
