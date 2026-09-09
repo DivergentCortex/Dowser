@@ -119,8 +119,12 @@ function Get-DowserJsonKey {
             }
 
             try {
+                $includeTriage = $item.Name -eq 'JSON-Triage'
                 $children = Get-ChildItem -LiteralPath $item.FullName -File -Recurse:$Recurse -ErrorAction Stop |
-                    Where-Object { $_.Extension -in '.json', '.jsonl' }
+                    Where-Object {
+                        $_.Extension -in '.json', '.jsonl' -and
+                        ($includeTriage -or $_.FullName -notmatch '[/\\]JSON-Triage([/\\]|$)')
+                    }
             }
             catch {
                 Write-Log "Get-DowserJsonKey could not enumerate '$($item.FullName)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
@@ -143,9 +147,19 @@ function Get-DowserJsonKey {
         $fileRows = [System.Collections.Generic.List[object]]::new()
         $fileSummaries = [System.Collections.Generic.List[object]]::new()
         $scanResults = @(Invoke-DowserJsonKeyScan -FilePath $files.FullName -ThreadCount $ThreadCount)
+        Write-Log "Get-DowserJsonKey scan finished; summarizing $($scanResults.Count) file result(s). Compare/Validation has no progress bar and can sit silent if files have tens of thousands of distinct key paths." -Severity Info
 
+        $parseFailures = [System.Collections.Generic.List[object]]::new()
         foreach ($scanResult in $scanResults) {
+            if (-not $scanResult.ReadSucceeded) {
+                $parseFailures.Add($scanResult)
+                continue
+            }
+
             $keyPaths = @($scanResult.KeyCounts.Keys | Sort-Object)
+            if ($keyPaths.Count -ge 5000) {
+                Write-Log "Get-DowserJsonKey '$($scanResult.FilePath)' has $($keyPaths.Count) distinct key paths; Compare/Validation will look hung from here." -Severity Warning
+            }
             $fileOccurrences = ($scanResult.KeyCounts.Values | Measure-Object -Sum).Sum
             if ($null -eq $fileOccurrences) {
                 $fileOccurrences = 0
@@ -173,11 +187,23 @@ function Get-DowserJsonKey {
             }
         }
 
+        $global:DowserJsonLastParseFailures = $parseFailures.ToArray()
+        if ($parseFailures.Count -gt 0) {
+            $sampleFailures = @($parseFailures | Select-Object -First 3 | ForEach-Object { $_.FilePath }) -join '; '
+            Write-Log "Get-DowserJsonKey skipped $($parseFailures.Count) non-JSON or invalid JSON file(s). Sample path(s): $sampleFailures. Inspect `$global:DowserJsonLastParseFailures for all paths and parser errors." -Severity Warning
+        }
+        if ($fileSummaries.Count -eq 0) {
+            Write-Log "Get-DowserJsonKey found no parseable JSON files among $($files.Count) candidate(s)" -Severity Warning
+            return
+        }
+
         if (-not $Compare) {
+            Write-Log "Get-DowserJsonKey emitting $($fileRows.Count) per-key row(s)" -Severity Info
             $fileRows | Sort-Object FilePath, KeyPath
             return
         }
 
+        Write-Log "Get-DowserJsonKey Compare starting on $($fileSummaries.Count) file(s), $((($fileSummaries | Measure-Object KeyCount -Sum).Sum)) total distinct key paths" -Severity Info
         $schemaProfiles = @($fileSummaries | Group-Object { $_.KeyPaths -join [string][char]31 })
         $orderedProfiles = @($schemaProfiles | Sort-Object @{ Expression = 'Count'; Descending = $true }, Name)
         $dominantProfile = $orderedProfiles | Select-Object -First 1
@@ -199,8 +225,8 @@ function Get-DowserJsonKey {
         $validationRows = [System.Collections.Generic.List[object]]::new()
         foreach ($keyPath in ($keyFileCounts.Keys | Sort-Object)) {
             $fileCount = $keyFileCounts[$keyPath]
-            $coveragePercent = [Math]::Round(($fileCount / $files.Count) * 100, 2)
-            $classification = if ($fileCount -eq $files.Count) {
+            $coveragePercent = [Math]::Round(($fileCount / $fileSummaries.Count) * 100, 2)
+            $classification = if ($fileCount -eq $fileSummaries.Count) {
                 'AlwaysPresent'
             }
             elseif ($coveragePercent -ge 95) {
@@ -218,7 +244,7 @@ function Get-DowserJsonKey {
                 Classification   = $classification
                 KeyPath          = $keyPath
                 FileCount        = $fileCount
-                MissingFileCount = $files.Count - $fileCount
+                MissingFileCount = $fileSummaries.Count - $fileCount
                 CoveragePercent  = $coveragePercent
             })
         }
@@ -232,10 +258,12 @@ function Get-DowserJsonKey {
         [pscustomobject]@{
             ResultType                 = 'DirectorySummary'
             FilesScanned               = $files.Count
+            FilesParsed                = $fileSummaries.Count
+            FilesSkippedInvalid        = $parseFailures.Count
             DocumentsScanned           = $documentsScanned
             DistinctSchemas            = $schemaProfiles.Count
             DominantSchemaFileCount    = $dominantProfile.Count
-            FilesDifferentFromDominant = $files.Count - $dominantProfile.Count
+            FilesDifferentFromDominant = $fileSummaries.Count - $dominantProfile.Count
             DominantSchemaKeyCount     = $dominantKeyPaths.Count
             DistinctKeyPaths           = @($fileSummaries.KeyPaths | Sort-Object -Unique).Count
             TotalOccurrences           = $totalOccurrences
@@ -269,7 +297,7 @@ function Get-DowserJsonKey {
         }
 
         if ($ShowKeyComparison -or $IncludeFiles) {
-            $allFiles = @($files.FullName | Sort-Object)
+            $allFiles = @($fileSummaries.FilePath | Sort-Object)
             $keyGroups = @($fileRows | Group-Object KeyPath)
             foreach ($group in ($keyGroups | Sort-Object Name)) {
                 $presentFiles = @($group.Group.FilePath | Sort-Object -Unique)

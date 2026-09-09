@@ -23,6 +23,7 @@ Dowser runs on PowerShell 5.1 (Windows) and pwsh 7+ (Windows/Linux/macOS).
 These functions work identically (or with a platform-equivalent path) on all supported platforms:
 
 - `Find-DowserDuplicate`, `Find-DowserFile`, `Find-DowserModified`, `Find-DowserOrphan`, `Find-DowserDependency`, `Find-DowserScript`, `Find-DowserString`, `Find-DowserRecentLog`
+- `Start-DowserTransfer`, `Remove-DowserTransferSource`
 - `Invoke-DowserFastSearch`, `Invoke-DowserNumericSort`, `Measure-DowserDirectory`, `Measure-DowserDiskUsage`
 - `Get-DowserMap`, `Get-DowserTopology`, `Get-DowserInfo`, `Get-DowserReport`, `Compare-DowserReport`
 - `ConvertTo-DowserBase64`
@@ -86,7 +87,10 @@ These functions emit a warning and return `$null` on non-Windows:
 
 ### Find-DowserDuplicate
 
-- Purpose: Detects duplicate files using Name, Size, and Chunked Hash algorithms.
+- Purpose: Finds duplicate-file candidates by name or shared chunks, and proves byte-identical files with full SHA content hashes. Shows progress during enumeration and every hash stage.
+- Inputs: `Path`, `Exclude`, `MinSize`, `Mode` (`Name`, `PartialName`, `NameSize`, `Content`, `Chunk`, or `All`), `HashAlgorithm`, `ChunkSize`, `ChunkOverlap`, `ReportPath` (CSV), `ExportHtml`, `ReviewBeforeDelete`, `AutoRemove`.
+- Outputs: Compact summary objects plus full duplicate sets in `$global:dupObjects`. `ExportHtml` writes an expandable exact-content report ranked by potential reclaimable space and creates its parent directory when needed.
+- Note: Only `Content` proves complete byte-for-byte equality. `Chunk` identifies shared blocks and is not a safe deletion decision by itself.
 - Source: `Find-FileDuplicates.ps1`
 
 ### Find-DowserFile
@@ -196,11 +200,28 @@ These functions emit a warning and return `$null` on non-Windows:
 - Source: `Export-DowserJsonCsv.ps1`
 - Alias: `Export-JsonCsv` after `Enable-DowserAliases`.
 
+### Test-DowserJson
+
+- Purpose: Diagnoses JSON and JSONL files before repair or schema assessment. Distinguishes valid JSON, valid JSONL, comment-bearing JSON, RECORD banner exports, tagged transcript text, and parser syntax errors.
+- Inputs: `Path` (file or directory; pipeline), `Recurse` (default true).
+- Outputs: One row per file with Classification, Repairable, RepairAction, parser error line and position, and the parser message. Does not change files.
+- Related: `Repair-DowserJson` performs only diagnosis-approved repairs; `Get-DowserJsonKey` assesses parseable file schemas.
+- Source: `Test-DowserJson.ps1`
+
+### Repair-DowserJson
+
+- Purpose: Diagnoses JSON first and writes a repaired copy only for recognized deterministic cases: Dowser RECORD banners and JSON comments.
+- Inputs: `Path` (file or directory; pipeline), `Recurse` (default true), `OutputDirectory` (optional), `Force`.
+- Outputs: One row per file with its diagnosis, Result, and OutputPath. By default a repaired file is written as `<name>.repaired.jsonl` under `JSON-Repaired` beside the source. Other syntax errors and tagged transcript text are skipped, never guessed into JSON.
+- Related: `Test-DowserJson` for assessment without writes; `Get-DowserJsonKey` for schema inspection afterward.
+- Source: `Repair-DowserJson.ps1`
+
 ### Get-DowserMap
 
 - Purpose: Visual tree renderer for directory structures. Renders folder/file hierarchy using Unicode box-drawing characters with optional size (-IncludeSize) and file count (-IncludeFileCount, alias: -IncludePsCount) annotations. Supports HTML, Markdown, and full-path trunk display modes. Symlinks are shown in place without traversal by default (two-line block: a name line marked U+2192 and a target line marked U+21B3); use -FollowReparse to descend into them.
 - Inputs: `Path` (pipeline, FullName alias), `MaxDepth` (default 3), `ShowFullPathTree` / `S`, `LinuxPaths` / `L`, `Ascii`, `AsHtml`, `AsMarkdown`, `IncludeHidden`, `FollowReparse`, `IncludeSize`, `IncludeFileCount` (alias: `IncludePsCount`), `FoldersOnly`, `IncludeFilePatterns`, `IncludeExtensions`, `ExcludeExtensions`, `ExcludeFolders`, `ExcludeFiles`, `IncludeFolders`, `ExcludePathPatterns`, `NoDefaultExcludes`, `OutputFile`, `MarkdownFile`, `EmitSummary`, `UseRunspaces`, `MaxThreads`
 - Outputs: String array of tree lines (pipeline). Optional file output via -OutputFile / -MarkdownFile.
+- Summary: `EmitSummary` auto-enables when the output is Markdown (-AsMarkdown, -MarkdownFile, or an -OutputFile ending .md) unless the caller explicitly passes -EmitSummary (including :$false, which always wins). Reports the scan parameters (MaxDepth, whether default excludes were bypassed, FoldersOnly), folder/file/skip/symlink counts, and, when -IncludeSize is active, total size plus a top-10 largest-folders table drawn from the same folder-size cache the tree walk already builds (no extra filesystem traversal). In Markdown mode the summary is placed before the tree, under a `#### Summary` heading.
 - Tree glyphs: `■` folder, `·` file, `→` (U+2192) symlink name, `↳` (U+21B3) symlink target, `×` access denied. Box-drawing: `├─` branch, `└─` last, `│` continuation. HTML mode emits `&#xNNNN;` entities; -Ascii mode uses `+`/`-`/`>`/`~`.
 - Related: `Get-DowserTopology` (any PSProvider path, ANSI color, no size/count annotations)
 - Source: `Get-DowserMap.ps1`
@@ -269,3 +290,21 @@ These functions emit a warning and return `$null` on non-Windows:
 - Related: `Test-DowserExtractable` (classification without extraction), `Test-DowserIntegrity` (corruption detection)
 - Source: Original to Dowser (not ported)
 - Aliases: `dexpand`, `dextract`
+
+### Start-DowserTransfer
+
+- Purpose: Copies one or more files or directories to a destination with a pre-flight free-space and headroom check, then verifies every copied file by hash before reporting it migrated. Only copies and verifies; never deletes source files.
+- Inputs: `Source` (required, pipeline, FullName alias, `string[]` -- file or directory paths; directory sources copy recursively, preserving structure under a folder named after the source directory), `Destination` (required directory, created on demand), `HeadroomPercent` (default 10 -- required free space as a percentage of total bytes to copy, on top of the total itself), `ManifestPath` (optional; defaults to a timestamped JSON file under -Destination; not written on a -WhatIf dry run), `ThreadCount` (default: the lower of 8 or the processor count). Supports -WhatIf/-Confirm (ConfirmImpact Medium).
+- Outputs: PSCustomObject with Success, DryRun, FileCount, TotalBytes, BytesCopied, FailureCount, ManifestPath, Destination. Under `-WhatIf`, reports the real file count and byte total it would move and copies nothing.
+- Note: Safety order per file, run in parallel across a dedicated runspace pool (Private/Invoke-DowserTransferPool.ps1, Private/Invoke-DowserTransferWorker.ps1): hash the source once (SHA256) -> copy -> hash the destination -> compare -> mark verified only on a match. A hash mismatch is a hard per-file failure; that file is never reported as migrated. A real run writes a JSON verification manifest (Items array with per-file SourcePath/DestinationPath/Success/SourceHash/DestHash), the required input to Remove-DowserTransferSource for a later, separate deletion pass -- the write is wrapped in its own try/catch, so ManifestPath comes back $null if the write itself fails (disk full, permissions).
+- Related: `Remove-DowserTransferSource` (manifest-gated deletion of verified source files)
+- Source: `Start-DowserTransfer.ps1`
+
+### Remove-DowserTransferSource
+
+- Purpose: Deletes source files recorded as hash-verified in a Start-DowserTransfer manifest. Never runs as a side effect of Start-DowserTransfer.
+- Inputs: `ManifestPath` (required -- no implicit "last run" lookup). Supports -WhatIf/-Confirm (ConfirmImpact High).
+- Outputs: PSCustomObject with Success, ManifestPath, TotalEntries, DeletedCount, SkippedCount, ReVerifyFailedCount, DeleteFailedCount.
+- Note: Manifest entries not marked Success are skipped outright. For every remaining entry, re-hashes the destination file (SHA256) and compares it against the DestHash recorded in the manifest before deleting -- a defense against a stale or tampered manifest. Any entry whose destination hash no longer matches is logged and skipped, never deleted.
+- Related: `Start-DowserTransfer` (produces the manifest this function consumes)
+- Source: `Remove-DowserTransferSource.ps1`

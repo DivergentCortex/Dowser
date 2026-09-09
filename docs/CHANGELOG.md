@@ -2,6 +2,187 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.09.09.241] - 2026-09-09
+### feat(Get-DowserMap): Markdown reports auto-emit a summary with size rollup and scan parameters
+
+What changed:
+- EmitSummary now auto-enables when output is markdown (-AsMarkdown, -MarkdownFile, or an -OutputFile ending .md) unless the caller explicitly passes -EmitSummary (including :$false, which always wins over the auto-enable)
+- Summary now declares the scan parameters that shaped it: MaxDepth, whether default excludes were bypassed, and FoldersOnly
+- When -IncludeSize is active, the summary adds a Total size line (sum of top-level folder sizes) and a top-10 largest-folders table/list, sourced entirely from the existing $SizeCache populated during the normal tree walk (zero extra filesystem traversal)
+- Updated CBH for -EmitSummary and the docs/INDEX.md Get-DowserMap entry to document the new behavior
+- Existing text-mode -EmitSummary output and all non-markdown callers are unaffected: no summary appears unless markdown output is requested or -EmitSummary is explicitly passed
+
+Why:
+- Operator ran Get-DowserMap against a real 96GB tree with -AsMarkdown -IncludeSize -OutputFile and got 923 lines of tree with zero summary, no totals, and no statement of what was excluded, forcing a separate manual investigation to find that one folder held 95.1GB. The tree already carried every number needed to answer that; the summary plumbing existed but only emitted folder/file/skip/symlink counts and was opt-in only, so report-file callers had to know to pass -EmitSummary and still got no size data.
+
+
+## [2026.08.26.240] - 2026-08-26
+### docs(ARCHITECTURE): Fix stale export/helper counts in ARCHITECTURE.md, cross-check sys_append accuracy
+
+What changed:
+- docs/ARCHITECTURE.md module-structure diagram: Private/*.ps1 corrected from 9 to 17 helpers, Public/*.ps1 corrected from 28 to 33 files, Aliases/Aliases.ps1 note corrected from a flat Set-Alias description to the actual $DowserAliasMap + opt-in Enable-DowserAliases design
+- docs/ARCHITECTURE.md narrative paragraph: Export-ModuleMember description corrected from '28 Public/ basenames plus Compare-DowserReport (29th)' to '33 Public/ basenames plus Compare-DowserReport and Enable-DowserAliases', FunctionsToExport count corrected from 29 to 35
+- docs/ARCHITECTURE.md Private helpers table: added the 8 missing rows for helpers added since the table was last updated (Export-DowserDuplicateHtml, Get-DowserJsonDiagnosis, Invoke-DowserJsonRepairScan, Invoke-DowserJsonRepairWorker, Invoke-DowserTransferPool, Invoke-DowserTransferWorker, Select-DowserUniquePath, Write-DowserJsonRepair)
+
+Why:
+- Fleet-wide sys_append accuracy sweep cross-checked docs against code: Dowser.psd1 FunctionsToExport lists 35 names and Private/ has 17 files on disk, but ARCHITECTURE.md still described the pre-transfer-feature state (28/29 exports, 9 private helpers). Verified counts against Dowser.psd1 and the Private/ and Public/ directory listings before writing the fix.
+
+
+## [2026.08.18.239] - 2026-08-18
+### fix(transfer): Close remaining pool-failure false-success gaps, fix loop-var collision, add real mock test
+
+What changed:
+- Private/Invoke-DowserTransferPool.ps1:49-50: renamed the foreach loop variable from $transferItem to $queuedItem; it collided with the -TransferItem parameter (PowerShell identifiers are case-insensitive), which corrupted $TransferItem to a 1-element array after the loop and broke worker-count/Write-Progress reporting for any run of more than one file
+- Public/Start-DowserTransfer.ps1:306: changed Success from ($failureCount -eq 0) to ($failureCount -eq 0 -and $results.Count -eq $transferItems.Count), closing two false-success paths the prior PoolStarted fix didn't cover: (a) the pool opens but every PowerShell.Create()/BeginInvoke() throws, leaving Results empty while PoolStarted stays $true, and (b) a worker dies mid-run (EndInvoke throws) so its in-flight items vanish from Results while PoolStarted still reports $true; both previously reported a clean success
+- Tests/Start-DowserTransfer.Tests.ps1:162-173: replaced the empty -Skip placeholder (which incorrectly claimed pool-failure was untestable) with a real Pester Mock of Invoke-DowserTransferPool returning PoolStarted=$false, asserting Start-DowserTransfer returns Success=$false, the attempted FileCount, and no ManifestPath; uses InModuleScope -Parameters to pass $script:sourceDir/$destDir in since $script: variables from the Describe's BeforeAll are not visible inside InModuleScope's rebound scope
+- Aliases/Aliases.ps1: added 'Remove-TransferSource' and 'Start-Transfer' brandless aliases for the two functions this feature exports, following the file's existing verb-noun convention, and realigned the whole $DowserAliasMap hashtable to the new longest-key column since 'Remove-TransferSource' exceeded the previous alignment width
+
+Why:
+- Task #11 was reopened after an independent audit (transfer-fix2-auditor) found the prior pool-failure fix only covered the case where RunspacePool.Open() itself throws, wrote and verified a working Mock-based test proving the -Skip claim of untestability was wrong, and found a real case-insensitive loop-variable/parameter name collision in Invoke-DowserTransferPool.ps1 that was corrupting worker-count reporting. The optional alias gap was also closed since it was reachable at no extra risk while already in this file.
+
+
+## [2026.08.18.238] - 2026-08-18
+### fix(transfer): Re-verify source hash before deletion; stop misreporting pool-startup failure as success
+
+What changed:
+- Public/Remove-DowserTransferSource.ps1: added a source-hash re-verify (SHA256 against manifest SourceHash) before the existing destination-hash re-verify, so a source file that changed after transfer but before the deletion pass, or a hand-edited manifest entry, is skipped and logged rather than deleted; both source and destination re-verify must now pass before any delete
+- Private/Invoke-DowserTransferPool.ps1: changed the return contract from a bare array to a PSCustomObject with PoolStarted and Results, so a total runspace-pool open failure is distinguishable from the pool starting and legitimately processing zero items
+- Public/Start-DowserTransfer.ps1: consumes the new PoolStarted/Results contract; when PoolStarted is $false, logs a -Severity Error and returns Success=$false with the attempted FileCount/TotalBytes instead of silently reporting FailureCount=0 and Success=$true for a run that never transferred anything
+- Tests/Remove-DowserTransferSource.Tests.ps1: extended the existing re-verify test with a fourth manifest entry whose source file is modified after the recorded hash was taken, asserting the source stays on disk and the mismatch is logged while unaffected entries still delete correctly
+- Tests/Start-DowserTransfer.Tests.ps1: added a documented -Skip test recording that pool-open failure is untestable in this sandbox without mocking a static .NET method (RunspaceFactory.CreateRunspacePool), rather than faking the scenario
+
+Why:
+- Independent Cortex-Valhalla review (codex, job rvw_20260818141738_e8700d57ea7a, verdict REJECTED) found both were real safety-contract violations in already-merged code: deletion only re-verified the destination file, never the source file about to be destroyed, and a total pool-startup failure was silently reported as a successful empty transfer (FailureCount=0, Success=$true) instead of failing loudly.
+
+
+## [2026.08.16.237] - 2026-08-16
+### docs(transfer): Document collision refusal and symlink skip in Start-DowserTransfer CBH
+
+What changed:
+- Public/Start-DowserTransfer.ps1 .DESCRIPTION: added two sentences covering behavior that shipped in the prior fix round but wasn't yet documented in Get-Help output -- that reparse points (symlinks/junctions) found while walking a directory source are skipped and logged rather than followed, and that two sources resolving to the same destination path cause the whole run to be refused before any byte moves
+
+Why:
+- huginn flagged in the final re-audit that a reader relying on Get-Help would have no way to learn about the collision-refusal or symlink-skip safety behaviors added in the prior fix round; the comment-based help needed to describe what the code actually does.
+
+
+## [2026.08.16.236] - 2026-08-16
+### test(transfer): Document the free-space cross-mount testability gap in Start-DowserTransfer tests
+
+What changed:
+- Added a comment to the existing insufficient-free-space It block in Tests/Start-DowserTransfer.Tests.ps1 clarifying it exercises the shared not-enough-room failure path, not the non-Windows DriveInfo.GetDrives() mount-boundary-matching fix specifically, and noting that fix is untestable in this sandbox (no second real mount point to construct the cross-mount scenario) rather than silently unaddressed
+
+Why:
+- The team lead flagged that the cross-mount free-space fix needs an explicit documented gap rather than silent omission, since constructing a real second mount point isn't feasible in this test sandbox
+
+
+## [2026.08.16.235] - 2026-08-16
+### test(transfer): Extend Start-DowserTransfer Pester coverage per Task #8's fix round
+
+What changed:
+- Added a symlink-capability probe at the top of Tests/Start-DowserTransfer.Tests.ps1 (mirrors the established Get-DowserMap.Tests.ps1 $global: probe-then-skip convention) so the symlink assertion below runs for real where the sandbox supports it and skips cleanly with a documented reason where it does not
+- Added It block: a single bare file as -Source copies correctly via the non-container code path
+- Added It block: multiple items piped into -Source (matching the second .EXAMPLE in the function's comment-based help) transfer correctly
+- Added It block: two -Source directories that collide on the same DestinationPath now fail loudly pre-flight per Fix 2, asserting Success=false, no manifest, zero bytes copied, and the destination directory never created
+- Added It block: a real symlink inside a source directory is skipped during recursive enumeration per Fix 3, never followed or copied, while its sibling real file still transfers
+- Added Remove-Variable cleanup for the new global probe flag in the existing AfterAll block
+
+Why:
+- Task #9 closes the coverage gap that let the destination-collision bug reach the first review round undetected, and proves Task #8's three code fixes (collision guard, symlink skip, and their surrounding paths) actually behave as fixed
+
+
+## [2026.08.16.234] - 2026-08-16
+### fix(transfer): Fix cross-platform free-space check, add collision guard and symlink skip
+
+What changed:
+- Public/Start-DowserTransfer.ps1: fixed the free-space pre-flight check on non-Windows -- [System.IO.Path]::GetPathRoot() always collapses to '/' on Linux/macOS, so the check was always querying the root filesystem instead of the mount actually backing -Destination; now finds the real mount by matching the longest RootDirectory.FullName prefix from [System.IO.DriveInfo]::GetDrives() when $IsWindows -eq $false, leaving the existing GetPathRoot()-based Windows path untouched
+- Public/Start-DowserTransfer.ps1: added a destination-path collision guard -- after the file list is built and before the runspace pool starts, groups all planned DestinationPath values and fails loudly (Write-Log -Severity Error naming every colliding path, structured failure return, no throw) if two sources would race the same destination file, closing a TOCTOU gap where one worker's completed, correctly-verified copy could be silently overwritten by another colliding worker afterward while the manifest still claimed it verified
+- Public/Start-DowserTransfer.ps1: recursive source enumeration no longer follows symlinks/junctions -- replaced the single Get-ChildItem -Recurse call with a manual stack-based walk (mirroring Get-DowserMap's existing Test-ReparsePoint convention: (item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) that logs a Warning naming each skipped reparse point instead of descending into or copying it
+- docs/README.md: corrected the stale 'Twenty-nine functions' figure in the What it does intro to 'Thirty-five', the current real count confirmed via both Dowser.psd1's FunctionsToExport array and (Get-Command -Module Dowser -CommandType Function).Count after a fresh Import-Module
+
+Why:
+- Two independent reviewers on the final full-diff pass (Task #7) corroborated a real cross-platform bug (free-space check silently checking the wrong filesystem on non-Windows) and a real TOCTOU trust bug (colliding destination paths could let a manifest report Success=true for a file that was actually overwritten by a race), plus flagged a missing symlink-traversal safeguard and a stale function count in the README; all four needed fixing before the changeset could pass final review.
+
+
+## [2026.08.16.233] - 2026-08-16
+### test(transfer): Add Pester coverage for Start-DowserTransfer and Remove-DowserTransferSource
+
+What changed:
+- Added Tests/Start-DowserTransfer.Tests.ps1: dry-run touches nothing on disk, a real run copies and verifies files with manifest hash data matching actual computed hashes, an induced destination-write race (real background runspace, no mocking) proves a hash mismatch or copy failure is always recorded Success=false and never marked verified, insufficient destination free space (via a sparse source file) fails loudly before any copy or destination directory is created, and source files survive a successful real run
+- Added Tests/Remove-DowserTransferSource.Tests.ps1: a hand-built manifest with a verified entry, an unverified entry, and a verified-but-since-tampered entry proves deletion only touches the verified entry, re-verification catches the tampered destination hash and skips its source file, and the untampered sibling is still deleted correctly
+
+Why:
+- Task #2 requires Pester proof that the new hash-verified transfer feature honors its safety contract (never deletes on unverified copy, never auto-triggers deletion, re-verifies before delete) before the feature ships
+
+
+## [2026.08.16.232] - 2026-08-16
+### docs(transfer): Document Start-DowserTransfer and Remove-DowserTransferSource
+
+What changed:
+- Added INDEX.md entries for Start-DowserTransfer and Remove-DowserTransferSource covering parameters, outputs, and the hash-verify safety order (hash source once, copy, hash destination, compare, mark verified only on match).
+- Documented that Remove-DowserTransferSource requires an explicit -ManifestPath, never runs as a side effect of Start-DowserTransfer, and re-verifies the destination hash before each delete.
+- Updated docs/README.md: replaced the stale 'does not move your files' / four-writing-functions claim with an accurate list that includes the transfer pair, and added a Move files safely capability summary.
+
+Why:
+- The project index and README are the command map and capability summary consumers read first; leaving them silent on the new transfer capability -- or worse, actively claiming Dowser never moves files -- would misrepresent the module's write surface and the safety contract a future reader needs before trusting a deletion pass.
+
+
+## [2026.08.16.231] - 2026-08-16
+### feat(transfer): Add Start-DowserTransfer and Remove-DowserTransferSource
+
+What changed:
+- Added Public/Start-DowserTransfer.ps1: general-purpose -Source/-Destination file and directory copy with a pre-flight free-space + headroom check, SupportsShouldProcess/-WhatIf dry-run reporting real file/byte counts, and a JSON verification manifest written after each real run
+- Added Public/Remove-DowserTransferSource.ps1: separate deletion pass that takes a mandatory -ManifestPath, deletes only hash-verified entries, and re-hashes the destination file immediately before each delete as a stale/tampered-manifest guard
+- Added Private/Invoke-DowserTransferWorker.ps1: the per-item runspace worker that hashes the source (SHA256), copies, hashes the destination, and marks an item verified only on a hash match; never throws, enqueues structured results and log lines onto the synchronized hashtable instead of calling Write-Log directly
+- Added Private/Invoke-DowserTransferPool.ps1: dedicated runspace pool orchestrator (InitialSessionState + SessionStateFunctionEntry, one shared RunspacePool, a Synchronized $Sync hashtable, ConcurrentQueue log/result draining on the main thread only, EndInvoke/Dispose per worker and Close/Dispose on the pool) built independently of the existing Invoke-DowserRunspacePool.ps1 helper, which does not meet the fleet runspace doctrine
+- Appended Remove-DowserTransferSource and Start-DowserTransfer to Dowser.psd1 FunctionsToExport in alphabetical order
+
+Why:
+- Dowser needed a general-purpose, doctrine-compliant safe transfer capability (arbitrary source(s) to an arbitrary destination) with hash-verified copies and a separate, manifest-gated deletion pass, since the module's existing runspace helper does not meet the mandatory ISS/SessionStateFunctionEntry/Synchronized-hashtable runspace doctrine and could not be reused for this workload.
+
+
+## [2026.08.16.230] - 2026-08-16
+### fix(Get-DowserJsonKey): Log after JSON scan so Compare silence is visible
+
+What changed:
+- Write-Log after Invoke-DowserJsonKeyScan returns
+- Warn when a file has 5000 or more distinct key paths
+- Write-Log immediately before Compare grouping starts
+
+Why:
+- ChatGPT mapping trees produce tens of thousands of UUID key paths. After the scan line the function did Compare with no further logs, which looked like a hang.
+
+
+## [2026.08.13.229] - 2026-08-13
+### test(json-assessment): Clean triage scan fixture after assertion
+
+What changed:
+- Remove the temporary parent and JSON-Triage fixture after the boundary test completes.
+
+Why:
+- Prevents an isolated boundary fixture from changing the later assessment report assertion.
+
+
+## [2026.08.13.228] - 2026-08-13
+### test(json-assessment): Verify JSON-Triage scan boundaries
+
+What changed:
+- Add coverage proving a parent scan excludes JSON-Triage and an explicit JSON-Triage target remains assessable.
+
+Why:
+- The triage boundary must be deliberate rather than an accidental omission from schema reports.
+
+
+## [2026.08.13.227] - 2026-08-13
+### fix(json-assessment): Exclude JSON-Triage from parent-directory scans
+
+What changed:
+- Skip JSON files beneath JSON-Triage when a broader parent directory is assessed.
+- Preserve direct JSON-Triage assessments for deliberate forensic review.
+
+Why:
+- A repaired corpus assessment must not silently mix preserved malformed originals back into its schema profile.
+
+
 ## [2026.08.13.226] - 2026-08-13
 ### test(json-repair): Cover nested-array source triage
 

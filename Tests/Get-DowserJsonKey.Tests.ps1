@@ -115,6 +115,23 @@ Describe 'Get-DowserJsonKey' {
         $summary.FilesScanned | Should -Be 2
         $summary.DistinctKeyPaths | Should -Be 5
     }
+
+    It 'excludes JSON-Triage from parent scans but permits direct review' {
+        $scanRoot = Join-Path $script:WorkDir 'scan-root'
+        $triageRoot = Join-Path $scanRoot 'JSON-Triage'
+        New-Item -ItemType Directory -Path $triageRoot -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $scanRoot 'valid.json'), '{"kind":"valid"}', [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText((Join-Path $triageRoot 'preserved.json'), '{"kind":"triage"}', [System.Text.UTF8Encoding]::new($false))
+
+        $parentSummary = Get-DowserJsonKey -Path $scanRoot -Compare |
+            Where-Object { $_.ResultType -eq 'DirectorySummary' }
+        $triageSummary = Get-DowserJsonKey -Path $triageRoot -Compare |
+            Where-Object { $_.ResultType -eq 'DirectorySummary' }
+
+        $parentSummary.FilesScanned | Should -Be 1
+        $triageSummary.FilesScanned | Should -Be 1
+        Remove-Item -LiteralPath $scanRoot -Recurse -Force
+    }
 }
 
 Describe 'Export-DowserJsonAssessment' {

@@ -15,6 +15,7 @@ function Read-DowserJsonKeyFile {
     $stream = $null
     $reader = $null
     $readSucceeded = $true
+    $errorMessage = $null
 
     try {
         $stream = [System.IO.File]::OpenRead($FilePath)
@@ -24,10 +25,7 @@ function Read-DowserJsonKeyFile {
     }
     catch {
         $readSucceeded = $false
-        $Sync.LogQueue.Enqueue([pscustomobject]@{
-            Severity = 'Warning'
-            Message = "Get-DowserJsonKey could not open '$FilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
-        })
+        $errorMessage = "Could not open file: $($_.Exception.Message)"
     }
 
     if ($readSucceeded) {
@@ -54,10 +52,7 @@ function Read-DowserJsonKeyFile {
         }
         catch {
             $readSucceeded = $false
-            $Sync.LogQueue.Enqueue([pscustomobject]@{
-                Severity = 'Warning'
-                Message = "Get-DowserJsonKey could not parse '$FilePath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
-            })
+            $errorMessage = "Could not parse JSON: $($_.Exception.Message)"
         }
         finally {
             $reader.Close()
@@ -70,6 +65,7 @@ function Read-DowserJsonKeyFile {
         Documents = $documentCount
         KeyCounts = $keyCounts
         ReadSucceeded = $readSucceeded
+        ErrorMessage = $errorMessage
     })
     $Sync.Progress.Enqueue(1)
 }

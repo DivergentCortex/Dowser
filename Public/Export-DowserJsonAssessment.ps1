@@ -72,17 +72,23 @@ function Export-DowserJsonAssessment {
     }
 
     try {
+        $global:DowserJsonLastValidation = @()
+        $comparison = @(Get-DowserJsonKey -Path $Path -Compare -ProfileLimit $ProfileLimit -ThreadCount $ThreadCount)
+        $summary = @($comparison | Where-Object { $_.ResultType -eq 'DirectorySummary' })
+        if ($summary.Count -eq 0) {
+            Write-Log "Export-DowserJsonAssessment found no parseable JSON files for '$Path'; no reports were written" -Severity Warning
+            return
+        }
+
         if (-not (Test-Path -LiteralPath $outputRoot)) {
             New-Item -ItemType Directory -Path $outputRoot -Force -ErrorAction Stop | Out-Null
         }
 
-        $comparison = @(Get-DowserJsonKey -Path $Path -Compare -ProfileLimit $ProfileLimit -ThreadCount $ThreadCount)
-        $summary = @($comparison | Where-Object { $_.ResultType -eq 'DirectorySummary' })
         $profiles = @($comparison | Where-Object { $_.ResultType -eq 'SchemaProfile' })
-
+        $validation = @($global:DowserJsonLastValidation)
         $summary | Export-Csv -LiteralPath $outputFiles[0] -NoTypeInformation -Encoding utf8 -Force
         $profiles | Export-Csv -LiteralPath $outputFiles[1] -NoTypeInformation -Encoding utf8 -Force
-        $global:DowserJsonLastValidation | Export-Csv -LiteralPath $outputFiles[2] -NoTypeInformation -Encoding utf8 -Force
+        $validation | Export-Csv -LiteralPath $outputFiles[2] -NoTypeInformation -Encoding utf8 -Force
     }
     catch {
         Write-Log "Export-DowserJsonAssessment could not write '$outputRoot': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error

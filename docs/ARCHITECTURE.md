@@ -11,12 +11,12 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 ```
 Dowser.psd1  -->  Dowser.psm1
                     |
-                    +-- Private/*.ps1    (9 helpers, not exported)
-                    +-- Public/*.ps1     (28 files, one function each, exported)
-                    +-- Aliases/Aliases.ps1  (Set-Alias calls, sourced last)
+                    +-- Private/*.ps1    (17 helpers, not exported)
+                    +-- Public/*.ps1     (33 files, one function each, exported)
+                    +-- Aliases/Aliases.ps1  ($DowserAliasMap + Enable-DowserAliases, opt-in, sourced last)
 ```
 
-The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 28 Public/ basenames plus `Compare-DowserReport` (the 29th public function, which lives inside Get-DowserReport.ps1 and so is named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 29-name list, not a wildcard.
+The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 33 Public/ basenames plus `Compare-DowserReport` and `Enable-DowserAliases` (neither has a Public/ basename, so both are named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 35-name list, not a wildcard.
 
 One function per file in Public. This keeps diffs clean, prevents agents from stomping each other's work, and makes `Get-ChildItem Public` read like a table of contents.
 
@@ -27,13 +27,21 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | File                          | Purpose                                                                                                   |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------- |
 | ConvertTo-DowserBytes.ps1     | Converts human-readable size strings (e.g., "1.5GB") to byte counts                                       |
+| Export-DowserDuplicateHtml.ps1 | Renders the expandable duplicate-set HTML report for Find-DowserDuplicate's -ExportHtml                  |
 | Format-DowserSize.ps1         | Formats byte counts into human-readable strings (e.g., "1.5 GB")                                          |
+| Get-DowserJsonDiagnosis.ps1   | Probes a JSON/JSONL file and classifies it (valid JSON, valid JSONL, comment-bearing, RECORD banner, tagged transcript, parser error) for Test-DowserJson and Repair-DowserJson |
 | Get-DowserSortKey.ps1         | Generates sort keys for natural numeric ordering                                                          |
-| Invoke-DowserRunspacePool.ps1 | Generic RunspacePool executor used by Find-DowserFile, Find-DowserString, Get-DowserMap, Get-DowserReport |
 | Invoke-DowserJsonKeyScan.ps1  | Bounded MTA runspace coordinator for JSON directory scans                                                  |
 | Invoke-DowserJsonKeyWorker.ps1 | Queue-consuming JSON scan worker                                                                          |
+| Invoke-DowserJsonRepairScan.ps1 | Bounded MTA runspace coordinator that dispatches Invoke-DowserJsonRepairWorker across a repair task queue |
+| Invoke-DowserJsonRepairWorker.ps1 | Queue-consuming repair worker: moves unrepairable sources to a triage folder, calls Write-DowserJsonRepair for the rest |
+| Invoke-DowserRunspacePool.ps1 | Generic RunspacePool executor used by Find-DowserFile, Find-DowserString, Get-DowserMap, Get-DowserReport |
+| Invoke-DowserTransferPool.ps1 | Builds the shared transfer runspace pool and dispatches Invoke-DowserTransferWorker across it              |
+| Invoke-DowserTransferWorker.ps1 | Runspace worker: hash-copy-hash-verify for one transfer item, logs through $Sync.LogQueue                 |
 | Read-DowserJsonKeyFile.ps1    | Token-streaming JSON and JSONL reader                                                                     |
+| Select-DowserUniquePath.ps1   | Deduplicates a path list in O(n), preserving first-seen order                                              |
 | Test-DowserHelpers.ps1        | Validation helpers shared across test functions                                                           |
+| Write-DowserJsonRepair.ps1    | Writes a diagnosis-approved repaired copy for Repair-DowserJson (RECORD banners, JSON comments)            |
 | Write-Log.ps1                 | CMTrace-compatible logging with file output and rotation                                                  |
 
 ### Public functions (exported)
