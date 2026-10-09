@@ -14,8 +14,8 @@ function Measure-DowserDiskUsage {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-        Alias: ddu
-        Related: Measure-DowserDirectory (immediate-subdir sizing, no recursion, no ranking)
+        Alias: Measure-DiskUsage (opt-in via Enable-DowserAliases)
+        Related: Measure-DowserDirectory (one freshness and size row per immediate subfolder, no ranking)
 
     .DESCRIPTION
         Scans a directory tree recursively and produces three ranked sections:
@@ -24,10 +24,11 @@ function Measure-DowserDiskUsage {
     structured PSCustomObjects to the pipeline and rendered as formatted
     console output via Write-Log.
 
-    Unlike Measure-DowserDirectory (which measures immediate subdirs only
-    with no ranking or extension breakdown), Measure-DowserDiskUsage
-    performs a full recursive rollup and is the "what is eating my space"
-    answer tool.
+    Unlike Measure-DowserDirectory (one row per immediate subfolder with
+    recursive file counts, age buckets, and totals, but no ranking of nested
+    directories and no extension breakdown), Measure-DowserDiskUsage ranks
+    every directory and file in the tree and is the "what is eating my
+    space" answer tool.
 
     Use -ExportHtml to write a self-contained HTML report with a treemap
     visualization (area proportional to disk usage) and the three ranked

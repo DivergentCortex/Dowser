@@ -5,6 +5,7 @@
 
 # file-scope map so psm1 can register aliases at module scope via a top-level loop
 $DowserAliasMap = [ordered]@{
+    'Compare-Directory'     = 'Compare-DowserDirectory'
     'Compare-Report'        = 'Compare-DowserReport'
     'ConvertTo-Base64'      = 'ConvertTo-DowserBase64'
     'ConvertTo-Exe'         = 'ConvertTo-DowserExe'

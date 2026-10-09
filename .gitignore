@@ -4,6 +4,9 @@
 # Test reports (regenerated on each run)
 Tests/Reports/
 
+# Cortex-Valhalla review session state (one folder per review-pair run)
+.reviews/
+
 # Logs
 *.log
 logs/

@@ -352,6 +352,11 @@ function Get-DowserReport {
 
             if ($fileCount -eq 0) {
                 Write-Log "Get-DowserReport no files found in '$resolvedPath' matching criteria" -Severity Warning
+                # -Depth 0 (the default) reads only files directly inside -Path, so a folder of
+                # folders silently reports nothing. Say so when that is the reason.
+                if ($Depth -eq 0 -and @(Get-ChildItem -LiteralPath $resolvedPath -Directory -Force -ErrorAction SilentlyContinue).Count -gt 0) {
+                    Write-Log "Get-DowserReport scanned only the top level of '$resolvedPath' (-Depth 0, the default), which has subfolders but no matching files; pass -Depth -1 to include every subfolder, or use Measure-DowserDirectory for per-folder recency" -Severity Warning
+                }
                 continue
             }
 

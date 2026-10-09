@@ -39,6 +39,7 @@
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
     FunctionsToExport = @(
+        'Compare-DowserDirectory'
         'Compare-DowserReport'
         'ConvertTo-DowserBase64'
         'ConvertTo-DowserExe'

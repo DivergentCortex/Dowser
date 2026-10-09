@@ -2,6 +2,335 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.09.24.268] - 2026-09-24
+### fix(Measure-DowserDirectory): Task 1836: hidden folders reported, PS 5.1 symlink-safe walk, -Now, file -Path rejected, bucket docs
+
+What changed:
+- Public/Measure-DowserDirectory.ps1: the top-level folder listing and ItemCount now use -Force, matching the recursive scan. Hidden and dot-prefixed folders (.git, .claude) used to get no row and were counted nowhere (Huginn 1504 finding 1). Verified: the pre-1836 build reported '., visible'; this build reports '., .hidden, visible'.
+- Public/Measure-DowserDirectory.ps1: on Windows PowerShell 5.1, whose Get-ChildItem -Recurse follows directory symlinks and junctions, the recursive scan uses Private/Get-DowserRelativeFileMap, which never follows symlinked directories (Muninn 1831 finding 1). PowerShell 6+ keeps the native -Recurse scan: both reviews verified by execution that it does not follow symlinked directories, and the script walker was measured about 15x slower there (388.7s vs 26.2s on 955k files). The 5.1 branch cannot be executed on this Linux host.
+- Public/Measure-DowserDirectory.ps1: new -Now reference instant (default Get-Date), used for every bucket and age. A -Path that is a file is skipped with a warning; it used to emit a bogus '.' row describing the file (Huginn finding 4; verified before and after). A Verbose log line is written when the newest file is dated after -Now (Muninn finding 7).
+- Public/Measure-DowserDirectory.ps1 CBH: states ModifiedWithinDays + OlderThanDays = FileCount and that ModifiedToday is a subset, not a separate tier (Muninn finding 2). Documents the DST behaviour of the local-time cutoff (Muninn finding 3), -Now, hidden-folder handling, and the symlink rule.
+- Public/Measure-DowserDiskUsage.ps1 CBH: the stale 'Measure-DowserDirectory ... no recursion' notes and the dead 'ddu' alias note were corrected (Muninn finding 4).
+- Tests/Measure-DowserDirectory.Tests.ps1: the fixture uses a fixed -Now (today at noon), so buckets cannot flip at local midnight (Muninn finding 5, Huginn finding 2). New tests: symlinked directory not followed, hidden folder measured, WithinDays + Older = FileCount for every row, file -Path skipped. 19/19 pass. Full Tests/ run: 255 passed, 1 failed; the failure is the pre-existing alias gap in backlog 1835.
+- docs/INDEX.md: Measure-DowserDirectory entry documents -Now, file-path handling, the bucket arithmetic, hidden folders, and the symlink rule per PowerShell version.
+- Live run on ~/.claude/plugins/cache/divergentcortex: 26.2s (25.7s before the change).
+
+Why:
+- Follow-up ledger from task 1831's dual-PASS reviews (Huginn review 1504, Muninn review of 1831): non-blocking but real gaps in the code shipped in .264, including one hang risk on the module's declared minimum PowerShell version.
+
+
+## [2026.09.24.267] - 2026-09-24
+### docs(Measure-DowserDirectory): Sync README/ARCHITECTURE/INDEX to task 1831's recursive FileCount and new Private helpers
+
+What changed:
+- docs/README.md: Measure-DowserDirectory's one-line description now says per-folder freshness (today/within N days/older) plus size and largest/newest/oldest file, replacing the stale 'quick size and count summary' line written before .264's age-bucket feature.
+- docs/INDEX.md: Measure-DowserDiskUsage's Related note for Measure-DowserDirectory corrected from 'immediate-subdir sizing only, no ranking or HTML' to 'recursive per-folder freshness and size, no ranking or HTML' -- the old note described the pre-.264 immediate-children FileCount, which .264 replaced with a recursive count.
+- docs/ARCHITECTURE.md: Private helpers table gains rows for Format-DowserAge.ps1 and Measure-DowserFileSet.ps1 (both new in .264); the module-structure diagram's Private/*.ps1 count corrected from 17 to 19 to include them.
+
+Why:
+- Huginn and Muninn's task 1831 reviews (both PASS) flagged the Measure-DowserDiskUsage/INDEX.md cross-reference as a stale, now-false description of Measure-DowserDirectory's FileCount semantics, and ARCHITECTURE.md's Private helpers table and count never picked up .264's two new Private files. Closing the doc-code sync gap the reviews found.
+
+
+## [2026.09.24.266] - 2026-09-24
+### feat(Compare-DowserDirectory): New Compare-DowserDirectory: SHA256 content diff of two folders or two files (task 1832)
+
+What changed:
+- Public/Compare-DowserDirectory.ps1 (new public function): pairs files by relative path and returns Same / Changed (Reason Size or Content) / MissingFromDifference / ExtraInDifference / Unreadable. -IncludeSame, -Summary (counts + InSync), -ExcludePattern, and -NoDefaultExcludes. PositionalBinding=$false with both paths at positions 0 and 1; a folder-vs-file pairing throws. Sizes are compared before hashing. Read-only.
+- Private/Get-DowserRelativeFileMap.ps1 (new): explicit-stack walk that prunes excluded folder names and patterns before entering them and never follows symlinked directories. Keys are forward-slash relative paths, case-sensitive on Linux/macOS and case-insensitive on Windows.
+- Dowser.psd1: Compare-DowserDirectory added to FunctionsToExport. Aliases/Aliases.ps1: Compare-Directory.
+- Tests/Compare-DowserDirectory.Tests.ps1 (new): 15 tests covering every status, the default and pattern excludes, the summary, two-file mode, folder-vs-file refusal, missing path, stray positional argument, and no modification of either side. All pass. Full Tests/ run: 251 passed, 1 failed; the failure is a pre-existing alias-coverage gap for three JSON functions (backlog, not touched here).
+- docs/INDEX.md: new Compare-DowserDirectory entry and cross-platform list update.
+- Live: ~/projects/cortex-plugins/cortex-toolbox vs its plugin cache in 1.6s. Same=1014, MissingFromDifference=4, including skills/lyrebird/SKILL.md; InSync=False.
+
+Why:
+- The operator asked whether Dowser can tell if installed plugin files match their source repo (Synapse #21252) and approved a two-path compare in #21256. The only existing compare, Compare-DowserReport, diffs report snapshots, not folders.
+
+
+## [2026.09.24.265] - 2026-09-24
+### fix(Measure-DowserDirectory): Accept -Path positionally; the documented `Measure-DowserDirectory <dir>` form failed
+
+What changed:
+- Public/Measure-DowserDirectory.ps1: -Path gets Position = 0. It sat in ParameterSetName 'Path' with no Position, so `Measure-DowserDirectory ~/dir` threw 'A positional parameter cannot be found' (operator run #21255). This predates .264, but .264 and the thread instructions used the positional form without testing it.
+- Class check: every exported Dowser function was enumerated for its primary path parameter; Measure-DowserDirectory was the only one that did not bind by position.
+- Tests/Measure-DowserDirectory.Tests.ps1: positional-call regression test; it fails against HEAD. Suite 15/15 on the working tree, 14 failing on HEAD; Get-DowserMap regression 60/60.
+
+Why:
+- The operator ran the exact command from Synapse #21251 and it failed. The tests had used -Path explicitly, so the positional form documented in INDEX and the thread was never exercised.
+
+
+## [2026.09.24.264] - 2026-09-24
+### feat(Measure-DowserDirectory): Folder freshness report: age buckets, true recursive FileCount, root row, 3x faster; Get-DowserReport depth hint
+
+What changed:
+- Public/Measure-DowserDirectory.ps1: new -RecentDays (1-36500, default 7). Rows gain Folder, ModifiedToday, ModifiedWithinDays, OlderThanDays, RecentDays, NewestFileAge, SizeBytes, and ItemCount. The default table view shows the freshness columns.
+- Public/Measure-DowserDirectory.ps1: FileCount was `(Get-ChildItem <dir>).Count`, the immediate children with folders included (myelindrite reported 32 at 43.6GB). It is now the recursive file count (955,079 for the same folder). ItemCount preserves the old value.
+- Public/Measure-DowserDirectory.ps1: loose files directly under -Path get a '.' row, when any exist; they were previously unreported. A single unreadable subfolder no longer drops the whole row: -ErrorAction Stop became SilentlyContinue plus a logged skip count. The stale CBH alias note (dsize) was corrected.
+- Private/Measure-DowserFileSet.ps1 (new): single-pass size/count/largest/newest/oldest/age-bucket math, replacing three Sort-Object passes per folder. The live run on ~/.claude/plugins/cache/divergentcortex went from 72s to 25.7s.
+- Private/Format-DowserAge.ps1 (new): 'Nm ago' / 'Nh ago' / 'Nd ago' formatter; $null renders blank, and future timestamps render 'in future'.
+- Public/Get-DowserReport.ps1: when -Depth 0 (the default) finds no files but -Path has subfolders, a second warning now says to pass -Depth -1 or use Measure-DowserDirectory. The operator saw only 'no files found'.
+- Tests/Measure-DowserDirectory.Tests.ps1 (new; the function previously had zero coverage): 14 tests. 13 fail against HEAD and 14 pass on the working tree. Tests/Get-DowserMap.Tests.ps1 regression: 60/60.
+- docs/INDEX.md: Measure-DowserDirectory entry rewritten for the new output. Get-DowserReport entry notes its speed, its Depth default, and when to use Measure-DowserDirectory instead.
+
+Why:
+- The operator asked how to see when folders were last updated and how many files changed today, this week, or are older than a week (Synapse #21247, #21248, task 1831). Get-DowserReport returned nothing at its default depth with no explanation, and the existing per-folder report mislabeled its count.
+
+
+## [2026.09.24.263] - 2026-09-24
+### docs(ARCHITECTURE): Document archive-mode's nested Private helpers, the doc gap that caused two false-premise incidents
+
+What changed:
+- docs/ARCHITECTURE.md: Private helpers table now notes that Get-DowserArchiveTreeLines and Complete-DowserArchiveMapOutput (archive-mode's rendering and output-finishing helpers) are nested inside Public/Get-DowserMap.ps1 itself, not separate Private/*.ps1 files.
+- docs/ARCHITECTURE.md: new Design decisions entry explains why archive mode was built as nested functions instead of the two separate Private files (Get-DowserArchiveEntry.ps1, Get-DowserArchiveMap.ps1) the original design spec proposed -- PowerShell does not hoist function definitions, and the real-folder finisher Complete-DirectoryMapOutput sits ~900 lines below the archive-mode dispatch check.
+
+Why:
+- The design spec (docs/superpowers/specs/2026-07-05-archive-map-design.md) required an ARCHITECTURE.md update as part of shipping archive mode; it never happened, even though docs/INDEX.md got the feature documented correctly. That silent gap is what let a filename-only check conclude archive mode was never built (it looked for the separate Private files the plan proposed, not the nested functions the shipped code actually uses) twice: once causing an actual wrongful archive-and-revert of the spec/plan docs on 2026-09-09, and again as Synapse task 805, which reached review before the false premise was caught on disk. Filling the gap ARCHITECTURE.md always had gives the next filename-only check something accurate to find instead of a blank spot it will misread as absence.
+
+
+## [2026.09.23.262] - 2026-09-23
+### fix(Get-DowserMap): Task 1789: symlinks obey -ExcludePathPatterns in both branches; single exclude-rule source; full INDEX alias list
+
+What changed:
+- Public/Get-DowserMap.ps1: every symlink path now checks Test-ExcludeByPath before rendering: file and folder links in the -ShowFullPathTree:$false branch, and folder links in the trunk branch. Previously a link matching -ExcludePathPatterns still rendered its name and target in those paths (Huginn review 1454 finding 1, executed repro). Excluded links count as skipped.
+- Public/Get-DowserMap.ps1: Test-FolderContainsIncludedFolder calls Test-FolderExcludedByRule instead of carrying an inline copy of the same precedence (Huginn finding 2). Same branch order, no behavior change.
+- docs/INDEX.md: added Aliases lines for the 19 functions whose real $DowserAliasMap aliases were undocumented, so every entry in Aliases/Aliases.ps1 now appears in INDEX (Huginn finding 3; the .261 wording overstated completeness).
+- Tests/Get-DowserMap.Tests.ps1: new test covers file and folder symlinks under -ExcludePathPatterns in both render branches, plus a control; it fails against HEAD. Full file: 60 passed, 0 failed.
+
+Why:
+- Huginn review 1454 passed the task's claims but confirmed a pre-existing -ExcludePathPatterns bypass for symlinks, located in the clause .260 rewrote. It can leak a path the caller asked to hide, so the whole link class was fixed in this build rather than sent to the backlog.
+
+
+## [2026.09.23.261] - 2026-09-23
+### fix(Get-DowserMap): Task 1789 rework: scoped size/count, includes under excluded names, -Ascii glyph, INDEX aliases
+
+What changed:
+- Public/Get-DowserMap.ps1: summary total no longer lists or counts loose root files while -IncludeFolders is active (Muninn review 1452 M1: 'selected/ [10.0B]' rendered, 'Total size: 30.0B' reported).
+- Public/Get-DowserMap.ps1: size and count walks merged into Measure-FolderScope. A route folder (ancestor of a match) now counts only its matched descendants, so 'py/' as the route to 'py/pysecrets' no longer annotates or totals all of py. Get-FolderAnnotation takes -InScope from both render branches.
+- Public/Get-DowserMap.ps1: Test-ExcludeFolder's -IncludeFolders bypass applies at every passthrough depth, not only depth 0, so '-IncludeFolders logs/target' reaches target through two default-excluded names (M2). Exclude rules split into Test-FolderExcludedByRule, which Measure-FolderScope uses inside matches so default excludes still apply there.
+- Public/Get-DowserMap.ps1: -Ascii last-child connector was a literal double backslash (operator run #20926); now a single backslash, matching archive mode.
+- docs/INDEX.md: 13 documented short aliases (dstr, dgrep, dmap, dsize, ddu, dsort, dnsort, dtest, dtestexe, dintegrity, dinteg, dexpand, dextract) never existed in Aliases/Aliases.ps1. Every Aliases line now lists the real names from $DowserAliasMap and marks them opt-in via Enable-DowserAliases. Folder-scoping line documents the new size/count and excluded-ancestor behavior.
+- Tests/Get-DowserMap.Tests.ps1: 5 new tests (root-file total, route-folder annotation and total, logs/target reach, default excludes inside a match, -Ascii glyph). All 5 fail against HEAD Get-DowserMap.ps1; full file on working tree: 59 passed, 0 failed.
+
+Why:
+- Muninn review 1452 returned REWORK with two confirmed defects. The operator's live test run (thread #20926) surfaced the -Ascii double backslash and a nonexistent dmap alias documented in INDEX; the route-folder size overcount is the same defect class as M1.
+
+
+## [2026.09.23.260] - 2026-09-23
+### fix(Get-DowserMap): Fix -IncludeFolders stopping at the matched folder, silent positional binding, and file symlinks under -FoldersOnly
+
+What changed:
+- Public/Get-DowserMap.ps1: both recursive calls now pass -IncludeFolders $null once the folder being entered matches an include entry, so the matched folder renders its full subtree. Previously the filter was re-applied at every depth, so 'pyconfig' was tested against 'py' and dropped, and -MaxDepth appeared to do nothing.
+- Public/Get-DowserMap.ps1: Test-FolderMatchesInclude path entries now compare the item path relative to the scan root (exact, prefix, or wildcard), instead of comparing only the first segment. Added Test-FolderIsIncludePathAncestor so 'py' renders as the route to 'py/pyconfig'; Test-IncludeFolder calls it before the descendant search.
+- Public/Get-DowserMap.ps1: the scan root is recorded once in TraversalState.RootFull and adopted by nested calls. Relative paths were previously computed against each recursion's own folder, which also broke relative -ExcludePathPatterns below depth 0.
+- Public/Get-DowserMap.ps1: at passthrough levels (an -IncludeFolders filter still active), both render branches hide loose files and folder symlinks that do not match, so root clutter no longer appears next to the requested folders.
+- Public/Get-DowserMap.ps1: in the -ShowFullPathTree:$false branch, file symlinks now obey -FoldersOnly and Test-IncludeFile like plain files. They used to go straight into the link list, so -FoldersOnly still printed DOCTRINE.md and CHANGELOG.md symlinks.
+- Public/Get-DowserMap.ps1: CmdletBinding(PositionalBinding = $false) with Path at Position 0. 'Get-DowserMap <path> -FoldersOnly max 1' now fails with PositionalParameterNotFound instead of binding 'max' to -IncludeFilePatterns and '1' to -IncludeExtensions and returning an empty tree.
+- Public/Get-DowserMap.ps1: CBH for -IncludeFolders and -MaxDepth rewritten; the -MaxDepth 2 example claimed a two-level tree but renders three (depth 0, 1, 2), matching Get-ChildItem -Depth. Behavior unchanged, docs corrected. Added an -IncludeFolders example.
+- docs/INDEX.md: Get-DowserMap entry documents binding, depth convention, folder scoping, and FoldersOnly symlink behavior.
+- Tests/Get-DowserMap.Tests.ps1: new Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter binding' (11 tests). 8 of them fail against the HEAD Get-DowserMap.ps1 and pass after this change; 3 are controls that pass on both. Full file: 54 passed, 0 failed.
+
+Why:
+- Operator runs against ~/projects/modules showed -IncludeFolders py, ts rendering only the two folder names at every -MaxDepth, -FoldersOnly max 1 returning an empty tree with no error, and -FoldersOnly still listing file symlinks.
+
+
+## [2026.09.15.259] - 2026-09-15
+### fix: Fix two archive-mode parity gaps found by review: root-level file exclusion naming and -LinuxPaths
+
+What changed:
+- Public/Get-DowserMap.ps1: Get-DowserArchiveTreeLines' top-level total-size loop had the identical root-level-file-exclusion blind spot Test-FileExcludedByRule closed on the filesystem path in entry 2026.09.15.255 -- an archive entry rejected by an actual exclude rule vanished from TotalBytes with zero signal. Missed initially even though this same total-size loop was being touched in that changeset. Added Test-ArcFileExcludedByRule (mirroring Test-ArcFile's exact branch order and precedence), threaded a new ExcludedTopLevelFileNames field through Get-DowserArchiveTreeLines' return object (both the success and archive-read-failure paths, keeping their shapes consistent), and added the matching 'Total size excludes filtered top-level files:' summary line to Complete-DowserArchiveMapOutput.
+- Public/Get-DowserMap.ps1: Complete-DowserArchiveMapOutput's markdown Root header ignored -LinuxPaths entirely, always rendering the raw archive path even when the filesystem path's Complete-DirectoryMapOutput would run it through ConvertTo-WslPath for the same flag. Fixed by relocating ConvertTo-WslPath (fully self-contained, no dependency on anything computed later in the function) up next to Complete-DowserArchiveMapOutput instead of duplicating it, adding a -LinuxPaths parameter to Complete-DowserArchiveMapOutput, and wiring it through the call site. Verified as true parity (not just 'something changed'): on this Linux test platform an already-Unix-style path is a correct no-op for ConvertTo-WslPath, so the fix was confirmed by checking that archive-mode and filesystem-mode now produce the byte-identical Root line for the same input and flag, not by asserting a specific /mnt/-style string.
+- Tests/Get-DowserMap.Tests.ps1: added 2 new Context blocks (5 new tests, 43 total in this file, all passing) covering both fixes.
+
+Why:
+- Both Huginn and Muninn were dispatched to review the archive-mode summary fix and the root-level-file exclusion naming fix (2026.09.15.255) directly via the Agent tool (Synapse/Cortex-Valhalla still disconnected). Both reviewers independently found the same two defects: this session's own Fix 2 (root-level file naming) was applied to the filesystem path but not propagated to the archive path it was simultaneously touching, and the new archive finalizer never wired -LinuxPaths through at all. Both are now fixed and verified. Full module suite re-verified 144/144 PASS, 0 FAIL, 0 WARN; Get-DowserMap.Tests.ps1 at 43/43 PASS.", "Deliberately NOT fixed in this pass, tracked as separate follow-up items: Muninn additionally found that archive-mode has never supported -ExcludePathPatterns or -IncludeFolders at all (both parameters are silently accepted by Get-DowserMap but never forwarded to Get-DowserArchiveTreeLines, which has no equivalent parameters), and that -AsHtml has no effect on archive-mode tree rendering. Both are real, pre-existing gaps (narrower filter/rendering support in archive mode than filesystem mode, not a regression introduced this session), but implementing full parity is a genuine feature addition -- new path-matching logic against archive-internal relative paths, an IncludeFolders-equivalent allowlist, and HTML-entity tree characters for archive rendering -- not a bug fix to code already written this session. Flagging clearly rather than silently expanding scope further into new-feature territory in an already large session.
+
+
+## [2026.09.15.258] - 2026-09-15
+### test: Add missing regression coverage for the root-level file exclusion naming fix
+
+What changed:
+- Tests/Get-DowserMap.Tests.ps1: added a new Pester context 'Excluded root-level files are named, not silently dropped (mirrors the folder case)' (5 new tests, 40 total in this file, all passing) for the root-level-file exclusion naming fix from entry 2026.09.15.255 (task 1461), which previously had only manual, non-permanent verification. Covers: a default-excluded root-level file is named and its bytes excluded from the total; a -ExcludePathPatterns-excluded root-level file is also named; an -IncludeExtensions allowlist mismatch on a root-level file is correctly NOT named (Decision D-1 parity with the existing -IncludeFolders boundary); and the no-exclusion baseline emits no new summary line.
+- First attempt at this test used '.env' as the default-excluded example filename and failed: '.env' is dot-prefixed, and Get-ChildItem -File without -Force does not list dot-prefixed files at all on Linux, so the file was invisible to the root-file-bytes loop from the start rather than genuinely exercising the exclude-rule naming path the test meant to cover. Confirmed by direct execution before fixing the test (not guessed) and switched to 'settings.local.json', a non-hidden entry in the same default-exclude-files list.
+
+Why:
+- Both Huginn and Muninn were dispatched to review the archive-mode summary fix and the root-level-file exclusion naming fix (dispatched directly via the Agent tool, Synapse/Cortex-Valhalla still disconnected); their reviews were still in progress when this gap was closed proactively, since both review prompts had already flagged the missing permanent coverage explicitly. Closing it before the reviews land avoids a known, already-identified gap surviving into the reviewed baseline. Full module suite re-verified 144/144 PASS, 0 FAIL, 0 WARN; Get-DowserMap.Tests.ps1 at 40/40 PASS.
+
+
+## [2026.09.15.257] - 2026-09-15
+### fix: Skip wasted top-level enumeration on -Recurse:$false; add missing ExcludePattern+StopOnFirstMatch test coverage
+
+What changed:
+- Public/Find-DowserFile.ps1: the top-level directory enumeration and its reparse-point/exclude filtering ran unconditionally even when -Recurse:$false, whose branch always falls through to $scanTargets = @($p) regardless -- the whole computation was discarded work in that case. Flagged by Huginn during review. Wrapped the enumeration and both filter passes in 'if ($Recurse) { ... }' so -Recurse:$false skips a Get-ChildItem call and its filtering entirely; behavior for every other case is unchanged.
+- Tests/Find-DowserFile.Tests.ps1: added a new Pester context '-ExcludePattern and -StopOnFirstMatch combined' (2 new tests, 20 total in this file, all passing) covering both the default runspace and serial paths, asserting a match inside an excluded directory never leaks into the result. Flagged independently by both Huginn and Muninn during review as untested: both flags share the same manual stack walk and stop signal, and had zero permanent coverage exercising them together before this.
+
+Why:
+- Remaining actionable, low-risk findings from the Huginn/Muninn dual review of this session's Find-DowserFile work (dispatched directly via the Agent tool, Synapse/Cortex-Valhalla still disconnected). Both reviewers' other notes (collapsing $targetRecurse to construction time, consolidating three scattered reparse-point checks into one helper, and Muninn's unverified concern about a hypothetical transient partial-enumeration-failure edge case that could not be reproduced deterministically even by the reviewer) were left as documented, non-blocking architectural opportunities rather than acted on, since none describe an active defect and the session had already made substantial, deep changes to this function. Full module suite verified 144/144 PASS, 0 FAIL, 0 WARN; Find-DowserFile.Tests.ps1 at 20/20 PASS.
+
+
+## [2026.09.15.256] - 2026-09-15
+### fix: Correct and complete the -StopOnFirstMatch fix after adversarial review found it underdelivered
+
+What changed:
+- CORRECTION to changelog entry 2026.09.15.254: that entry's claim ("a match found by any one worker can halt every other worker's walk, not just its own") is not true in general. Independent adversarial review (Muninn), executing two controlled reproductions against the actual shipped module rather than reading the code, found: (1) the plain serial fast path (-UseRunspaces:$false, no -ExcludePattern) still used 'Get-ChildItem @params | ForEach-Object { ...; if ($StopOnFirstMatch) { return } }' -- the .254 fix converted the RUNSPACE scriptblock's fast path from this exact anti-pattern to a working foreach+break, but missed this second, separate occurrence of the identical bug in the plain serial branch, so that branch got zero early-stop benefit at all (measured: no timing difference between a match placed first vs. last in enumeration order). (2) In the default runspace path, a worker already mid-walk of a large target never re-checked the shared stop signal against another worker's match -- only a not-yet-started target or chunk saw it -- so a large non-matching sibling directory still got walked to completion regardless (measured: only a 16% saving vs. a full scan, and the StopOnFirstMatch-with-big-sibling case took nearly twice as long as the same search with no big sibling present).
+- Public/Find-DowserFile.ps1: fixed the plain serial fast path with the same foreach+break conversion already applied elsewhere.
+- Public/Find-DowserFile.ps1: root-caused the runspace path's weak improvement by direct execution -- Get-ChildItem -Recurse was found to largely BUFFER its entire recursive listing before a consuming foreach loop can begin iterating at all (breaking after the very first of 50,000 recursively-enumerated items still cost 77% of the time to enumerate all 50,000), so the .254 fix's foreach+break only ever skipped per-item PROCESSING after a match, never the underlying disk enumeration. Fixed by routing -StopOnFirstMatch through the same manual, per-directory stack walk already used for -ExcludePattern (a single Get-ChildItem call per directory, not per recursive subtree), with the shared stop signal now checked at the top of each directory pop AND on every child item within a directory's listing, not only between top-level targets. This bounds the amount of buffered, unstoppable work to one directory's worth of children at a time instead of an entire remaining subtree, which is what actually lets one worker's match interrupt another worker mid-walk of a large sibling.
+- Verified by re-running Muninn's exact adversarial shape (a large multi-subdirectory sibling next to a tiny matching directory, default runspace path): the ratio of (StopOnFirstMatch-with-big-sibling time) to (same search against only the small directory) dropped from roughly 1.9x (the .254 fix) to roughly 1.1x (this fix) -- the big sibling now costs about 10% overhead instead of about 90%.
+- Tests/Find-DowserFile.Tests.ps1: added a new Pester context asserting this efficiency property directly (a large multi-directory sibling does not meaningfully delay a match in a small directory, generous 3x threshold to stay reliable under machine-load variance while still failing hard on a real regression), correcting a gap Muninn also identified: the existing StopOnFirstMatch tests asserted only correctness (a non-null, non-array result), which passed identically whether the underlying scan stopped early or scanned everything and picked one result afterward -- exactly what the broken code already did.
+
+Why:
+- Dispatched Huginn and Muninn (directly via the Agent tool, Synapse/Cortex-Valhalla still disconnected) to review the three Find-DowserFile fixes in this session per mandatory dual-review doctrine. Muninn's verdict on claim 3 (-StopOnFirstMatch) was REJECTED, backed by two independently executed reproductions against the actual shipped module, not inferred from reading. The finding was correct and is fully accepted: the .254 entry overstated what was actually fixed. This entry documents the honest correction and the deeper fix, verified by re-running Muninn's own adversarial shape against the corrected code. One known, documented, non-regressed limitation remains: the serial path's improvement is inherently order-dependent (a DFS-style single-threaded walk can only save time proportional to how early in traversal order the match falls, a limitation shared by any single-threaded recursive search, not unique to this implementation), unlike the default runspace path where independent workers on separate top-level directories give a much stronger, verified guarantee. Full module suite re-verified 144/144 PASS, 0 FAIL, 0 WARN after this correction; Find-DowserFile.Tests.ps1 at 18/18 PASS.
+
+
+## [2026.09.15.255] - 2026-09-15
+### fix: Fix Get-DowserMap archive-mode inputs silently bypassing -EmitSummary, -OutputFile, and -MarkdownFile
+
+What changed:
+- Public/Get-DowserMap.ps1: the -Path-is-an-archive-file branch (.zip/.7z/.rar/.tar/.gz) used to call Get-DowserArchiveTreeLines and return its lines directly, completely bypassing Complete-DirectoryMapOutput -- -EmitSummary (explicit or markdown-auto-enabled), -OutputFile, and -MarkdownFile were all silent no-ops for archive inputs. Could not simply route archive mode through Complete-DirectoryMapOutput: that function, and its dependencies ConvertTo-ForwardSlashPath/ConvertTo-NativeSeparator/ConvertTo-WslPath, are all defined roughly 900 lines further down in the same function body, and PowerShell does not hoist function definitions ahead of sequential execution -- confirmed by direct execution (a minimal repro throws 'term not recognized' when an earlier-executing branch calls a function defined later in the same scriptblock) before choosing a fix approach.
+- Public/Get-DowserMap.ps1: added Complete-DowserArchiveMapOutput, a self-contained archive-mode counterpart defined immediately after Get-DowserArchiveTreeLines (well before the archive-mode check runs), building the same Summary: block shape (Scan/Folders/Files/Skipped/Total size/Total size excludes filtered top-level folders/Largest folders) and handling -OutputFile/-MarkdownFile writing with the same plain-text-vs-markdown-wrapped conventions as the filesystem path.
+- Public/Get-DowserMap.ps1: Write-ArcNode now threads a $stats accumulator (a hashtable, mutated by reference across recursive calls with no scope-modifier gymnastics needed) tracking FolderCount/FileCount/SkippedFolders/SkippedFiles/ExcludedTopLevelNames, matching the filesystem TraversalState's own semantics exactly (a folder skipped only for failing an active file-content filter is counted but not named; a folder skipped by an actual exclude rule is both counted and named). Get-DowserArchiveTreeLines' return shape changed from a bare [string[]] to a [PSCustomObject] additionally carrying TotalBytes and TopFolders (depth-1-only, matching the filesystem summary's own documented double-counting-avoidance rule). The archive-read-failure early-return path was updated to return the same object shape (zeroed out) instead of a bare string array, since a shape mismatch there would have silently dropped the 'ARCHIVE UNREADABLE' error line (.Lines resolving to $null on a plain array).
+- Tests/Get-DowserMap.Tests.ps1: added a new Describe block 'Get-DowserMap archive-mode summary, output-file, and markdown-file support' (6 new tests, 35 total in this file, all passing) covering Summary emission with correct Folders/Files/Total-size/Largest-folders numbers, -OutputFile actually writing to disk, -MarkdownFile actually writing proper markdown structure, the no-EmitSummary backward-compatible default, and the corrupt-archive error-line-still-surfaces case.
+
+Why:
+- Tracked as Synapse task 1452 from an earlier session (the operator-relayed Get-DowserMap markdown-summary complaint) and deliberately deferred pending Synapse reconnection for proper task tracking; fixed now per the operator's explicit instruction this session to fix every issue found. Confirmed by direct execution against a real 3-file, 2-folder test zip: before the fix, -EmitSummary/-OutputFile/-MarkdownFile against that archive produced no summary, no output file, and no markdown file at all; after the fix, all three work correctly (Folders: 2, Files: 3, Total size: 17.0B with correct per-folder byte counts, both files written with correct content), while the un-adorned baseline call and the corrupt-archive error path are both unaffected. Full module suite verified 144/144 PASS, 0 FAIL, 0 WARN before and after; Get-DowserMap.Tests.ps1 verified 35/35 PASS (29 pre-existing plus 6 new).
+
+
+## [2026.09.15.254] - 2026-09-15
+### fix: Fix -StopOnFirstMatch being silently ignored in Find-DowserFile's runspace path
+
+What changed:
+- Public/Find-DowserFile.ps1: the runspace scriptblock never received -StopOnFirstMatch at all; every target was scanned to completion across all workers before the flag was checked, post-hoc, by picking allPaths[0] from the fully aggregated result list. Added a synchronized hashtable stop signal (created only when -StopOnFirstMatch is set, so the common case pays nothing), passed to every worker via -ArgumentList so a match found by any one worker can halt every other worker's walk, not just its own.
+- Public/Find-DowserFile.ps1: checked at the top of each worker's per-target loop (a queued-but-not-yet-started chunk bails before doing any work), inside the exclude-based manual stack walk (a new labeled 'walkLoop' lets a match break both the inner foreach and the outer while in one step), and inside the fast Get-ChildItem path.
+- Public/Find-DowserFile.ps1: converted the fast path's 'Get-ChildItem @params | ForEach-Object { ... }' pipeline into a real 'foreach ($item in (Get-ChildItem @params))' loop; a plain 'return' inside a ForEach-Object script block only skips to the pipeline's next input item, it never stops Get-ChildItem's own enumeration, so a working stop-on-match required an actual loop where 'break' has real effect.
+- Tests/Find-DowserFile.Tests.ps1: added a new Pester context 'StopOnFirstMatch stops early instead of scanning the whole tree' (2 new tests, 17 total, all passing) covering both the default runspace path and the serial path.
+
+Why:
+- Tracked as a deliberately deferred follow-up from the -ExcludePattern review earlier in this session and now fixed per the operator's explicit instruction to fix every issue found. Confirmed by direct execution on a 480-file, 12-directory fixture where every file matches the pattern: before the fix the runspace path always scanned all 480 files (857ms) regardless of -StopOnFirstMatch; after the fix it returns exactly one PSCustomObject (not an array) in roughly half the time (422ms) on both the runspace and serial paths. This is an efficiency fix, not a correctness fix -- the function always returned exactly one correct match either way, it previously just did far more work than necessary to get there.
+
+
+## [2026.09.15.253] - 2026-09-15
+### fix: Fix top-level symlink duplication and redundant double-scan in Find-DowserFile's runspace partitioning
+
+What changed:
+- Public/Find-DowserFile.ps1: top-level partition list now drops reparse-point (symlink) directories unconditionally, not only when -ExcludePattern is active, closing a runspace-only duplication bug where a top-level symlink's own dedicated worker walked straight through it and returned every file under the real target a second time (confirmed 3 results instead of 2 before the fix, 2 after, matching the serial path).
+- Public/Find-DowserFile.ps1: added a $rootPath scriptblock parameter and a per-target $targetRecurse flag ($recurse -and $targetPath -ne $rootPath) so the search root's own worker always scans non-recursively; every subdirectory is already covered by its own dedicated recursive worker, so recursing through the root on top of that duplicated the whole subtree (confirmed 961 item-touches before the fix vs 481 after, on a 481-file fixture, with identical correct result counts both before and after).
+- Public/Find-DowserFile.ps1: added -Force to the top-level Get-ChildItem -Directory enumeration; without it a hidden top-level directory was invisible to the partition list, a defect previously masked by the root worker's own redundant recursive pass that this fix removes (confirmed a dot-prefixed top-level directory's contents are still found, count 1, both before and after the full fix).
+- Tests/Find-DowserFile.Tests.ps1: added 3 new Pester contexts / 4 new tests (15 total, all passing) covering the top-level symlink fix, the hidden-top-level-directory regression guard, and the no-duplicate-results invariant; corrected a stale comment in the existing symlink context that referenced the top-level case as a bug this task does not touch.
+
+Why:
+- Operator reported Find-DowserFile false positives and asked for -ExcludePattern; while adding it and fixing a symlink regression under dual review, two more pre-existing defects in the runspace path's top-level-directory partitioning were identified, deliberately deferred with justification, and are now fixed per the operator's explicit follow-up request ("fix any issues you found"). All three defects (symlink duplication, redundant double-scan, and the newly discovered -Force gap needed to fix the double-scan without regressing hidden directories) were confirmed by direct execution against real fixtures before and after, not inferred from reading the code. Full module suite verified 144/144 PASS, 0 FAIL, 0 WARN before and after.
+
+
+## [2026.09.15.252] - 2026-09-15
+### fix(Find-DowserFile): Fix symlink-following regression and empty-pattern gap found by dual raven review
+
+What changed:
+- CONFIRMED REGRESSION, fixed: the new -ExcludePattern manual stack walk pushed every child directory onto its traversal stack with no reparse-point check, unlike Get-ChildItem -Recurse (the path it replaces), which never follows directory symlinks. Reproduced independently before fixing: a plain symlink caused the same file to return twice under two paths; a self-referencing symlink (A/loop -> A) produced 41 duplicate rows at increasing path depth, bounded only by an OS path-length limit, not by any cycle detection in the code. Fixed in both the runspace scriptblock and the serial branch by checking ($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 before pushing a child directory, matching Get-DowserMap's existing -FollowReparse default-off precedent in this same module.
+- Found and left out of scope, confirmed pre-existing: a directory symlink sitting directly at the TOP LEVEL of the scanned root reproduces a similar duplicate via the pre-existing top-level-partitioning logic (a top-level symlinked directory becomes its own redundant parallel scan target) -- confirmed present identically with no -ExcludePattern at all, i.e. against the completely unmodified fast path. Not fixed here; tracked as a follow-up once Synapse reconnects, since it predates this session's diff and affects both code paths equally, not something -ExcludePattern introduced.
+- Fixed a second finding from the same review: an empty-string element in -ExcludePattern auto-wrapped to "**", which -like matches against everything, silently excluding 100% of results with no error or warning. Blank elements are now dropped with a Warning-level log line instead.
+- Extended Tests/Find-DowserFile.Tests.ps1 with a symlink-capability probe (matching the pattern in Get-DowserMap.Tests.ps1) and three regression tests: a plain symlink and a self-referencing cycle, both placed one level below the scan root to isolate the fixed regression from the separate pre-existing top-level-partition issue, on both the serial and default-runspace code paths, plus one test for the blank-exclude-pattern fix. Also fixed a bug in the test file itself found while adding these: the DowserFindFileCanSymlink cleanup was loose top-level code at file end rather than inside an AfterAll, which Pester's discovery pass executed before the run phase's BeforeAll bodies ever saw the variable, silently null-ing the fixture for three tests. 11/11 tests pass; full suite 144/144 PASS, 0 WARN.
+- Two independent reviews (Huginn and Muninn, dispatched directly as agents since Synapse and Cortex-Valhalla MCP servers failed to connect this session) verified the original -ExcludePattern fix and the two bugs found and fixed earlier in this session (top-level scan-target bypass, CBH leading-period corruption), then Muninn found and I independently reproduced this symlink regression before shipping. Both reviews also flagged, as pre-existing and out of scope: an 8x runspace-vs-serial slowdown from the existing top-level-partitioning design re-walking the same subtree twice, and -StopOnFirstMatch being silently ignored by the runspace scriptblock (both predate this diff).
+
+Why:
+- Shipping a directory-traversal feature that silently duplicates results (and, in a genuine symlink cycle more common than a literal self-loop, could burn significant CPU/IO before an OS limit intervenes) in exactly the kind of tree the feature exists to search -- a home directory full of toolchain and package-manager symlinks -- would have been a regression worse than the bug it fixed. Caught by adversarial review before the operator ever saw it, verified by independent reproduction rather than trusting the report, and closed using this codebase's own established precedent (Get-DowserMap's -FollowReparse default) rather than inventing a new convention.
+
+
+## [2026.09.15.251] - 2026-09-15
+### fix(Find-DowserFile): Fix CBH corruption caused by an EXAMPLE line starting with a literal period
+
+What changed:
+- Fixed the new -ExcludePattern EXAMPLE's description text: a wrapped line began with '.rustup or node_modules ...', and PowerShell's comment-based-help parser treats any line starting with a period as a section keyword marker (like .SYNOPSIS or .EXAMPLE) regardless of context, so this silently corrupted the entire CBH block -- Get-Help Find-DowserFile returned an empty Synopsis and only 1 of 5 examples, confirmed via raw AST GetHelpContent() (not a caching artifact -- a fresh process showed the same result). Reworded the sentence so no line starts with a period.
+- Caught via the full Invoke-DowserTestSuite.ps1 run: T-02 Help Blocks showed a new WARN ('Synopsis present; no .EXAMPLE blocks') where a PASS existed before this session's edits. Root-caused with Parser.ParseFile()/FunctionDefinitionAst.GetHelpContent() and a line-by-line scan for leading '.' characters rather than guessing; verified the fix by re-running the same diagnostic (Synopsis and all 5 examples now parse) and the full suite (144/144 PASS, 0 WARN, back to baseline).
+
+Why:
+- A results-only test suite pass (all green) would have missed this -- the function still worked correctly at runtime, only its documentation surface silently broke. The WARN in Invoke-DowserTestSuite.ps1's T-02 section was the only signal, and it was worth chasing down to a root cause rather than dismissing as unrelated noise, since shipping a public function with broken Get-Help is a real regression even when the function's behavior is correct."
+
+
+## [2026.09.15.250] - 2026-09-15
+### feat(Find-DowserFile): Add -ExcludePattern with real traversal pruning, not post-hoc filtering
+
+What changed:
+- Added -ExcludePattern (string[], auto-wraps bare strings the same way -Pattern does) tested against both an item's bare Name and its full path, so a folder name ("node_modules") or a path fragment ("/cache/") both work as exclude criteria
+- A directory matching -ExcludePattern is pruned from the walk outright via a new manual directory-stack traversal, added as an opt-in code path in both the runspace scriptblock and the serial (-UseRunspaces:$false) branch -- Get-ChildItem -Recurse cannot prune, since its own -Exclude parameter only hides a matched item from output without stopping recursion into it
+- Fixed a bug caught in this same change before it shipped: the runspace path pre-partitions top-level subdirectories into separate parallel scan targets, and each target's own root was being pushed onto its worker's stack unconditionally, bypassing exclusion entirely for a folder that sits directly under the search root (exactly the reported .rustup case) -- top-level targets are now filtered against ExcludePattern before dispatch
+- Verified pruning is real, not cosmetic, using a chmod 000 probe: a locked, unreadable directory generates an UnauthorizedAccessException when NOT excluded (proving the walk entered it) and generates zero errors when excluded via -ExcludePattern (proving the walk never touched it)
+- This is purely additive: the new stack-walk code path only activates when -ExcludePattern is supplied; every existing call site keeps the original Get-ChildItem -Recurse fast path unchanged, verified by the full Invoke-DowserTestSuite.ps1 run showing no regressions
+- New Tests/Find-DowserFile.Tests.ps1 (7 tests): reproduces the reported false-positive substring match (pattern '.vbs' matching 'fn.vbsl_s32.html'), exclusion by path fragment on both the runspace and serial code paths, auto-wrap, -Recurse:$false interaction, and the chmod-based pruning proof (Linux-gated)
+- Fixed docs/INDEX.md's Find-DowserFile entry: wrong Source filename (Find-Files.ps1 instead of the actual Find-DowserFile.ps1) and a previously missing Inputs/Outputs breakdown
+
+Why:
+- Operator ran Find-DowserFile -Path ~/ -Pattern .vbs and got a false-positive substring match 30+ directory levels deep inside ~/.rustup's toolchain tree (fn.vbsl_s32.html, matched because .vbs is literally a substring of vbsl_s32.html), and the search took 33 seconds because there was no way to keep the walk out of a huge irrelevant directory in the first place. A results-only post-filter would have fixed the wrong-match complaint but not the slowness, since the walk would still fully traverse the excluded tree; the fix instead prunes traversal at the directory level, closing both complaints with one mechanism.
+
+
+## [2026.09.09.249] - 2026-09-09
+### fix(docs): Restore docs/superpowers/ archived on the stale #799 premise; document archive mode
+
+What changed:
+- Restored docs/superpowers/specs/2026-07-05-archive-map-design.md and docs/superpowers/plans/2026-07-05-archive-map-implementation.md from .archives/docs-superpowers/ back to docs/superpowers/. A documentation-engineer subagent (dispatched for task 1457's closure) archived this directory during its run on the claim that Get-DowserMap's archive-mode feature was never built, searching for Get-DowserArchiveEntry.ps1/Get-DowserArchiveMap.ps1 in Private/ and finding neither -- but the real implementation is a nested function, Get-DowserArchiveTreeLines, inside Public/Get-DowserMap.ps1 itself, dispatched from a $CurrentDepth -eq 0 leaf-file check for .zip/.7z/.rar/.tar/.gz paths, with -SevenZipPath as a live documented parameter. This is the exact same false premise task #799 was built on and that this session already verified as stale and set #799 to blocked to prevent acting on (decision_id 173) -- the subagent repeated the error independently rather than checking Synapse decisions first
+- Added an Archive mode subsection to docs/INDEX.md's Get-DowserMap entry documenting the real, shipped feature: dispatch condition, .zip via System.IO.Compression vs other formats via 7-Zip, the exact parameter set the dispatch call forwards versus silently ignores, and a pointer to the two restored design/plan docs as design history
+- Verified Get-DowserArchiveTreeLines and -SevenZipPath directly against current source before restoring (function at Public/Get-DowserMap.ps1:211, dispatch call at :566) and after (module still imports, Tests/Get-DowserMap.Tests.ps1 29/29 pass)
+
+Why:
+- Restoring real documentation for a shipped feature that a subagent nearly deleted on a repeated false premise, and closing the actual gap that premise stumbled onto (the feature being genuinely undocumented in INDEX.md) rather than leaving both the false claim uncorrected and the real gap unfixed.
+
+
+## [2026.09.09.248] - 2026-09-09
+### chore(repo-hygiene): Archive stray root-level HTML report, gitignore Valhalla review session state
+
+What changed:
+- Moved untracked 'Dowser duplicate report.html' from the project root to .archives/root-generated-reports/ -- a generated Find-DowserDuplicate -ExportHtml report has no reason to live at repo root alongside the module manifest and docs
+- Added .reviews/ to .gitignore -- Cortex-Valhalla review-pair runs write one timestamped session folder per review under .reviews/ (four accumulated so far) and were untracked but not excluded, the same category of regenerated tool state as the existing Tests/Reports/ entry
+
+Why:
+- Documentation cleanliness audit (doctrine-documentation) extends to project-wide working artifacts, not just docs/. A generated report sitting at project root and an unbounded, ungitignored review-session directory are both clutter a new contributor would have to figure out is not part of the maintained surface.
+
+
+## [2026.09.09.247] - 2026-09-09
+### docs(docs): Archive stale archive-mode design docs, close ARCHITECTURE verb-bucket gap
+
+What changed:
+- Archived docs/superpowers/specs/2026-07-05-archive-map-design.md and docs/superpowers/plans/2026-07-05-archive-map-implementation.md into .archives/_archive.zip, then relocated the now-empty docs/superpowers/ tree to .archives/docs-superpowers/. Both files describe an archive-mode feature for Get-DowserMap (open a .zip/.7z/.rar/.tar/.gz and render its contents as a tree) that was never built: no Get-DowserArchiveEntry.ps1 or Get-DowserArchiveMap.ps1 exist in Private/, and docs/INDEX.md's Get-DowserMap entry has no archive-mode mention
+- docs/ARCHITECTURE.md verb-bucket list: added the missing Start-Dowser*, Remove-Dowser*, and Enable-Dowser* entries -- a concurrent doc-sync pass in this same session (changelog entry .245) rewrote this list but still omitted 3 of the 14 verb prefixes actually present in Dowser.psd1's FunctionsToExport
+- Removed a transient duplicate bullet left by that same concurrent edit landing mid-review (a combined Start-Dowser*/Remove-Dowser* line alongside the three separate ones this entry added)
+
+Why:
+- docs/superpowers held two-month-old plans for an unbuilt feature; ARCHITECTURE's verb list still omitted three real export prefixes.
+
+
+## [2026.09.09.246] - 2026-09-09
+### docs(docs): Verify concurrent JSON-toolset doc-sync fixes; docs/ directory now fully clean
+
+What changed:
+- Re-verified docs/README.md, docs/ARCHITECTURE.md, and docs/INDEX.md against current Public/ and Private/ source after a concurrent session's doc-sync pass landed mid-session (changelog entry .245): Export-DowserJsonAssessment and Get-DowserJsonKey -Validation are now correctly documented
+- Confirmed docs/ contains only the four core docs plus the justified exe-static-classification-reference.md conditional reference; no other files remain
+
+Why:
+- Confirms the doc-code sync gaps found during this engagement's audit are closed and the docs/ directory meets the cleanliness bar before reporting the engagement complete.
+
+
+## [2026.09.09.245] - 2026-09-09
+### docs(docs): Close doc-code sync gaps for Export-DowserJsonAssessment and the JSON toolset
+
+What changed:
+- docs/INDEX.md: added a full Export-DowserJsonAssessment entry (Purpose/Inputs/Outputs/Note/Related/Source) -- this exported Public function had no INDEX entry at all despite being in Dowser.psd1's FunctionsToExport list and README's function-count claim
+- docs/INDEX.md: Get-DowserJsonKey entry now documents the -Validation switch, its KeyValidation output rows, and the three $global: result caches (DowserJsonLastComparison, DowserJsonLastValidation, DowserJsonLastParseFailures), verified against the current Public/Get-DowserJsonKey.ps1 source
+- docs/README.md: added a 'Make sense of JSON exports' paragraph to the What it does section covering Get-DowserJsonKey, Export-DowserJsonCsv, Test-DowserJson, Repair-DowserJson, and Export-DowserJsonAssessment -- the entire JSON toolset (5 of 35 exported functions) was absent from this section
+- docs/ARCHITECTURE.md: fixed the verb-bucket list, which claimed 'five verb buckets' while listing eight and omitting Export-Dowser*, Repair-Dowser*, Start-Dowser*, Remove-Dowser*, and Compare-Dowser* entirely; now lists every verb prefix in use with an accurate description
+
+Why:
+- Doc-code sync audit found Export-DowserJsonAssessment.ps1, a real exported and tested Public function, undocumented in every core doc, and Get-DowserJsonKey's -Validation switch (with its global result caches, one of which Export-DowserJsonAssessment directly depends on) undocumented in INDEX.md. INDEX.md tells readers to check it before adding new code; it could not have surfaced either.
+
+
+## [2026.09.09.244] - 2026-09-09
+### fix(Get-DowserMap): Fix single-line array-fusion bug found during 1457 review; add twin-branch test coverage
+
+What changed:
+- Complete-DirectoryMapOutput now wraps the Where-Object filter results in @() for both $filteredLines and $treeOnly -- without it, a single surviving non-blank line unwraps to a bare [string], so "$filteredLines + $summaryLines" silently became string concatenation instead of array concatenation, fusing the tree line and every summary line into one corrupted string. Confirmed pre-existing and orthogonal to the -ExcludePathPatterns work (Huginn review_id 906), reproducible with a minimal one-folder root and no exclusion filters involved at all; only reachable via -ShowFullPathTree:$false, which nothing in the test suite exercised
+- Added a regression test reproducing the exact single-surviving-line scenario, asserting 'Summary:' and the tree content land as separate array elements
+- Added -ShowFullPathTree:$false companion assertions to both exclusion-naming test contexts (default-exclude 'logs' and -ExcludePathPatterns 'secretstuff'), closing the coverage gap both Huginn and Muninn flagged where only the ShowFullPathTree(default) twin branch was test-proven
+
+Why:
+- Task 1457's dual-PASS review (Huginn review_id 906, Muninn review_id 905) surfaced this while verifying the -ExcludePathPatterns fix's test coverage -- a confirmed, execution-verified defect violating the function's own documented .OUTPUTS contract, sitting directly next to code already under active review. Fixed immediately while the exact reproduction and root cause were already in hand, rather than leaving a known array/string corruption bug in a function whose whole point is producing a clean line array for callers and files to consume.
+
+
 ## [2026.09.09.243] - 2026-09-09
 ### fix(Get-DowserMap): Extend exclusion-naming to -ExcludePathPatterns; lock D-1 scope decision
 
