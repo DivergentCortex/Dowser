@@ -11,7 +11,7 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 ```
 Dowser.psd1  -->  Dowser.psm1
                     |
-                    +-- Private/*.ps1    (17 helpers, not exported)
+                    +-- Private/*.ps1    (19 helpers, not exported)
                     +-- Public/*.ps1     (33 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  ($DowserAliasMap + Enable-DowserAliases, opt-in, sourced last)
 ```
@@ -28,6 +28,7 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | ----------------------------- | --------------------------------------------------------------------------------------------------------- |
 | ConvertTo-DowserBytes.ps1     | Converts human-readable size strings (e.g., "1.5GB") to byte counts                                       |
 | Export-DowserDuplicateHtml.ps1 | Renders the expandable duplicate-set HTML report for Find-DowserDuplicate's -ExportHtml                  |
+| Format-DowserAge.ps1          | Renders elapsed time as "Nm/Nh/Nd ago" for Measure-DowserDirectory's freshness columns; $null blanks, future timestamps read "in future" |
 | Format-DowserSize.ps1         | Formats byte counts into human-readable strings (e.g., "1.5 GB")                                          |
 | Get-DowserJsonDiagnosis.ps1   | Probes a JSON/JSONL file and classifies it (valid JSON, valid JSONL, comment-bearing, RECORD banner, tagged transcript, parser error) for Test-DowserJson and Repair-DowserJson |
 | Get-DowserSortKey.ps1         | Generates sort keys for natural numeric ordering                                                          |
@@ -38,24 +39,33 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | Invoke-DowserRunspacePool.ps1 | Generic RunspacePool executor used by Find-DowserFile, Find-DowserString, Get-DowserMap, Get-DowserReport |
 | Invoke-DowserTransferPool.ps1 | Builds the shared transfer runspace pool and dispatches Invoke-DowserTransferWorker across it              |
 | Invoke-DowserTransferWorker.ps1 | Runspace worker: hash-copy-hash-verify for one transfer item, logs through $Sync.LogQueue                 |
+| Measure-DowserFileSet.ps1     | Single-pass size/count/largest/newest/oldest/age-bucket math for a file set, used by Measure-DowserDirectory in place of three Sort-Object passes |
 | Read-DowserJsonKeyFile.ps1    | Token-streaming JSON and JSONL reader                                                                     |
 | Select-DowserUniquePath.ps1   | Deduplicates a path list in O(n), preserving first-seen order                                              |
 | Test-DowserHelpers.ps1        | Validation helpers shared across test functions                                                           |
 | Write-DowserJsonRepair.ps1    | Writes a diagnosis-approved repaired copy for Repair-DowserJson (RECORD banners, JSON comments)            |
 | Write-Log.ps1                 | CMTrace-compatible logging with file output and rotation                                                  |
 
+Archive-mode rendering for `Get-DowserMap` (auto-detecting a `.zip`/`.7z`/`.rar`/`.tar`/`.gz` `-Path` and rendering its internal contents as a tree) is not in this table: its helpers, `Get-DowserArchiveTreeLines` and `Complete-DowserArchiveMapOutput`, are private functions nested inside `Public/Get-DowserMap.ps1` itself rather than files under `Private/`. See Design decisions below for why, and `docs/INDEX.md`'s Get-DowserMap entry for the feature itself.
+
 ### Public functions (exported)
 
-Functions fall into five verb buckets:
+Functions fall into these verb buckets:
 
 - **Find-Dowser\***: Hunt for things (duplicates, strings, orphans, dependencies, scripts, files, recent logs). These are search operations that locate items matching criteria.
-- **Get-Dowser\***: Inspect and report (directory maps, file properties, ownership, topology, reports, module info, folder templates). These read and describe what exists.
+- **Get-Dowser\***: Inspect and report (directory maps, file properties, ownership, topology, reports, module info, folder templates, JSON key paths).
+- **Compare-Dowser\***: Diff two prior results (Get-DowserReport snapshots).
 - **Measure-Dowser\***: Count and size (directory measurement).
 - **ConvertTo-Dowser\***: Transform (Base64 encoding, EXE compilation, ICO creation).
+- **Export-Dowser\***: Write derived reports without touching the source (JSON values to CSV, JSON directory assessment to CSV).
 - **Invoke-Dowser\***: Actions (fast text search, numeric sorting).
-- **Test-Dowser\***: Validation (EXE extractability classification, file integrity/corruption detection).
+- **Test-Dowser\***: Validation (EXE extractability classification, file integrity/corruption detection, JSON/JSONL diagnosis).
+- **Repair-Dowser\***: Deterministic, diagnosis-gated fixes (JSON RECORD banners and comments).
 - **Expand-Dowser\***: Extraction (EXE archive extraction via 7-Zip).
 - **New-Dowser\***: Creation (hidden folder attribute setting).
+- **Start-Dowser\***: Begin a tracked, hash-verified operation (file/directory transfer to a destination).
+- **Remove-Dowser\***: Deletion gated on prior verification (source cleanup after a verified transfer; never runs as a side effect of Start-Dowser\*).
+- **Enable-Dowser\***: Opt-in session setup (brandless alias registration).
 
 `Get-DowserJsonKey` and `Export-DowserJsonCsv` use `Newtonsoft.Json.JsonTextReader` over a file stream. Each JSON reader processes one token at a time. Directory scans use a dedicated MTA runspace pool with a synchronized pending-path queue and a default maximum of eight readers. Workers return results and log messages through synchronized queues; the caller emits logs and progress, preserving a bounded memory and output model.
 
@@ -102,6 +112,8 @@ Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) 
 **Default-on switches.** Parameters that should default to true use `[switch]$Param = $true`, preserving normal switch syntax while allowing callers to disable them with `-Param:$false`.
 
 **Tilde path resolution.** All functions that pass paths to .NET static methods (System.IO.File, System.IO.Directory, System.IO.Path) resolve PowerShell tilde paths first using `Resolve-Path` or `GetUnresolvedProviderPathFromPSPath`. .NET methods do not expand `~`.
+
+**Archive-mode rendering lives inside `Get-DowserMap.ps1`, not in `Private/`.** The original design (`docs/superpowers/specs/2026-07-05-archive-map-design.md`) proposed two new Private files, `Get-DowserArchiveEntry.ps1` and `Get-DowserArchiveMap.ps1`. The shipped implementation instead nests `Get-DowserArchiveTreeLines` (entry listing and tree rendering) and `Complete-DowserArchiveMapOutput` (the archive-mode counterpart to `Complete-DirectoryMapOutput`, handling the Summary block and `-OutputFile`/`-MarkdownFile` writing) directly inside `Get-DowserMap`'s own function body. PowerShell does not hoist function definitions ahead of the sequential statement that defines them, and `Complete-DirectoryMapOutput` sits roughly 900 lines below the archive-mode dispatch check that needs a finisher, so a self-contained nested finisher avoids that ordering hazard rather than restructuring the whole file; the cost is some duplicated summary-text and file-writing logic between the two finishers. `-SevenZipPath` is a real, live parameter on `Get-DowserMap`, resolving 7-Zip for `.7z`/`.rar`/`.tar`/`.gz` entries (`.zip` is read natively via `System.IO.Compression.ZipFile`). A filename search for the separate Private files this feature was originally planned to ship as will not find it and will wrongly read as "never built." Check `Get-DowserMap.ps1` itself for `-SevenZipPath` and `Get-DowserArchiveTreeLines` instead. This gap in ARCHITECTURE.md's coverage is what let that wrong conclusion get drawn twice: once as an actual archive-and-revert of the design docs (`docs/CHANGELOG.md` entries recording the 2026-09-09 incident and its same-day reversal), and once as a Synapse ticket that reached review before the false premise was caught on this pass.
 
 ## Naming law
 
