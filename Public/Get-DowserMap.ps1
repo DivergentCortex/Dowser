@@ -44,9 +44,9 @@ function Get-DowserMap {
         File names or wildcards to exclude, added on top of the default exclude set.
     .PARAMETER IncludeFolders
         Folder names, wildcards, or paths (relative to -Path, e.g. 'py/pyconfig') to restrict
-        the tree to. A matching folder renders with its full subtree (subject to -MaxDepth and
-        the other filters). Folders above a match render only as the route to it; files and
-        unrelated folders at those levels are hidden.
+        the tree to. Without a file filter, renders only matching folders and the routes to
+        them. Files and unrelated descendants stay hidden. With -IncludeFilePatterns or
+        -IncludeExtensions, searches the matched folders' subtrees for matching files.
     .PARAMETER ExcludePathPatterns
         Path patterns to exclude by full or relative path match.
     .PARAMETER NoDefaultExcludes
@@ -119,8 +119,8 @@ function Get-DowserMap {
     .EXAMPLE
         Get-DowserMap -Path ~/projects/modules -IncludeFolders py, ts -FoldersOnly -MaxDepth 1
 
-        Renders only the py and ts folders with their subfolders one level down; loose files
-        and other folders at the root are hidden.
+        Renders matching py and ts folders and their ancestor routes up to one level below
+        the root. Files and nonmatching descendant folders are hidden.
     .EXAMPLE
         Get-DowserMap -Path D:\Scripts -IncludeFileCount -FoldersOnly
 
@@ -194,6 +194,10 @@ function Get-DowserMap {
         [Parameter(DontShow = $true)]
         [hashtable]$PsCountCache
     )
+
+    if ($IncludeFolders -and -not $IncludeFilePatterns -and -not $IncludeExtensions) {
+        $FoldersOnly = $true
+    }
 
     if ($CurrentDepth -eq 0) {
         Write-Log "Starting Get-DowserMap"
@@ -1373,7 +1377,7 @@ function Get-DowserMap {
             $relKey = (ConvertTo-RelativePath $item.FullName).TrimEnd('/').ToLowerInvariant()
             foreach ($path in $includeExactPaths) {
                 $pathKey = (ConvertTo-ForwardSlashPath $path).Trim('/')
-                if ($relKey -eq $pathKey -or $relKey.StartsWith("$pathKey/")) {
+                if ($relKey -eq $pathKey) {
                     return $true
                 }
             }
@@ -1498,11 +1502,7 @@ function Get-DowserMap {
     }
     function Test-ExcludeFolder {
         param($item)
-        # An explicitly included folder, or the route to one, bypasses the exclude lists at
-        # every passthrough depth, not only depth 0: '-IncludeFolders logs/target' must reach
-        # 'target' even though both 'logs' and 'target' are default-excluded names. Safe to
-        # apply below depth 0 because recursion clears -IncludeFolders inside a match, so
-        # this never reopens excluded folders under an included one.
+        # explicit folder matches and their routes bypass name exclusions at every depth
         if ($IncludeFolders -and (@($IncludeFolders).Count -gt 0)) {
             if (Test-IncludeFolder $item) {
                 return $false 
@@ -2065,10 +2065,7 @@ function Get-DowserMap {
 
         # pre-filter items before calculating isLast (fixes tree connector bug)
         $filteredFolders = @(); $filteredLinks = @(); $filteredFiles = @()
-        # -IncludeFolders still being set at this level means this folder is a passthrough
-        # (an ancestor of an included folder), not inside one: loose files and unrelated
-        # links here are outside the requested scope. Recursion clears -IncludeFolders once
-        # it enters a matching folder, so everything below a match renders unfiltered.
+        # folder searches retain the filter at every depth; file searches clear it inside a match
         $includeScopeActive = ($IncludeFolders -and @($IncludeFolders).Count -gt 0)
         foreach ($item in $rawItems) {
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
@@ -2175,8 +2172,8 @@ function Get-DowserMap {
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
                 $TraversalState.FolderCount++
                 if ($CurrentDepth -lt $MaxDepth) {
-                    # Inside a matched folder the whole subtree is in scope: stop filtering.
-                    $childIncludeFolders = if (Test-FolderMatchesInclude $item) { $null } else { $IncludeFolders }
+                    # file filters search the matched subtree; folder searches keep matching
+                    $childIncludeFolders = if ($fileFilterActive -and (Test-FolderMatchesInclude $item)) { $null } else { $IncludeFolders }
                     $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 }
             }
@@ -2359,7 +2356,7 @@ function Get-DowserMap {
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
                 $TraversalState.FolderCount++
-                $childIncludeFolders = if (Test-FolderMatchesInclude $item) { $null } else { $IncludeFolders }
+                $childIncludeFolders = if ($fileFilterActive -and (Test-FolderMatchesInclude $item)) { $null } else { $IncludeFolders }
                 $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
             }

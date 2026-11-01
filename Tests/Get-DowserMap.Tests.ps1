@@ -668,39 +668,41 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         }
     }
 
-    Context 'Name entries render the matched folder''s subtree' {
-        It 'Shows subfolders of each included folder instead of stopping at it' {
-            $out = Get-DowserMap -Path $script:incRoot -IncludeFolders py, ts -FoldersOnly -MaxDepth 1
-            $out | Where-Object { $_ -match 'pyconfig[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'pydates[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'tsconfig[\\/]' } | Should -Not -BeNullOrEmpty
+    Context 'Folder matches stay scoped at every depth' {
+        It 'Shows matching folders without unrelated descendants or files in both render modes' {
+            foreach ($trunk in @($true, $false)) {
+                $out = Get-DowserMap $script:incRoot -IncludeFolders py, ts -Ascii -ShowFullPathTree:$trunk
+                @($out | Where-Object { $_ -match ' (py|ts)[\\/]$' }).Count | Should -Be 2
+                $out | Where-Object { $_ -match 'pyconfig|pydates|tsconfig|INDEX\.md|config\.py|LICENSE|DOCTRINE' } | Should -BeNullOrEmpty
+            }
         }
 
-        It 'Excludes folders that are not included' {
-            $out = Get-DowserMap -Path $script:incRoot -IncludeFolders py, ts -FoldersOnly -MaxDepth 3
-            $out | Where-Object { $_ -match '\bjs' } | Should -BeNullOrEmpty
+        It 'Renders ancestor routes to wildcard matches' {
+            $out = Get-DowserMap $script:incRoot -IncludeFolders '*config' -Ascii
+            @($out | Where-Object { $_ -match ' (pyconfig|tsconfig)[\\/]$' }).Count | Should -Be 2
+            $out | Where-Object { $_ -match ' py[\\/]$' } | Should -Not -BeNullOrEmpty
+            $out | Where-Object { $_ -match 'docs|tests|pydates|config\.py' } | Should -BeNullOrEmpty
         }
 
-        It '-MaxDepth takes effect inside an included folder' {
-            $shallow = Get-DowserMap -Path $script:incRoot -IncludeFolders py -FoldersOnly -MaxDepth 1
-            $deep = Get-DowserMap -Path $script:incRoot -IncludeFolders py -FoldersOnly -MaxDepth 2
-            $shallow | Where-Object { $_ -match 'docs[\\/]' } | Should -BeNullOrEmpty
-            $deep | Where-Object { $_ -match 'docs[\\/]' } | Should -Not -BeNullOrEmpty
+        It 'Applies MaxDepth to matching folders below ancestor routes' {
+            $shallow = Get-DowserMap $script:incRoot -IncludeFolders '*config' -Ascii -MaxDepth 0
+            $deep = Get-DowserMap $script:incRoot -IncludeFolders '*config' -Ascii -MaxDepth 1
+            $shallow | Where-Object { $_ -match ' (pyconfig|tsconfig)[\\/]$' } | Should -BeNullOrEmpty
+            @($deep | Where-Object { $_ -match ' (pyconfig|tsconfig)[\\/]$' }).Count | Should -Be 2
         }
 
-        It 'Hides loose files at the root but keeps files inside the included folder' {
-            $out = Get-DowserMap -Path $script:incRoot -IncludeFolders py -MaxDepth 2
-            # Anchored to a file line: the DOCTRINE.md symlink's target line also ends in LICENSE.
-            $out | Where-Object { $_ -match ([char]0x00B7 + ' LICENSE$') } | Should -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'INDEX\.md' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'config\.py' } | Should -Not -BeNullOrEmpty
+        It 'Shows matching files inside selected folders when a file filter is supplied' {
+            foreach ($trunk in @($true, $false)) {
+                $out = Get-DowserMap $script:incRoot -IncludeFolders py -IncludeFilePatterns '*.py' -Ascii -ShowFullPathTree:$trunk
+                $out | Where-Object { $_ -match 'config\.py$' } | Should -Not -BeNullOrEmpty
+                $out | Where-Object { $_ -match 'INDEX\.md|LICENSE|DOCTRINE' } | Should -BeNullOrEmpty
+            }
         }
 
-        It 'Behaves the same in -ShowFullPathTree:$false mode (the twin render branch)' {
-            $out = Get-DowserMap -Path $script:incRoot -ShowFullPathTree:$false -IncludeFolders py, ts -FoldersOnly -MaxDepth 1
-            $out | Where-Object { $_ -match 'pyconfig[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'tsconfig[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match ([char]0x00B7 + ' LICENSE$') } | Should -BeNullOrEmpty
+        It 'Accepts an extension filter as an explicit file search' {
+            $out = Get-DowserMap $script:incRoot -IncludeFolders 'py/pyconfig' -IncludeExtensions '.py' -Ascii
+            $out | Where-Object { $_ -match 'config\.py$' } | Should -Not -BeNullOrEmpty
+            $out | Where-Object { $_ -match 'INDEX\.md|LICENSE|DOCTRINE' } | Should -BeNullOrEmpty
         }
     }
 
@@ -708,7 +710,7 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         It 'py/pyconfig selects exactly that folder and the route to it' {
             $out = Get-DowserMap -Path $script:incRoot -IncludeFolders 'py/pyconfig' -FoldersOnly -MaxDepth 3
             $out | Where-Object { $_ -match 'pyconfig[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'tests[\\/]' } | Should -Not -BeNullOrEmpty
+            $out | Where-Object { $_ -match 'tests[\\/]' } | Should -BeNullOrEmpty
             $out | Where-Object { $_ -match 'pydates' } | Should -BeNullOrEmpty
             $out | Where-Object { $_ -match 'tsconfig' } | Should -BeNullOrEmpty
         }
@@ -798,7 +800,7 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
             # both 'logs' and 'target' are default-excluded folder names
             $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders 'logs/target' -MaxDepth 3
             $out | Where-Object { $_ -match 'target[\\/]' } | Should -Not -BeNullOrEmpty
-            $out | Where-Object { $_ -match 'inside\.txt' } | Should -Not -BeNullOrEmpty
+            $out | Where-Object { $_ -match 'inside\.txt' } | Should -BeNullOrEmpty
         }
 
         It 'Default excludes still apply inside an included folder' {
@@ -807,6 +809,34 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
             $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders selected -IncludeSize -EmitSummary -MaxDepth 3
             $out | Where-Object { $_ -match 'node_modules' } | Should -BeNullOrEmpty
             $out | Where-Object { $_ -match '^\s*Total size: 10\.0B$' } | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    Context 'Hidden folder searches' {
+        BeforeAll {
+            $script:dotRoot = Join-Path $TestDrive 'DotFolders'
+            foreach ($relative in @('.archive/plain/.nested', '.archive/unrelated', 'route/.cache/other', 'ordinary')) {
+                $null = New-Item -ItemType Directory -Path (Join-Path $script:dotRoot $relative) -Force
+            }
+            [System.IO.File]::WriteAllText((Join-Path $script:dotRoot '.archive/hidden-scope.txt'), 'x')
+            [System.IO.File]::WriteAllText((Join-Path $script:dotRoot 'ordinary/loose.txt'), 'x')
+        }
+
+        It 'Shows dot matches and their routes without expanding every matched subtree' {
+            foreach ($trunk in @($true, $false)) {
+                foreach ($parallel in @($true, $false)) {
+                    $out = Get-DowserMap $script:dotRoot -IncludeFolders '.*' -IncludeHidden -Ascii -ShowFullPathTree:$trunk -UseRunspaces:$parallel |
+                        ForEach-Object { $_ -replace '\x1B\[[0-9;]*m', '' }
+                    @($out | Where-Object { $_ -match ' \.(archive|nested|cache)[\\/]$' }).Count | Should -Be 3
+                    $out | Where-Object { $_ -match ' plain[\\/]| route[\\/]' } | Should -Not -BeNullOrEmpty
+                    $out | Where-Object { $_ -match 'unrelated| other[\\/]|ordinary|\.txt' } | Should -BeNullOrEmpty
+                }
+            }
+        }
+
+        It 'Reports no rendered files in the folder-search summary' {
+            $out = Get-DowserMap $script:dotRoot -IncludeFolders '.*' -IncludeHidden -Ascii -EmitSummary
+            $out | Should -Contain '  Files: 0'
         }
     }
 

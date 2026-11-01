@@ -2,6 +2,45 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.10.31.282] - 2026-10-31
+Aligned the folder-exclusion comment with persistent folder matching below selected folders.
+
+## [2026.10.31.281] - 2026-10-31
+Updated the IncludeFolders help example to describe matched folders and ancestor routes.
+
+## [2026.10.31.280] - 2026-10-31
+Adjusted hidden-folder assertions to ignore console color escapes around hidden item names.
+
+## [2026.10.31.279] - 2026-10-31
+Added hidden-folder regressions verifying dot-name matches, ancestor routes, omitted descendants and files, and zero rendered files in the summary across both render and pre-scan modes.
+
+## [2026.10.31.278] - 2026-10-31
+Updated the default-excluded ancestor regression to keep files hidden during folder searches.
+
+## [2026.10.31.277] - 2026-10-31
+Updated the exact folder-path regression to require nonmatching descendants to remain hidden.
+
+## [2026.10.31.276] - 2026-10-31
+Updated Get-DowserMap tests for folder-only matching, ancestor routes, depth limits, and explicit file-pattern and extension searches.
+
+## [2026.10.31.275] - 2026-10-31
+Documented IncludeFolders folder-search behavior and explicit file-filter behavior.
+
+## [2026.10.31.274] - 2026-10-31
+Clarified recursion behavior for combined folder and file searches.
+
+## [2026.10.31.273] - 2026-10-31
+Updated folder-scope comments to describe folder-only filtering and explicit file searches.
+
+## [2026.10.31.272] - 2026-10-31
+Made exact IncludeFolders paths select the named folder rather than every descendant during folder searches.
+
+## [2026.10.31.271] - 2026-10-31
+Kept folder matching active below matches during folder searches so unrelated descendant folders stay hidden.
+
+## [2026.10.31.270] - 2026-10-31
+Made IncludeFolders searches omit files unless IncludeFilePatterns or IncludeExtensions is supplied.
+
 ## [2026.10.31.269] - 2026-10-31
 Fixed Get-DowserMap -IncludeFolders descendant discovery to find matching default-excluded folder names below route folders. Added regression coverage for repeated logs folders in both render modes, with pre-scan enabled and disabled, explicit path exclusions, and depth limits.
 
