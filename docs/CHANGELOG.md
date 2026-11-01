@@ -2,6 +2,9 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.10.31.269] - 2026-10-31
+Fixed Get-DowserMap -IncludeFolders descendant discovery to find matching default-excluded folder names below route folders. Added regression coverage for repeated logs folders in both render modes, with pre-scan enabled and disabled, explicit path exclusions, and depth limits.
+
 ## [2026.09.24.268] - 2026-09-24
 ### fix(Measure-DowserDirectory): Task 1836: hidden folders reported, PS 5.1 symlink-safe walk, -Now, file -Path rejected, bucket docs
 

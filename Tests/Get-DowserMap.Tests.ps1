@@ -810,6 +810,37 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         }
     }
 
+    Context 'Repeated default-excluded folder names' {
+        BeforeAll {
+            $script:logsRoot = Join-Path $TestDrive 'RepeatedLogs'
+            foreach ($relative in @('logs', 'hooks/axon/logs', 'hooks/global/logs', 'unrelated')) {
+                $null = New-Item -ItemType Directory -Path (Join-Path $script:logsRoot $relative) -Force
+            }
+        }
+
+        It 'Finds every logs folder through route folders in both render modes' {
+            foreach ($trunk in @($true, $false)) {
+                foreach ($parallel in @($true, $false)) {
+                    $out = Get-DowserMap $script:logsRoot -IncludeFolders logs -Ascii -ShowFullPathTree:$trunk -UseRunspaces:$parallel
+                    @($out | Where-Object { $_ -match ' logs[\\/]$' }).Count | Should -Be 3
+                    $out | Where-Object { $_ -match ' hooks[\\/]$' } | Should -Not -BeNullOrEmpty
+                    $out | Where-Object { $_ -match 'unrelated' } | Should -BeNullOrEmpty
+                }
+            }
+        }
+
+        It 'Keeps explicit path exclusions effective during discovery' {
+            $out = Get-DowserMap $script:logsRoot -IncludeFolders logs -Ascii -ExcludePathPatterns 'hooks/axon/logs'
+            @($out | Where-Object { $_ -match ' logs[\\/]$' }).Count | Should -Be 2
+            $out | Where-Object { $_ -match ' axon[\\/]$' } | Should -BeNullOrEmpty
+        }
+
+        It 'Keeps MaxDepth relative to the scan root' {
+            $out = Get-DowserMap $script:logsRoot -IncludeFolders logs -Ascii -MaxDepth 1
+            @($out | Where-Object { $_ -match ' logs[\\/]$' }).Count | Should -Be 1
+        }
+    }
+
     Context '-Ascii glyphs' {
         It 'Uses a single backslash for the last-child connector' {
             $out = Get-DowserMap -Path $script:incRoot -FoldersOnly -MaxDepth 0 -Ascii

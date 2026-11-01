@@ -1646,13 +1646,15 @@ function Get-DowserMap {
                     if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
                         continue 
                     }
-                    # Single source for exclude precedence (Huginn review 1454 finding 2): this
-                    # used to hand-copy Test-FolderExcludedByRule's branch order inline.
-                    if (Test-FolderExcludedByRule $item) {
+                    if (Test-ExcludeByPath $item) {
                         continue
                     }
+                    # explicit matches bypass name exclusions during descendant discovery
                     if (Test-FolderMatchesInclude $item) {
                         $IncludeFolderCache[$cacheKey] = $true; return $true 
+                    }
+                    if (Test-FolderExcludedByRule $item) {
+                        continue
                     }
                     $stack.Push([PSCustomObject]@{ Path = $item.FullName; Depth = $current.Depth + 1 })
                 }
