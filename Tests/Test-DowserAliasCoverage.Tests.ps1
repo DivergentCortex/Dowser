@@ -10,13 +10,8 @@
     exported function (the enabler itself excepted), that a few known names resolve to their branded
     targets, and that the function refuses to alias over a name already in use unless forced.
 
-    This test exists because three functions shipped without aliases before the original guard was
-    added (Get-DowserInfo, Compare-DowserReport, New-DowserHiddenFolder), and because the aliases
-    later moved to an opt-in model that must not squat names on import.
-
-.NOTES
-    Run from the module root:
-        Invoke-Pester -Path ./Tests/Test-DowserAliasCoverage.Tests.ps1 -Output Detailed
+.EXAMPLE
+    Invoke-Pester -Path ./Tests/Test-DowserAliasCoverage.Tests.ps1 -Output Detailed
 #>
 
 BeforeAll {

@@ -1,8 +1,7 @@
 #Requires -Modules @{ModuleName='Pester';ModuleVersion='5.0'}
 
-# Probe symlink capability before Describe so the boolean is available at discovery time,
-# matching the pattern already established in Get-DowserMap.Tests.ps1. $global: is used
-# because $script: set at file scope is not visible inside Pester BeforeAll blocks.
+# probe symlink support up front so the -Skip conditions can see it at discovery time
+# $global: because a $script: variable set at file scope is invisible inside BeforeAll
 $global:DowserFindFileCanSymlink = $false
 $_pt = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserFindFileProbeT'
 $_pl = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserFindFileProbeL'
@@ -25,9 +24,8 @@ Describe 'Find-DowserFile -ExcludePattern' {
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Shape matches the reported incident: a junk top-level folder (".rustup") sitting
-        # directly under the search root, containing a file whose name is a false-positive
-        # substring match for the include pattern, plus a real match outside it.
+        # junk top-level folder (.rustup) full of files that match the pattern by accident,
+        # plus one real match elsewhere
         $script:root = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFile_$([System.IO.Path]::GetRandomFileName())"
         $junkDir = Join-Path $script:root '.rustup'
         $junkNested = Join-Path $junkDir 'nested/deep'
@@ -122,13 +120,10 @@ Describe 'Find-DowserFile -ExcludePattern' {
     Context 'Symlinked directories are never followed by the -ExcludePattern stack walk' {
         BeforeAll {
             if ($global:DowserFindFileCanSymlink) {
-                # Symlink placed one level BELOW the scan root, not as an immediate child of it.
-                # A symlink sitting directly at the top level exercises the runspace path's
-                # top-level-directory partitioning instead (its own dedicated context below,
-                # "Top-level symlinked directory", covers that case, fixed 2026-09-15). This
-                # fixture isolates the regression this diff actually introduced: the new manual
-                # stack walk following a symlink DURING a deep traversal, which Get-ChildItem
-                # -Recurse never did.
+                # symlinks go one level below the scan root on purpose: a top-level one hits the
+                # runspace partitioning instead (next context covers that). this fixture is for
+                # the manual stack walk following a link mid-traversal, which Get-ChildItem
+                # -Recurse never does
                 $script:symRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileSym_$([System.IO.Path]::GetRandomFileName())"
                 $normalDir = Join-Path $script:symRoot 'container/normal'
                 $null = New-Item -ItemType Directory -Path $normalDir -Force
@@ -137,7 +132,7 @@ Describe 'Find-DowserFile -ExcludePattern' {
                 $null = New-Item -ItemType Directory -Path $elsewhereDir -Force
                 $null = New-Item -ItemType SymbolicLink -Path (Join-Path $elsewhereDir 'link_to_normal') -Target $normalDir -Force
 
-                # Self-referencing cycle, also one level below the root.
+                # a symlink that points back at its own folder, also one level down
                 $cycleDir = Join-Path $script:symRoot 'container/cycle'
                 $null = New-Item -ItemType Directory -Path $cycleDir -Force
                 'y' | Out-File (Join-Path $cycleDir 'target.vbs')
@@ -171,15 +166,11 @@ Describe 'Find-DowserFile -ExcludePattern' {
     Context 'Top-level symlinked directory (default runspace, no -ExcludePattern)' {
         BeforeAll {
             if ($global:DowserFindFileCanSymlink) {
-                # Real fix target: a symlink sitting directly at the search root used to get
-                # its own dedicated runspace worker (the top-level partitioning step handed it
-                # the symlink's own path as an explicit scan root), and Get-ChildItem happily
-                # walks through an explicit-root symlink even though it never follows one it
-                # only ENCOUNTERS mid-recursion. That returned every file under the real target
-                # a second time, reported under the symlink's own path. Fixed 2026-09-15 by
-                # dropping reparse-point directories from the top-level partition list
-                # unconditionally. Confirmed by direct execution before the fix: this exact
-                # shape returned 3 results instead of 2.
+                # a symlink right at the search root used to get its own runspace worker, and
+                # Get-ChildItem walks an explicit-root symlink even though it won't follow one
+                # it finds mid-recursion. every file under the real target then came back a
+                # second time under the symlink path (3 results instead of 2). reparse-point
+                # dirs are now dropped from the top-level partition list
                 $script:topSymRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileTopSym_$([System.IO.Path]::GetRandomFileName())"
                 $realTarget = Join-Path $script:topSymRoot 'realtarget'
                 New-Item -ItemType Directory -Path $realTarget -Force | Out-Null
@@ -212,13 +203,9 @@ Describe 'Find-DowserFile -ExcludePattern' {
 
     Context 'Hidden top-level directory is still scanned after the double-scan fix' {
         BeforeAll {
-            # The double-scan fix stops $p's own worker from recursing through every
-            # subdirectory (that work now belongs solely to each subdirectory's own
-            # dedicated worker), so the top-level partitioning enumeration is the ONLY
-            # remaining place that can find a hidden top-level directory. It must use
-            # -Force, or a dot-prefixed directory here would silently stop being scanned
-            # entirely instead of merely being scanned twice. Confirmed by direct
-            # execution before and after the fix: count stayed at 1 in both cases.
+            # the top-level partition listing is the only place that can find a hidden
+            # top-level directory, so it needs -Force or dot-prefixed folders quietly
+            # stop being scanned at all
             $script:hiddenRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileHidden_$([System.IO.Path]::GetRandomFileName())"
             $hiddenDir = Join-Path $script:hiddenRoot '.hidden'
             New-Item -ItemType Directory -Path $hiddenDir -Force | Out-Null
@@ -239,14 +226,10 @@ Describe 'Find-DowserFile -ExcludePattern' {
 
     Context 'No redundant double-scan of subdirectories already covered by their own worker' {
         BeforeAll {
-            # Before the fix, $p's own worker recursed through the entire tree AND every
-            # top-level subdirectory got its own separately recursive worker, so each file
-            # nested under a top-level subdirectory was enumerated twice (deduped back down
-            # to the correct count by Select-DowserUniquePath, so this was invisible in the
-            # result count and only showed up as wasted scan work). This does not re-measure
-            # timing (too fixture-size-sensitive to assert reliably); it locks in the
-            # correctness invariant instead: nested results stay complete and exact after
-            # the redundant pass was removed.
+            # each top-level subdirectory has its own worker, so the parent worker must not
+            # recurse into them too. the duplicates got deduped away afterwards, so the count
+            # never showed it. timing is too flaky to assert, so this only checks the nested
+            # results stay complete and exact
             $script:noDupeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileNoDupe_$([System.IO.Path]::GetRandomFileName())"
             for ($d = 1; $d -le 3; $d++) {
                 $nested = Join-Path $script:noDupeRoot "dir$d/deep"
@@ -270,12 +253,8 @@ Describe 'Find-DowserFile -ExcludePattern' {
 
     Context 'StopOnFirstMatch stops early instead of scanning the whole tree' {
         BeforeAll {
-            # Multiple top-level directories, each with its own matching file, so a
-            # correct fix should return before every worker finishes its own subtree.
-            # A prior gap here: the runspace scriptblock never received -StopOnFirstMatch
-            # at all, so every target was scanned to completion before the flag was
-            # checked, post-hoc, against the fully aggregated result list. Fixed
-            # 2026-09-15 with a synchronized stop signal shared across every worker.
+            # several top-level dirs, each with its own match, so an early stop can return
+            # before every worker has finished its subtree
             $script:stopRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileStop_$([System.IO.Path]::GetRandomFileName())"
             for ($d = 1; $d -le 4; $d++) {
                 $dir = Join-Path $script:stopRoot "dir$d"
@@ -305,28 +284,14 @@ Describe 'Find-DowserFile -ExcludePattern' {
 
     Context 'StopOnFirstMatch genuinely bounds work to one directory at a time, not the whole tree' {
         BeforeAll {
-            # Regression coverage for a real gap the earlier "StopOnFirstMatch stops early"
-            # tests could not catch: those tests only assert correctness (a single non-array
-            # result), which passes identically whether the underlying scan stopped early or
-            # walked the entire tree first and picked one result afterward -- exactly what
-            # the pre-fix code already did. Confirmed by direct execution that
-            # Get-ChildItem -Recurse largely BUFFERS its entire recursive listing before a
-            # consuming foreach loop can begin iterating (breaking after the first of 50,000
-            # recursively-enumerated items still cost 77% of the time to enumerate all
-            # 50,000), so converting "return" to "break" alone only skipped per-item
-            # processing, never the disk work. Fixed 2026-09-15 by routing -StopOnFirstMatch
-            # through the same manual, per-directory stack walk -ExcludePattern already used,
-            # which bounds buffered work to one directory's children at a time instead of an
-            # entire recursive subtree. This fixture (many separate subdirectories) is the
-            # shape that fix actually helps: a single huge FLAT directory with no
-            # subdirectories at all does not benefit the same way (Get-ChildItem still
-            # buffers that one directory's own full listing before any item is examined),
-            # but that shape was never faster before this fix either, so it is a documented
-            # boundary, not a regression.
-            # [System.IO.File]::Create, not New-Item: this fixture needs thousands of files
-            # and New-Item's per-call cmdlet overhead made this single Context add roughly
-            # 7 seconds to the suite on its own -- the direct .NET call is materially faster
-            # for bulk fixture creation and the content of these files is never read.
+            # the earlier early-stop tests only check for one non-array result, which passes
+            # even if the scan walked the whole tree first. Get-ChildItem -Recurse buffers
+            # most of its listing before the loop sees an item, so a plain break never saved
+            # any disk work. -StopOnFirstMatch now walks one directory at a time, and this
+            # fixture (many separate subdirs) is where that pays off. one huge flat directory
+            # still buffers its own full listing, which is a known limit
+            # [System.IO.File]::Create instead of New-Item: thousands of files, and New-Item's
+            # per-call overhead added about 7 seconds to the suite
             $script:perfRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFilePerf_$([System.IO.Path]::GetRandomFileName())"
             $bigDir = Join-Path $script:perfRoot 'big'
             for ($d = 0; $d -lt 10; $d++) {
@@ -357,9 +322,8 @@ Describe 'Find-DowserFile -ExcludePattern' {
             $swWithSibling.Stop()
 
             $result.FullName | Should -Match 'match\.vbs$'
-            # Generous multiple (not a tight percentage) to stay reliable under normal
-            # machine-load variance while still failing hard if early termination regresses:
-            # the pre-fix code measured roughly 1.9x here; the fix measured roughly 1.1x.
+            # generous multiple instead of a tight percentage so machine load doesn't flake it;
+            # without early termination this lands around 1.9x, with it about 1.1x
             $ratio = $swWithSibling.Elapsed.TotalMilliseconds / [Math]::Max(1, $swSmallOnly.Elapsed.TotalMilliseconds)
             $ratio | Should -BeLessThan 3.0
         }
@@ -367,12 +331,8 @@ Describe 'Find-DowserFile -ExcludePattern' {
 
     Context '-ExcludePattern and -StopOnFirstMatch combined' {
         BeforeAll {
-            # Both flags share the same manual stack walk and the same stop signal; this
-            # combination had zero permanent test coverage before (flagged independently by
-            # both Huginn and Muninn during review). The excluded directory would contain a
-            # match if not pruned, so a leak here would be a real, user-visible defect: the
-            # caller asked to exclude that directory and would get a match from inside it
-            # anyway.
+            # both flags share one stack walk and one stop signal. the excluded dir holds a
+            # match, so a leak would hand back a result from a folder the caller excluded
             $script:comboRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserFindFileCombo_$([System.IO.Path]::GetRandomFileName())"
             $excludedDir = Join-Path $script:comboRoot 'excluded'
             New-Item -ItemType Directory -Path $excludedDir -Force | Out-Null
@@ -410,12 +370,9 @@ Describe 'Find-DowserFile -ExcludePattern' {
     }
 
     AfterAll {
-        # Deferred cleanup, not loose top-level code: Pester's discovery pass walks the whole
-        # file once (to evaluate every -Skip:(-not $global:DowserFindFileCanSymlink) condition
-        # correctly), and loose top-level code at file end would execute during THAT walk,
-        # clearing the variable before the run phase's BeforeAll bodies ever see it. An AfterAll
-        # is deferred until the run phase actually finishes this Describe's tests, matching the
-        # proven-working pattern in Get-DowserMap.Tests.ps1.
+        # cleanup lives in AfterAll because Pester's discovery pass walks the file first (to
+        # evaluate the -Skip conditions), and loose code at the end would run then and clear
+        # the variable before any BeforeAll could see it
         Remove-Variable DowserFindFileCanSymlink -Scope Global -ErrorAction SilentlyContinue
     }
 }

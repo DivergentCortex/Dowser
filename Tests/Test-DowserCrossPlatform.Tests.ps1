@@ -30,15 +30,11 @@ Describe 'Dowser Cross-Platform Support' {
 
     Context 'Platform Detection' {
         It 'Platform variable IsWindows is accessible to module functions' {
-            # Verifies the module scope chain works — if platform detection
-            # failed, Windows-only guards would misfire
+            # if platform detection failed, windows-only guards would misfire
             if ($IsWindows) {
-                # On Windows: ConvertTo-DowserIco should NOT emit platform warning
-                # Verify the platform variable resolves to boolean in module context
                 $IsWindows | Should -BeOfType [bool]
             }
             else {
-                # On Linux/macOS: variable is $false
                 $IsWindows | Should -Be $false
             }
         }

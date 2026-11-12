@@ -1,8 +1,8 @@
 #Requires -Modules @{ModuleName='Pester';ModuleVersion='5.0'}
 
-# Probe symlink capability before Describe so the boolean is available at discovery time.
-# $global: is used because $script: set at file scope is not visible inside Pester BeforeAll blocks.
-# The probe creates and immediately destroys a throwaway symlink.
+# probe symlink support up front so -Skip can see it at discovery time
+# $global: because a $script: variable set at file scope is invisible inside BeforeAll
+# the probe makes a throwaway symlink and deletes it straight away
 $global:DowserTestCanSymlink = $false
 $_pt = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserProbeT'
 $_pl = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserProbeL'
@@ -25,7 +25,7 @@ Describe 'Get-DowserMap symlink rendering' {
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # target lives OUTSIDE the mapped root so traversal of the link is the only way inner.txt appears
+        # target sits outside the mapped root, so following the link is the only way inner.txt can show up
         $tmpTarget = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSymTarget'
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSymRoot'
         $null = New-Item -ItemType Directory -Path $tmpTarget -Force
@@ -39,7 +39,7 @@ Describe 'Get-DowserMap symlink rendering' {
             $null = New-Item -ItemType SymbolicLink -Path (Join-Path $tmpRoot 'the-link') -Target $tmpTarget -ErrorAction SilentlyContinue
         }
 
-        # sibling file so the-link is NOT the last child (sorts before z-*)
+        # sibling so the-link isn't the last child (it sorts before z-*)
         [System.IO.File]::WriteAllText((Join-Path $tmpRoot 'z-sibling.txt'), 'x')
 
         $script:tmpRoot = $tmpRoot
@@ -77,7 +77,7 @@ Describe 'Get-DowserMap symlink rendering' {
         }
 
         It 'Target line carries continuation bar for non-last-child symlink' -Skip:(-not $global:DowserTestCanSymlink) {
-            # the-link sorts before z-sibling.txt so it is NOT the last child
+            # the-link sorts before z-sibling.txt, so it isn't the last child
             $script:out | Where-Object { $_ -match [char]0x21B3 } | Should -Match ([char]0x2502)
         }
     }
@@ -147,12 +147,11 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         $null = New-Item -ItemType Directory -Path $dirANested -Force
         $null = New-Item -ItemType Directory -Path $dirB -Force
 
-        # Known byte counts, real assertions, not a smell test. Shape matters: a file
-        # sitting loose at the scan root, a top-level folder with its own file plus a
-        # nested subfolder (so its cached size is inclusive of the nested bytes), and a
-        # second plain top-level folder. This is the exact shape that surfaced both the
-        # total-size undercount (loose root files were never counted) and the Top-N
-        # double-count (a nested folder's bytes are already inside its parent's total).
+        # known byte counts, and the shape matters: a loose file at the scan root, a
+        # top-level folder with its own file plus a nested subfolder (so its cached size
+        # includes the nested bytes), and a second plain top-level folder. that mix is
+        # what exposes a total that skips loose root files and a Top-N that double-counts
+        # nested folders
         [System.IO.File]::WriteAllBytes((Join-Path $tmpRoot 'rootloose.txt'), (New-Object byte[] 300))
         [System.IO.File]::WriteAllBytes((Join-Path $dirA 'a1.txt'), (New-Object byte[] 100))
         [System.IO.File]::WriteAllBytes((Join-Path $dirANested 'n1.txt'), (New-Object byte[] 400))
@@ -160,8 +159,8 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
         $script:tmpRoot = $tmpRoot
 
-        # Report-file writes below go here, NEVER inside $tmpRoot -- a .md report written into
-        # the scanned tree would become a new loose root file for the next test's size totals.
+        # report files go here and never inside $tmpRoot: a .md written into the scanned
+        # tree turns into a new loose root file and skews the next test's totals
         $outDir = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryOutputs'
         Remove-Item -LiteralPath $outDir -Recurse -Force -ErrorAction SilentlyContinue
         $null = New-Item -ItemType Directory -Path $outDir -Force
@@ -220,10 +219,9 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
 
         It 'Ranks only top-level folders, never double-listing a nested folder inside its parent' {
-            # A's cached size (500) is inclusive of A/Nested (400) plus its own a1.txt (100).
-            # "Nested" legitimately appears as its own bare tree line -- what must NOT appear
-            # is a ranked "A/Nested" row in the summary (the relative-path form only the
-            # largest-folders section ever produces).
+            # A's cached size (500) includes A/Nested (400) plus its own a1.txt (100).
+            # "Nested" is allowed as a bare tree line; what must not appear is a ranked
+            # "A/Nested" row, which is the form only the largest-folders section produces
             $script:out | Where-Object { $_ -match '500\.0B\s+A$' } | Should -Not -BeNullOrEmpty
             $script:out | Where-Object { $_ -match '50\.0B\s+B$' } | Should -Not -BeNullOrEmpty
             $script:out | Where-Object { $_ -match 'A[\\/]Nested' } | Should -BeNullOrEmpty
@@ -237,9 +235,9 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Default-excluded top-level folders are named, not silently dropped' {
         BeforeAll {
-            # 'logs' is one of the built-in default-excluded folder names. Give it more bytes
-            # than the folder that IS counted, so a total that silently omitted it would be
-            # obviously, provably wrong rather than just slightly off.
+            # 'logs' is a built-in default-excluded folder name. it gets more bytes than the
+            # folder that is counted, so a total that quietly left it out would be loudly
+            # wrong instead of just slightly off
             $excludeRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryExcludeRoot'
             Remove-Item -LiteralPath $excludeRoot -Recurse -Force -ErrorAction SilentlyContinue
             $logsDir = Join-Path $excludeRoot 'logs'
@@ -268,8 +266,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
 
         It 'Also names it in -ShowFullPathTree:$false mode (the other twin filter branch)' {
-            # Both rendering branches implement top-level filtering separately; a fix applied to
-            # only one is a real, previously-uncaught regression risk (review_id 905/906).
+            # the two render branches filter top-level folders separately, so a fix in one can miss the other
             $nonTrunkOut = Get-DowserMap -Path $script:excludeRoot -ShowFullPathTree:$false -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
             $nonTrunkOut | Where-Object { $_ -match '^\s*Total size: 100\.0B$' } | Should -Not -BeNullOrEmpty
             $nonTrunkOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:.*logs' } | Should -Not -BeNullOrEmpty
@@ -278,10 +275,9 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Path-pattern-excluded top-level folders are also named' {
         BeforeAll {
-            # Mirrors the Huginn/Muninn court-review repro exactly: a top-level folder excluded
-            # via -ExcludePathPatterns (not a default-excluded name) reproduced the identical
-            # silent-undercount failure the 'logs' fix above was meant to close, because only
-            # Test-ExcludeFolder rejections were tracked -- Test-ExcludeByPath rejections were not.
+            # a top-level folder excluded via -ExcludePathPatterns (not a default-excluded
+            # name) used to drop out of the total silently: only Test-ExcludeFolder
+            # rejections were tracked, Test-ExcludeByPath ones weren't
             $pathExcludeRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryPathExcludeRoot'
             Remove-Item -LiteralPath $pathExcludeRoot -Recurse -Force -ErrorAction SilentlyContinue
             $normalDir2 = Join-Path $pathExcludeRoot 'NormalFolder2'
@@ -318,16 +314,13 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Excluded root-level files are named, not silently dropped (mirrors the folder case)' {
         BeforeAll {
-            # Before this fix, a root-level file rejected by the size-total loop simply
-            # vanished with no signal at all -- unlike an excluded top-level FOLDER, which
-            # is named via ExcludedTopLevelNames. 'settings.local.json' is one of the
-            # built-in default-excluded FILE names; give it more bytes than the counted
-            # file so a total that silently included or omitted it would be obviously
-            # wrong. Deliberately NOT using '.env' here even though it is also in the
-            # default-exclude-files list: a dot-prefixed name is invisible to
-            # Get-ChildItem -File without -Force on Linux (the hidden-file convention),
-            # so it would never even reach the exclude-rule check this test means to
-            # exercise -- confirmed by direct execution before writing this fixture.
+            # a root-level file rejected by the size-total loop used to vanish without a
+            # word, unlike an excluded top-level folder, which gets named via
+            # ExcludedTopLevelNames. 'settings.local.json' is a built-in default-excluded
+            # file name, given more bytes than the counted file so a total that silently
+            # included or dropped it is obviously wrong. not '.env', even though it is on
+            # the same list: dot-prefixed names are invisible to Get-ChildItem -File
+            # without -Force on linux, so it would never reach the exclude rule under test
             $fileExcludeRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryFileExcludeRoot'
             Remove-Item -LiteralPath $fileExcludeRoot -Recurse -Force -ErrorAction SilentlyContinue
             $null = New-Item -ItemType Directory -Path $fileExcludeRoot -Force
@@ -369,9 +362,8 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
 
         It 'An -IncludeExtensions allowlist mismatch on a root-level file is NOT named (Decision D-1 parity)' {
-            # Matches the existing "-IncludeFolders allowlist mismatches are not named"
-            # boundary: declared scope narrowing via an allowlist is not a surprise the
-            # summary needs to flag the way an actual exclude rule is.
+            # same boundary as the -IncludeFolders case: narrowing scope with an allowlist
+            # is declared up front, so the summary doesn't flag it like an exclude rule
             $allowlistRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummaryFileAllowlistRoot'
             Remove-Item -LiteralPath $allowlistRoot -Recurse -Force -ErrorAction SilentlyContinue
             $null = New-Item -ItemType Directory -Path $allowlistRoot -Force
@@ -404,11 +396,10 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Single-surviving-line output is never fused into one string' {
         It 'Keeps the tree line and the summary as separate array elements when exactly one item survives' {
-            # Regression for review_id 906 (Huginn): Where-Object unwraps a single surviving
-            # result to a bare string, so "$filteredLines + $summaryLines" silently became
-            # string concatenation instead of array concatenation, fusing the tree line and
-            # every summary line into one corrupted string. Only reachable via
-            # -ShowFullPathTree:$false, which nothing else in this file exercises.
+            # Where-Object unwraps a single surviving result to a bare string, so
+            # "$filteredLines + $summaryLines" turned into string concatenation and fused the
+            # tree line and every summary line into one string. only reachable with
+            # -ShowFullPathTree:$false, which nothing else in this file exercises
             $singleRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserSummarySingleRoot'
             Remove-Item -LiteralPath $singleRoot -Recurse -Force -ErrorAction SilentlyContinue
             $onlyDir = Join-Path $singleRoot 'OnlyFolder'
@@ -426,9 +417,9 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Decision D-1: -IncludeFolders allowlist mismatches are not named' {
         It 'Does not treat an -IncludeFolders allowlist as an exclusion worth naming' {
-            # Deliberate scope boundary (Synapse decision_id 175): -IncludeFolders is an opt-in
-            # allowlist, so everything outside it is expected, declared absence, not a surprise
-            # the summary needs to flag the way a default-exclude or -ExcludeFolders carve-out is.
+            # -IncludeFolders is an opt-in allowlist, so everything outside it is declared
+            # absence, not a surprise the summary needs to flag the way a default-exclude or
+            # -ExcludeFolders carve-out is
             $allowlistOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -IncludeFolders 'A'
             $allowlistOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:' } | Should -BeNullOrEmpty
         }
@@ -459,14 +450,11 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Prior to the fix, the -Path-is-an-archive branch returned its tree lines directly,
-        # bypassing Complete-DirectoryMapOutput entirely -- -EmitSummary, -OutputFile, and
-        # -MarkdownFile were all silent no-ops for a .zip/.7z/.rar/.tar/.gz input. Fixed
-        # 2026-09-15 via Complete-DowserArchiveMapOutput, a self-contained archive-mode
-        # counterpart (Complete-DirectoryMapOutput itself is defined ~900 lines later in the
-        # file and is not yet callable at the point the archive-mode check runs -- PowerShell
-        # does not hoist function definitions ahead of sequential execution, confirmed by
-        # direct execution before this fix was written).
+        # the archive branch returns its tree lines directly, so it has its own output path
+        # (Complete-DowserArchiveMapOutput); without it -EmitSummary, -OutputFile and
+        # -MarkdownFile would be silent no-ops for .zip/.7z/.rar/.tar/.gz input.
+        # Complete-DirectoryMapOutput is defined much further down the file and isn't
+        # callable yet when the archive check runs, since PowerShell doesn't hoist functions
         $arcWork = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserArchiveSummaryWork'
         Remove-Item -LiteralPath $arcWork -Recurse -Force -ErrorAction SilentlyContinue
         $srcDir = Join-Path $arcWork 'src'
@@ -547,11 +535,9 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
 
     Context 'Archive read failure still surfaces its error line through the new return shape' {
         It 'Returns the ARCHIVE UNREADABLE line instead of losing it to a shape mismatch' {
-            # The error path inside Get-DowserArchiveTreeLines used to return a bare
-            # [string[]], while the success path now returns a richer [PSCustomObject].
-            # If the error path had not been updated to match, Complete-DowserArchiveMapOutput
-            # reading .Lines off a bare string array would have silently resolved to $null,
-            # losing the error message entirely instead of surfacing it.
+            # the error path of Get-DowserArchiveTreeLines has to return the same
+            # [PSCustomObject] shape as the success path. a bare string array makes .Lines
+            # resolve to $null in Complete-DowserArchiveMapOutput and the error just vanishes
             $out = Get-DowserMap -Path $script:corruptZipPath
             $out | Where-Object { $_ -match 'ARCHIVE UNREADABLE' } | Should -Not -BeNullOrEmpty
         }
@@ -559,11 +545,9 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
 
     Context 'Excluded root-level files inside an archive are also named (parity with the filesystem path)' {
         BeforeAll {
-            # Found by Huginn/Muninn review of the filesystem-mode fix (entry 2026.09.15.255):
-            # the archive path's own top-level total-size loop had the identical blind spot
-            # Test-FileExcludedByRule closed on the filesystem side -- a root-level archive
-            # entry rejected by an actual exclude rule vanished from TotalBytes with zero
-            # signal. Fixed 2026-09-15 via Test-ArcFileExcludedByRule.
+            # the archive's top-level total-size loop needs the same exclude rule as the
+            # filesystem side (Test-ArcFileExcludedByRule here, Test-FileExcludedByRule
+            # there), or an excluded root-level entry drops out of TotalBytes with no signal
             $arcFileExcludeWork = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserArchiveFileExcludeWork'
             Remove-Item -LiteralPath $arcFileExcludeWork -Recurse -Force -ErrorAction SilentlyContinue
             $srcDir2 = Join-Path $arcFileExcludeWork 'src'
@@ -594,16 +578,11 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
 
     Context '-LinuxPaths markdown Root header matches the filesystem path''s own behavior' {
         It 'Applies the same WSL-path conversion rule as Complete-DirectoryMapOutput for an already-Unix-style path' {
-            # Found by Huginn/Muninn review: Complete-DowserArchiveMapOutput's markdown Root
-            # header ignored -LinuxPaths entirely, always rendering the raw archive path even
-            # when the filesystem path would run it through ConvertTo-WslPath. Fixed
-            # 2026-09-15 by wiring -LinuxPaths through to Complete-DowserArchiveMapOutput and
-            # calling the (now shared, relocated) ConvertTo-WslPath. On this platform, an
-            # already-Unix-style path is a correct no-op for ConvertTo-WslPath (it only
-            # transforms Windows drive-letter/UNC paths), so this test asserts TRUE PARITY --
-            # archive-mode and filesystem-mode produce the identical Root line for the same
-            # already-Unix-style path and the same -LinuxPaths flag -- rather than asserting
-            # a specific /mnt/-style string that would be platform-dependent.
+            # the archive markdown Root header has to honor -LinuxPaths the way the
+            # filesystem path does (ConvertTo-WslPath). a unix path is a no-op for that
+            # function, which only rewrites drive-letter and UNC paths, so this checks that
+            # both modes agree on the Root line instead of expecting a /mnt/-style string
+            # that would depend on the platform
             $work = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserLinuxPathsParityWork'
             Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
             $null = New-Item -ItemType Directory -Path $work -Force
@@ -639,9 +618,9 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Mirrors the operator's ~/projects/modules layout that exposed the defects:
-        # -IncludeFolders py, ts stopped at py/ and ts/ because the filter was re-applied at
-        # every depth, so 'pyconfig' was tested against 'py' and dropped.
+        # layout that exposed the bug: -IncludeFolders py, ts used to stop at py/ and ts/
+        # because the filter was re-applied at every depth, so 'pyconfig' was tested
+        # against 'py' and dropped
         $root = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserIncludeScopeRoot'
         Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         foreach ($rel in @('py/pyconfig/docs', 'py/pyconfig/tests', 'py/pydates/docs', 'ts/tsconfig/tests', 'js/jsdates/docs')) {
@@ -790,7 +769,7 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
 
         It 'A route folder annotates and totals only its in-scope descendants' {
             # outer/ is only the route to outer/inner: its own 300B file and outer/other (500B)
-            # are out of scope. Only inner's 40B counts, on the outer/ line and in the total.
+            # are out of scope, so just inner's 40B counts, on the outer/ line and in the total
             $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders 'outer/inner' -IncludeSize -IncludeFileCount -EmitSummary -FoldersOnly
             $out | Where-Object { $_ -match 'outer[\\/] \[40\.0B\] \[1 files\]' } | Should -Not -BeNullOrEmpty
             $out | Where-Object { $_ -match '^\s*Total size: 40\.0B$' } | Should -Not -BeNullOrEmpty

@@ -1,8 +1,6 @@
 #Requires -Modules @{ModuleName='Pester';ModuleVersion='5.0'}
 
-# Pester coverage for the Linux-behavior / path-separator / output-silence fixes
-# (Task #1). These exercise the cross-platform defects that previously produced
-# silent false success or empty/zero output on non-Windows pwsh.
+# non-windows pwsh behavior: path separators, output silence, and no silent false success
 
 Describe 'Dowser Linux behavior fixes' {
     BeforeAll {
@@ -13,7 +11,7 @@ Describe 'Dowser Linux behavior fixes' {
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DowserLinux_$([System.IO.Path]::GetRandomFileName())"
         $null = New-Item -ItemType Directory -Path $tmpRoot -Force
         $script:tmpRoot = $tmpRoot
-        # On a non-Windows pwsh $IsWindows is $false; on PS 5.1 it is $null.
+        # $IsWindows is $false on non-windows pwsh but $null on 5.1, hence -ne $false
         $script:onWindows = ($IsWindows -ne $false)
     }
 
@@ -84,7 +82,7 @@ Describe 'Dowser Linux behavior fixes' {
             foreach ($o in $script:orphResult) {
                 $o | Should -BeOfType [System.IO.FileInfo]
             }
-            # No format-record objects leak into the return.
+            # a stray Format-Table shows up as format-record objects in the output
             ($script:orphResult | Where-Object { $_.GetType().FullName -like 'Microsoft.PowerShell.Commands.Internal.Format.*' }) |
                 Should -BeNullOrEmpty
         }
@@ -100,20 +98,16 @@ Describe 'Dowser Linux behavior fixes' {
             $out = ConvertTo-DowserBase64 -Path $script:imgPath
             $out | Should -Not -BeNullOrEmpty
             $out | Should -BeOfType [string]
-            # Round-trips back to the original bytes.
             [Convert]::FromBase64String($out).Length | Should -Be 32
         }
 
         It 'With -OutputFile and a failing clipboard, writes the file and emits NOTHING to the pipeline' -Skip:$script:onWindows {
-            # On headless Linux Set-Clipboard runtime-fails (no display); -OutputFile is
-            # the destination, so the clipboard failure must NOT emit a blob to the
-            # pipeline (the regression the audit caught).
+            # headless linux has no display, so Set-Clipboard fails at runtime. the file is
+            # the destination, so that failure must not dump the blob onto the pipeline
             $outFile = Join-Path $script:tmpRoot 'b64out.txt'
             $out = ConvertTo-DowserBase64 -Path $script:imgPath -OutputFile $outFile -CopyToClipboard -WarningAction SilentlyContinue
-            # File is the destination and was written...
             Test-Path -LiteralPath $outFile | Should -BeTrue
             (Get-Content -LiteralPath $outFile -Raw).Trim() | Should -Not -BeNullOrEmpty
-            # ...and the pipeline stays empty (no unexpected blob for capturing callers).
             $out | Should -BeNullOrEmpty
         }
     }
@@ -123,7 +117,6 @@ Describe 'Dowser Linux behavior fixes' {
             $target = Join-Path $script:tmpRoot 'secretwork'
             $result = New-DowserHiddenFolder -Path $target
             $result | Should -Not -BeNullOrEmpty
-            # The created/renamed folder is dot-prefixed and actually exists on disk.
             $dotted = Join-Path $script:tmpRoot '.secretwork'
             Test-Path -LiteralPath $dotted | Should -BeTrue
             (Split-Path -Path $result.Path -Leaf) | Should -Be '.secretwork'
@@ -154,15 +147,13 @@ Describe 'Dowser Linux behavior fixes' {
         }
 
         It 'Renders symlinks as a two-line name/target pair' {
-            # If this environment cannot create symlinks, the render feature has
-            # nothing to assert against; record that rather than fail spuriously.
+            # no symlinks allowed here means nothing to render, so skip instead of failing
             if (-not $script:linkMade) {
                 Set-ItResult -Skipped -Because 'symlink creation is not permitted in this environment'
                 return
             }
             $lines = Get-DowserMap -Path $script:mapRoot
             $joined = $lines -join "`n"
-            # The link name and its target both appear in the output.
             $joined | Should -Match 'link'
             $joined | Should -Match 'sub'
         }

@@ -71,15 +71,15 @@ function Get-ScriptPath {
     try {
         [string]$determinedScriptPath = $null
         
-        # CHECK IF USING ISE
+        # running inside the ise
         if (Get-Variable "psISE" -ValueOnly -ErrorAction SilentlyContinue) {
             Write-Host "Powershell ISE detected"
             $determinedScriptPath = Split-Path -Parent -Path $psISE.CurrentFile.FullPath
         }
-        # CHECK POWERSHELL VERSION 
+        # anything newer than 3.0 gets the call stack route
         elseif ($PSVersionTable.PSVersion.Major -gt 3) {
             Write-Host "PowerShell $($PSVersionTable.PSVersion) detected"
-            # Use CallStack to get the path of the calling script
+            # prefer the calling script's folder, fall back to $PSScriptRoot
             $callStack = Get-PSCallStack
             if ($callStack.Count -gt 1) {
                 $callingScript = $callStack[1].ScriptName
@@ -96,7 +96,7 @@ function Get-ScriptPath {
         }
         else {
             Write-Host "PowerShell $($PSVersionTable.PSVersion) detected"
-            # For PS 2.0, use call stack as well
+            # 2.0 has no $PSScriptRoot, so $PWD is the fallback
             $callStack = Get-PSCallStack
             if ($callStack.Count -gt 1) {
                 $callingScript = $callStack[1].ScriptName
@@ -112,13 +112,13 @@ function Get-ScriptPath {
             }
         }
 
-        # VALIDATE BEFORE RETURNING
+        # last resort is wherever we're standing
         if ([string]::IsNullOrEmpty($determinedScriptPath)) {
             Write-Host "Unable to determine script path, using current directory" -ForegroundColor Yellow
             $determinedScriptPath = $PWD.Path
         }
 
-        # PREFER MAPPED DRIVE WHEN UNC ROOT IS MAPPED AND REACHABLE
+        # if the unc share is also mapped to a drive letter, use the drive letter
         $preferredPath = $determinedScriptPath
         if ($determinedScriptPath -like '\\*\*') {
             $rootMatch = [regex]::Match($determinedScriptPath, '^(\\\\[^\\]+\\[^\\]+)')
@@ -160,9 +160,7 @@ if (-not $modulesDir -or -not (Test-Path (Join-Path $modulesDir "Dowser.psd1")))
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
 
-# ---------------------------------------------------------
 # helpers
-# ---------------------------------------------------------
 $script:TestResults = [System.Collections.Generic.List[object]]::new()
 $script:PassCount = 0
 $script:FailCount = 0
@@ -221,9 +219,7 @@ function Invoke-Timed {
     }
 }
 
-# ---------------------------------------------------------
 # setup
-# ---------------------------------------------------------
 $null = New-Item -ItemType Directory -Path $ReportDir -Force -ErrorAction SilentlyContinue
 Get-ChildItem -Path $ReportDir -Include '*.csv', '*.html' -File -ErrorAction SilentlyContinue |
     Remove-Item -Force -ErrorAction SilentlyContinue
@@ -263,9 +259,7 @@ Write-Host "  Medium  : $mediumDir" -ForegroundColor Cyan
 Write-Host "  Large   : $largeDir  ($largeFileCount files)" -ForegroundColor Cyan
 Write-Host "============================================================`n" -ForegroundColor Cyan
 
-# ---------------------------------------------------------
-# T-00  syntax check (pre-import)
-# ---------------------------------------------------------
+# t-00 syntax check, before import
 Write-Host "T-00: Syntax Check (pre-import)" -ForegroundColor White
 $pubDir = Join-Path (Split-Path $ModulePath -Parent) "Public"
 foreach ($f in (Get-ChildItem "$pubDir\*.ps1" | Sort-Object Name)) {
@@ -287,9 +281,7 @@ foreach ($f in (Get-ChildItem "$pubDir\*.ps1" | Sort-Object Name)) {
     Add-TestResult -Cmdlet $f.BaseName -TestName "Syntax" -Status $status -Detail $detail
 }
 
-# ---------------------------------------------------------
-# T-01  module import
-# ---------------------------------------------------------
+# t-01 module import
 Write-Host "`nT-01: Module Import" -ForegroundColor White
 $t = Invoke-Timed { Import-Module $ModulePath -Force -ErrorAction Stop }
 if ($t.Error) {
@@ -315,9 +307,7 @@ Add-TestResult -Cmdlet "Module" -TestName "AliasCount" -Status $(if ($aliasCount
         'WARN'
     }) -Detail "$aliasCount registered via Enable-DowserAliases (need >= 20)"
 
-# ---------------------------------------------------------
-# T-02  help blocks
-# ---------------------------------------------------------
+# t-02 help blocks
 Write-Host "`nT-02: Help Blocks" -ForegroundColor White
 $allCmdlets = @(
     'ConvertTo-DowserBase64', 'ConvertTo-DowserExe', 'ConvertTo-DowserIco',
@@ -360,9 +350,7 @@ foreach ($cmdlet in $allCmdlets) {
     }
 }
 
-# ---------------------------------------------------------
-# T-03  pipeline support
-# ---------------------------------------------------------
+# t-03 pipeline support
 Write-Host "`nT-03: Pipeline Support" -ForegroundColor White
 $pipelineCmdlets = @{
     'Find-DowserFile'         = 'Path'
@@ -387,7 +375,6 @@ foreach ($entry in $pipelineCmdlets.GetEnumerator()) {
         $cmd = Get-Command $cmdlet -ErrorAction Stop
         $param = $cmd.Parameters[$paramName]
         if (-not $param) {
-            # check if any parameter has pipeline support
             $pipeParam = $cmd.Parameters.Values | Where-Object {
                 $_.Attributes | Where-Object { $_ -is [Parameter] -and ($_.ValueFromPipeline -or $_.ValueFromPipelineByPropertyName) }
             } | Select-Object -First 1
@@ -428,9 +415,7 @@ foreach ($entry in $pipelineCmdlets.GetEnumerator()) {
     }
 }
 
-# ---------------------------------------------------------
-# T-04  functional tests
-# ---------------------------------------------------------
+# t-04 functional tests, one block per cmdlet
 Write-Host "`nT-04: Functional Tests" -ForegroundColor White
 
 # Find-DowserFile
@@ -563,7 +548,6 @@ Add-TestResult -Cmdlet "Find-DowserDuplicate" -TestName "ContentHash" `
     }) `
     -Detail "$(if($t2.Error){$t2.Error}else{"$(@($global:dupObjects).Count) sets (Content mode)"})" -ElapsedMs $t2.ElapsedMs
 
-# check we found the actual duplicate
 $contentDups = @($global:dupObjects | Where-Object Mode -EQ 'Content')
 $foundDupe = $contentDups.Count -gt 0
 Add-TestResult -Cmdlet "Find-DowserDuplicate" -TestName "DetectsActualDupe" `
@@ -955,7 +939,6 @@ Add-TestResult -Cmdlet "ConvertTo-DowserBase64" -TestName "Decode" `
     }) `
     -Detail "$(if($t2.Error){$t2.Error}else{"Decoded to $([System.IO.Path]::GetFileName($b64Dec))"})" -ElapsedMs $t2.ElapsedMs
 
-# roundtrip content check
 if ((Test-Path $srcFile) -and (Test-Path $b64Dec)) {
     $orig = Get-Content $srcFile -Raw
     $round = Get-Content $b64Dec -Raw
@@ -974,7 +957,7 @@ if ((Test-Path $srcFile) -and (Test-Path $b64Dec)) {
         })
 }
 
-# ConvertTo-DowserExe (param check only - compilation requires Windows csc)
+# ConvertTo-DowserExe: param check only, compiling needs the windows csc
 Write-Host "  [ConvertTo-DowserExe]" -ForegroundColor DarkCyan
 $cmd = Get-Command ConvertTo-DowserExe
 Add-TestResult -Cmdlet "ConvertTo-DowserExe" -TestName "HasScriptPath" `
@@ -988,7 +971,7 @@ Add-TestResult -Cmdlet "ConvertTo-DowserExe" -TestName "HasScriptPath" `
 Add-TestResult -Cmdlet "ConvertTo-DowserExe" -TestName "CompileTest" -Status SKIP `
     -Detail "Requires Windows .NET csc compiler - skipped on Linux/WSL"
 
-# ConvertTo-DowserIco (param check only - System.Drawing not reliably available)
+# ConvertTo-DowserIco: param check only, System.Drawing isn't reliably there
 Write-Host "  [ConvertTo-DowserIco]" -ForegroundColor DarkCyan
 $cmd2 = Get-Command ConvertTo-DowserIco
 $hasInput = $cmd2.Parameters.ContainsKey('InputFilePath')
@@ -1004,7 +987,7 @@ Add-TestResult -Cmdlet "ConvertTo-DowserIco" -TestName "ParameterCheck" `
 Add-TestResult -Cmdlet "ConvertTo-DowserIco" -TestName "ConversionTest" -Status SKIP `
     -Detail "Requires System.Drawing + image file - skipped"
 
-# Get-DowserTemplate (Shell.Application - Windows COM only)
+# Get-DowserTemplate: Shell.Application is windows COM only, so linux skips
 Write-Host "  [Get-DowserTemplate]" -ForegroundColor DarkCyan
 $t = Invoke-Timed { @(Get-DowserTemplate -Path $smallDir -WarningAction SilentlyContinue -ErrorAction SilentlyContinue) }
 $resultCount = @($t.Result).Count
@@ -1021,9 +1004,7 @@ else {
         -Detail "$resultCount result(s)" -ElapsedMs $t.ElapsedMs
 }
 
-# ---------------------------------------------------------
-# T-05  timing benchmarks
-# ---------------------------------------------------------
+# t-05 timing benchmarks
 Write-Host "`nT-05: Timing Benchmarks" -ForegroundColor White
 $benchmarks = [System.Collections.Generic.List[object]]::new()
 
@@ -1084,9 +1065,7 @@ else {
     Add-TestResult -Cmdlet "Benchmark" -TestName "LargeTree" -Status SKIP -Detail "Path not found: $largeDir"
 }
 
-# ---------------------------------------------------------
-# T-06  edge cases
-# ---------------------------------------------------------
+# t-06 edge cases
 Write-Host "`nT-06: Edge Cases" -ForegroundColor White
 
 $emptyDir = Join-Path $tempBase "edge_empty"
@@ -1125,7 +1104,7 @@ Add-TestResult -Cmdlet "Find-DowserFile" -TestName "NonExistentPath" `
     }) `
     -Detail "$(if($t3.Error){"Error: $($t3.Error)"}else{"$rc3 results - graceful on nonexistent path"})" -ElapsedMs $t3.ElapsedMs
 
-# size filter - use KB/MB not bare "1B" (ConvertTo-DowserBytes parses KB/MB/GB/TB)
+# size filter: stick to KB/MB/GB/TB, ConvertTo-DowserBytes doesn't parse a bare "1B"
 $t4 = Invoke-Timed { @(Find-DowserFile -Path $smallDir -MinSize "1KB" -MaxSize "100KB" -UseRunspaces:$false) }
 $rc4 = @($t4.Result).Count
 Add-TestResult -Cmdlet "Find-DowserFile" -TestName "SizeFilter" `
@@ -1199,18 +1178,14 @@ Add-TestResult -Cmdlet "Find-DowserFile" -TestName "RecurseVsFlat" `
     }) `
     -Detail "Flat=$flatCount Recurse=$recurseCount"
 
-# ---------------------------------------------------------
 # cleanup
-# ---------------------------------------------------------
 try {
     Remove-Item $tempBase -Recurse -Force -ErrorAction SilentlyContinue 
 }
 catch {
 }
 
-# ---------------------------------------------------------
 # results summary
-# ---------------------------------------------------------
 $total = $script:TestResults.Count
 $passes = $script:PassCount
 $fails = $script:FailCount
@@ -1259,17 +1234,13 @@ if ($benchmarks.Count -gt 0) {
     $benchmarks | Sort-Object Tree, Cmdlet | Format-Table -AutoSize
 }
 
-# ---------------------------------------------------------
-# CSV export
-# ---------------------------------------------------------
+# csv export
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $csvPath = Join-Path $ReportDir "DowserTestResults_$stamp.csv"
 $script:TestResults | Export-Csv -Path $csvPath -NoTypeInformation -Force
 Write-Host "CSV  : $csvPath" -ForegroundColor Green
 
-# ---------------------------------------------------------
-# HTML export
-# ---------------------------------------------------------
+# html export
 $htmlPath = Join-Path $ReportDir "DowserTestResults_$stamp.html"
 
 function Escape-Html([string]$s) {

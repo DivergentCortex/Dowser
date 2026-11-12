@@ -1,10 +1,9 @@
 #Requires -Modules @{ModuleName='Pester';ModuleVersion='5.0'}
 
-# Probe symlink capability before Describe so the boolean is available at discovery time
-# (mirrors Get-DowserMap.Tests.ps1's convention). $global: is used because $script: set at
-# file scope is not visible inside Pester BeforeAll blocks. The probe creates and immediately
-# destroys a throwaway symlink; if the sandbox can't create one (e.g. Windows without Developer
-# Mode / elevation), the one symlink-skip assertion below is skipped rather than faked.
+# probe symlink support up front so -Skip can see it at discovery time
+# $global: because a $script: variable set at file scope is invisible inside BeforeAll
+# the probe makes a throwaway symlink and deletes it; where that's not allowed (windows
+# without developer mode or elevation) the symlink test skips instead of pretending
 $global:DowserTransferCanSymlink = $false
 $_dtProbeTarget = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserTransferProbeTarget'
 $_dtProbeLink = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserTransferProbeLink'
@@ -82,12 +81,9 @@ Describe 'Start-DowserTransfer' {
     }
 
     It 'treats an induced destination-write race as a hard failure that is never marked verified' {
-        # Start-DowserTransfer's safety contract is hash-source -> copy -> hash-dest -> compare,
-        # verified only on a match. To exercise that TOCTOU defense for real (no mocking, no
-        # calling the private worker directly), a background runspace continuously overwrites
-        # the destination file for the whole transfer, racing the worker's own copy/verify
-        # steps. That lands as either a genuine hash mismatch or a copy denied mid-write -
-        # both are real induced failures, and both must never be marked verified.
+        # no mocking: a background runspace keeps overwriting the destination for the whole
+        # transfer, racing the copy and verify steps. you get either a real hash mismatch or
+        # a copy denied mid-write, and neither may ever be marked verified
         $raceRoot = Join-Path $script:tempRoot 'Race'
         $raceSourceDir = Join-Path $raceRoot 'Source'
         $null = New-Item -ItemType Directory -Path $raceSourceDir -Force
@@ -137,12 +133,10 @@ Describe 'Start-DowserTransfer' {
     }
 
     It 'fails loudly on insufficient destination free space before touching the destination' {
-        # This exercises the shared "not enough room" failure path, not the non-Windows
-        # mount-matching fix itself (DriveInfo.GetDrives() boundary-prefix match against the
-        # actual filesystem backing -Destination, vs. GetPathRoot's collapsed "/"). Reproducing
-        # THAT specific fix would need a second real mount point distinct from the one backing
-        # this temp dir, which this sandbox does not have -- an untestable-in-this-environment
-        # gap, noted here rather than silently skipped.
+        # this covers the generic not-enough-room failure only. the non-windows mount
+        # matching (DriveInfo.GetDrives() prefix match against the filesystem behind
+        # -Destination, instead of GetPathRoot's "/") would need a second real mount point
+        # next to the temp dir, and this sandbox hasn't got one
         $spaceRoot = Join-Path $script:tempRoot 'Space'
         $spaceSourceDir = Join-Path $spaceRoot 'Source'
         $null = New-Item -ItemType Directory -Path $spaceSourceDir -Force

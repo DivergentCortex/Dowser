@@ -17,9 +17,8 @@
     These are smoke tests. They do not validate every code path; they validate that
     the cmdlet's public contract holds for the common scenarios.
 
-.NOTES
-    Run from the module root:
-        Invoke-Pester -Path .\Tests\Test-DowserIntegrity.Tests.ps1 -Output Detailed
+.EXAMPLE
+    Invoke-Pester -Path .\Tests\Test-DowserIntegrity.Tests.ps1 -Output Detailed
 #>
 
 BeforeAll {
@@ -28,25 +27,21 @@ BeforeAll {
 
     Import-Module $script:ManifestPath -Force -ErrorAction Stop
 
-    # Scratch directory
     $script:WorkDir = Join-Path ([System.IO.Path]::GetTempPath()) ("DowserIntegrity_" + [guid]::NewGuid().Guid.Substring(0, 8))
     New-Item -ItemType Directory -Path $script:WorkDir -Force | Out-Null
 
-    # Fixtures
     $script:EmptyFile = Join-Path $script:WorkDir 'empty.bin'
     $script:CleanText = Join-Path $script:WorkDir 'clean.txt'
     $script:CorruptExe = Join-Path $script:WorkDir 'broken.exe'
     $script:ThumbsDb = Join-Path $script:WorkDir 'Thumbs.db'
     $script:OfficeLock = Join-Path $script:WorkDir '~$document.docx'
 
-    # Create them
     New-Item -ItemType File -Path $script:EmptyFile -Force | Out-Null
 
     'This is a clean text file for baseline + read-access tests.' |
         Set-Content -LiteralPath $script:CleanText -Encoding ASCII
 
-    # Corrupt "EXE": bytes that are not MZ-prefixed.
-    # WriteAllBytes is version-agnostic; Set-Content -Encoding Byte was removed in PS6+.
+    # an "exe" with no MZ header; WriteAllBytes because Set-Content -Encoding Byte is gone in PS 6+
     [System.IO.File]::WriteAllBytes(
         $script:CorruptExe,
         [byte[]](0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)
@@ -137,7 +132,7 @@ Describe 'Test-DowserIntegrity - baseline' {
     It 'flags hash mismatch when baseline differs' {
         $baselineCsv = Join-Path $script:WorkDir 'baseline.csv'
 
-        # Capture the real hash but record a fake one in the baseline
+        # the baseline gets a fake hash, so the real one can't match
         $realHash = (Get-FileHash -LiteralPath $script:CleanText -Algorithm SHA256).Hash
         $fakeHash = ('0' * 64)
 
@@ -153,6 +148,6 @@ Describe 'Test-DowserIntegrity - baseline' {
         $cleanEntry.Status        | Should -Be 'Suspicious'
         $cleanEntry.BaselineMatch | Should -Be $false
         ($cleanEntry.Issues -join ' ') | Should -Match 'Hash mismatch'
-        $realHash | Should -Not -BeNullOrEmpty  # sanity: we did compute a hash
+        $realHash | Should -Not -BeNullOrEmpty  # sanity: the real hash did get computed
     }
 }
