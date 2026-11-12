@@ -2,6 +2,53 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.05.297] - 2026-11-05
+Tests comment cleanup, third pass: comments in Tests/Test-DowserIntegrity, Test-DowserLinuxBehavior, Test-DowserLogging, Test-DowserPlatformGuards, Test-DowserAliasCoverage, Start-DowserTransfer, Measure-DowserDiskUsage and Get-DowserMap test files rewritten to short lowercase notes; review ids, task numbers and dated fix narration removed; help blocks keep SYNOPSIS, DESCRIPTION and EXAMPLE only. Comment text only, no code or string changes.
+
+## [2026.11.05.296] - 2026-11-05
+Second comment pass over Public/ continued: Measure-DowserDirectory, Invoke-DowserNumericSort and Get-DowserTemplate comments reworded in lowercase plain language, #Requires directives restored to canonical casing, perf and platform notes restored. Comment text only; no code changed.
+
+## [2026.11.05.295] - 2026-11-05
+Tests comment cleanup, second pass: Tests/Invoke-DowserTestSuite.ps1 and Tests/Find-DowserFile.Tests.ps1 comments rewritten to short lowercase notes, three-line section banners collapsed to one-line markers, ALL-CAPS and restated-code comments removed. Comment text only; the author .NOTES banner in Get-ScriptPath is untouched. Non-comment token stream checked against the pre-change snapshot.
+
+## [2026.11.05.294] - 2026-11-05
+### Changed
+- Private/*.ps1 and Aliases/Aliases.ps1: comment-only cleanup. Rewrote inline comments as short lowercase notes, trimmed help-block descriptions to concise factual text, and dropped history and restating comments. No code, strings or behavior changed.
+
+## [2026.11.05.293] - 2026-11-05
+Second comment pass over Public/ continued: Get-DowserOwnership, Get-DowserProperty, Get-DowserTopology, Measure-DowserDiskUsage and Test-DowserIntegrity inline comments restored or reworded in lowercase plain language (platform quirks, pe header offsets, depth guard). Comment text only; no code changed.
+
+## [2026.11.05.292] - 2026-11-05
+Second comment pass over Public/ (Get-DowserInfo through Test-DowserJson): restored comments that explain platform quirks, runspace limits and binary-format details, and rewrote inline comments in lowercase, plain wording. Comment text only; the non-comment token stream of each file is unchanged.
+
+## [2026.11.05.291] - 2026-11-05
+Comment-only cleanup in Public/Compare-DowserDirectory.ps1, ConvertTo-DowserBase64.ps1, ConvertTo-DowserExe.ps1, ConvertTo-DowserIco.ps1, Expand-DowserExe.ps1, Find-DowserDuplicate.ps1, Find-DowserModified.ps1, Find-DowserOrphan.ps1, Find-DowserRecentLog.ps1, Find-DowserScript.ps1, Find-DowserDependency.ps1. Tightened help text, removed porting/history notes and a stale MaxSize comment, rewrote inline comments in lowercase plain language. No code, strings, or behavior changed; parser token sequences verified identical against pre-edit snapshots.
+
+## [2026.11.05.290] - 2026-11-05
+Get-DowserMap gains -Search: -IncludeFolders name entries match any folder whose name contains them ('research' finds '.research', 'research-notes'), with no wildcards typed. Default matching stays exact apart from the leading-dot allowance. Hidden folders matched by name are admitted by every listing path through Test-HiddenAdmitted.
+
+## [2026.11.05.289] - 2026-11-05
+### Changed
+- Dowser.psm1, Dowser.psd1, Aliases/Aliases.ps1: comment-only cleanup. Removed file-path headers and comments that restated the code, rewrote the remaining inline comments as short lowercase notes, and made the manifest help block describe the manifest. No code, strings or behavior changed.
+
+## [2026.11.05.288] - 2026-11-05
+Get-DowserMap builds one parallel folder index before rendering when a file or folder filter is active. The new Private/Invoke-DowserMapIndexScan.ps1 and Invoke-DowserMapIndexWorker.ps1 list directories from a shared queue on a runspace pool, then fold the results bottom-up into MatchCache and IncludeFolderCache, storing negatives as well as positives. The old pre-scan is removed: its root job re-walked the whole tree, it ignored folder excludes, and it recorded only matches. IncludeFolders name matching ignores a leading dot, so 'research' also finds '.research'. Hidden folders matched by IncludeFolders are listed without -IncludeHidden; other hidden items are unchanged.
+
+## [2026.11.05.287] - 2026-11-05
+Tests comment cleanup (comment-only, no code, string or behavior change): rewrote comments in Tests/Select-DowserUniquePath.Tests.ps1, Tests/Test-DowserCrossPlatform.Tests.ps1, Tests/Measure-DowserDirectory.Tests.ps1 and Tests/Find-DowserFile.Tests.ps1 into short lowercase notes that keep only non-obvious fixture, platform and ordering context. Removed review references, dated fix narration and comments that restated test names. Non-comment token sequence verified identical to the pre-change snapshot with the PowerShell parser.
+
+## [2026.11.05.286] - 2026-11-05
+Comment cleanup in Public/Test-DowserExtractable.ps1 and Test-DowserIntegrity.ps1. Replaced banner separators with one-line step markers, dropped restated-code comments and informal wording. Comment text only; the non-comment token stream of each file is unchanged.
+
+## [2026.11.05.285] - 2026-11-05
+Comment cleanup in Public/Measure-DowserDiskUsage.ps1, New-DowserHiddenFolder.ps1, Remove-DowserTransferSource.ps1, Start-DowserTransfer.ps1 and Test-DowserExtractable.ps1. Removed porting and source-file notes, banner separators and restated-code comments; condensed help descriptions. Comment text only; the non-comment token stream of each file is unchanged.
+
+## [2026.11.05.284] - 2026-11-05
+Comment cleanup in Public/ (Get-DowserReport, Get-DowserProperty, Get-DowserTopology, Get-DowserTemplate, Invoke-DowserFastSearch, Invoke-DowserNumericSort, Measure-DowserDirectory, Measure-DowserDiskUsage). Removed porting, history and review references, banner separators and restated-code comments; condensed help text. Comment text only; the non-comment token stream of each file is unchanged.
+
+## [2026.11.05.283] - 2026-11-05
+Comment cleanup in Public/Get-DowserInfo.ps1, Get-DowserJsonKey.ps1, Get-DowserOwnership.ps1 and Get-DowserProperty.ps1. Removed porting and history notes, restated-code comments and duplicate parameter comments; tightened help text; kept the author banner and the platform notes for the Windows-only shell COM paths. Comment text only; the non-comment token stream of each file is unchanged.
+
 ## [2026.10.31.282] - 2026-10-31
 Aligned the folder-exclusion comment with persistent folder matching below selected folders.
 
