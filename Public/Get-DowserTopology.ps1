@@ -1,8 +1,5 @@
 #Requires -Version 5.1
 
-# depth check must come first or recursion runs away
-# InColor needs the DynamicParam block, do not remove it
-
 function Get-DowserTopology {
     <#
     .SYNOPSIS
@@ -18,7 +15,6 @@ function Get-DowserTopology {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-        Ported from: Get-TreeTopology.ps1 (standalone scripts)
         Opt-in aliases via Enable-DowserAliases: Get-Tree, pstree, shtree
 
     .DESCRIPTION
@@ -97,6 +93,7 @@ function Get-DowserTopology {
         [string[]]$ShowProperty
     )
 
+    # -InColor only makes sense on a filesystem path, so it's a dynamic param. don't "simplify" it away
     dynamicparam {
         if ($PSBoundParameters.ContainsKey("Path")) {
             $here = $PSBoundParameters["Path"]
@@ -131,7 +128,7 @@ function Get-DowserTopology {
         }
 
         if ($PSBoundParameters.ContainsKey("InColor")) {
-            # PSAnsiFileMap is ps7+ only, null on 5.1 and indexing null-refs
+            # PSAnsiFileMap is ps7+ only; on 5.1 it's null and indexing it goes badly
             if ($PSVersionTable.PSVersion.Major -ge 7) {
                 $Colorize = $True
                 $script:top = ($global:PSAnsiFileMap).where({ $_.description -eq 'TopContainer' }).Ansi
@@ -284,6 +281,7 @@ function Get-DowserTopology {
             )
             Write-Log "Starting $($MyInvocation.MyCommand) on $Path" -Severity Verbose
             Write-Log ($PSBoundParameters | Out-String) -Severity Verbose
+            # depth check has to come first or the recursion never stops
             if ($IsLast.Count -gt $Depth) {
                 return 
             }

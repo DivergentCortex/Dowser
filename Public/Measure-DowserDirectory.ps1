@@ -15,10 +15,6 @@ function Measure-DowserDirectory {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: Measure-Directory (opt-in via Enable-DowserAliases)
-        Source: Get-DirectorySizeCounts.ps1 (standalone scripts)
-        Ported: removed legacy write-alias dot-source and replaced custom write-alias calls with Write-Log.
-        Output improved: NewestFile/OldestFile split into separate Name/Date properties instead
-        of a single concatenated string.
         Related: Get-DowserTree (tree traversal), Get-DowserReport (per-file metrics)
 
     .DESCRIPTION
@@ -45,10 +41,6 @@ function Measure-DowserDirectory {
         The default table view shows Folder, FileCount, ModifiedToday, ModifiedWithinDays,
         OlderThanDays, NewestFileAge, NewestFileName, and DataSize; every other property is on
         the object (Format-List * or Select-Object) for scripting.
-
-        Replaces Get-DirectorySizeCounts. Verb changed from Get to Measure because this is
-        a sizing/counting operation, not a retrieval. Inline ConvertFrom-Bytes removed;
-        all byte formatting now routes through Format-DowserSize (Private\).
 
     .PARAMETER Path
         Root directory to measure. Defaults to current directory.
@@ -87,8 +79,7 @@ function Measure-DowserDirectory {
 
     .OUTPUTS
         PSCustomObject per subdirectory (plus an optional '.' root row): Folder, Directory,
-        FileCount (recursive files), ItemCount (immediate children, folders included; this was
-        the value previously reported as FileCount), ModifiedToday, ModifiedWithinDays,
+        FileCount (recursive files), ItemCount (immediate children, folders included), ModifiedToday, ModifiedWithinDays,
         OlderThanDays, RecentDays, NewestFileAge, NewestFileName, NewestFileDate,
         OldestFileName, OldestFileDate, DataSize, SizeBytes, LargestFile, LargestFileName.
     #>
@@ -112,8 +103,8 @@ function Measure-DowserDirectory {
 
     begin {
         Write-Log "Starting Measure-DowserDirectory"
-        # One reference instant for every row, so buckets and ages are consistent across folders.
-        # -Now makes it injectable; tests pass their fixture instant instead of racing midnight.
+        # one reference instant for every row so buckets and ages agree across folders. -Now
+        # makes it injectable, so tests hand in a fixed time instead of racing midnight
         $runNow = $Now
         $todayStart = $runNow.Date
         $recentCutoff = $runNow.AddDays(-$RecentDays)
@@ -125,7 +116,7 @@ function Measure-DowserDirectory {
             param([string]$DirectoryPath, [string]$FolderName, [int]$ItemCount, [object[]]$Files)
             $stats = Measure-DowserFileSet -Files $Files -TodayStart $todayStart -RecentCutoff $recentCutoff
             if ($stats.Newest -and $stats.Newest.LastWriteTime -gt $runNow) {
-                # Clock skew or backdated copies: leave a trace beyond the 'in future' table cell.
+                # clock skew or backdated copies, so leave a trace in the log too
                 Write-Log "Measure-DowserDirectory: newest file under '$DirectoryPath' is dated in the future ($($stats.Newest.Name), $($stats.Newest.LastWriteTime))" -Severity Verbose
             }
             $row = [PSCustomObject][Ordered]@{
@@ -156,7 +147,6 @@ function Measure-DowserDirectory {
         foreach ($rootPath in $Path) {
             Write-Log "Measure-DowserDirectory scanning subdirectories under '$rootPath'" -Severity Verbose
 
-            # A file passed as -Path used to produce a '.' row describing that single file.
             if (-not (Test-Path -LiteralPath $rootPath -PathType Container)) {
                 Write-Log "Measure-DowserDirectory: '$rootPath' is not a folder; pass a directory to measure its subfolders" -Severity Warning
                 continue
@@ -164,8 +154,7 @@ function Measure-DowserDirectory {
 
             $directoryItems = $null
             try {
-                # -Force so hidden and dot-prefixed folders (.git, .claude) get a row like any
-                # other; without it they were silently absent from the whole report.
+                # -Force or .git and .claude quietly vanish from the report
                 $directoryItems = @(Get-ChildItem -LiteralPath $rootPath -Directory -Force -ErrorAction Stop |
                     Sort-Object Name)
             }
@@ -174,8 +163,7 @@ function Measure-DowserDirectory {
                 continue
             }
 
-            # Loose files directly under the root were never reported before; they get a '.'
-            # row, emitted only when there are any.
+            # loose files directly under the root get a '.' row, only when there are any
             $rootFiles = @()
             try {
                 $rootFiles = @(Get-ChildItem -LiteralPath $rootPath -File -Force -ErrorAction Stop)
@@ -193,22 +181,16 @@ function Measure-DowserDirectory {
 
                 $subFolderItems = $null
                 try {
-                    # ItemCount keeps the old 'FileCount' meaning (immediate children, folders
-                    # included), now with -Force so it counts the same hidden items FileCount does.
+                    # immediate children, folders included; -Force so hidden items count the way FileCount does
                     $itemCount = @(Get-ChildItem -LiteralPath $dir.FullName -Force -ErrorAction Stop).Count
                     if ($PSVersionTable.PSVersion.Major -ge 6) {
-                        # PowerShell 6+: Get-ChildItem -Recurse does not follow symlinked
-                        # directories (verified by execution in both task 1831 reviews), and it is
-                        # about 15x faster than the script-level walker on large trees (25.7s vs
-                        # 388.7s on 955k files).
+                        # pwsh 6+ -Recurse leaves symlinked directories alone and is about 15x faster than the walker on big trees
                         $scanErrors = $null
                         $subFolderItems = @(Get-ChildItem -LiteralPath $dir.FullName -Recurse -File -Force -ErrorAction SilentlyContinue -ErrorVariable scanErrors)
                         $skipped = @($scanErrors).Count
                     }
                     else {
-                        # Windows PowerShell 5.1: -Recurse follows directory symlinks and junctions,
-                        # so a link loop could hang the scan. Use the pruning walker, which never
-                        # follows symlinked directories.
+                        # 5.1 -Recurse follows symlinks and junctions, so one link loop and the scan never ends. use the pruning walker
                         $scan = Get-DowserRelativeFileMap -Root $dir.FullName
                         $subFolderItems = @($scan.Map.Values)
                         $skipped = $scan.Errors

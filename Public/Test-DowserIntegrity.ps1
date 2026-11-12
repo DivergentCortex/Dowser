@@ -18,9 +18,9 @@ function Test-DowserIntegrity {
         Related: Test-DowserExtractable, Get-DowserReport, Expand-DowserExe
 
     .DESCRIPTION
-        Layered integrity validation. Not one magic "is this corrupt" test.
-    "Corrupt" depends on file type, so this cmdlet dispatches by category
-    and reports what it checked and how confident it is.
+        Layered integrity validation. What counts as corrupt depends on file type, so
+    the cmdlet dispatches by category and reports what it checked and how confident
+    it is.
 
     Layers:
 
@@ -69,7 +69,7 @@ function Test-DowserIntegrity {
        Warning     Soft issue that does not prove damage (e.g., zero bytes).
        Suspicious  Baseline drift (size or hash mismatch).
        Residue     Otherwise-OK file carrying a hygiene flag (MOTW, Hidden,
-                   residue filename). These are the SCCM-distribution killers.
+                   residue filename). These block SCCM distribution.
        Unverified  Partial check only. Rare. Example: MSI detected by OLE
                    magic with no 7-Zip available for full structural test.
 
@@ -560,8 +560,8 @@ function Test-DowserIntegrity {
             '^Thumbs\.db$',
             '^desktop\.ini$',
             '^\.DS_Store$',
-            '^\._',            # macOS AppleDouble companions
-            '^~\$',            # Office lock / temp
+            '^\._',            # macos appledouble sidecars
+            '^~\$',            # office lock and temp files
             '\.tmp$',
             '\.bak$',
             '\.orig$',
@@ -591,7 +591,7 @@ function Test-DowserIntegrity {
                 }
             }
 
-            # zone.identifier ADS is the sccm killer
+            # zone.identifier streams block sccm distribution
             try {
                 $streams = Get-Item -LiteralPath $File.FullName -Stream '*' -ErrorAction Stop |
                     Where-Object { $_.Stream -ne ':$DATA' }

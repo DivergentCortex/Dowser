@@ -17,15 +17,13 @@ function Remove-DowserTransferSource {
         Date Created:   2026-08-16
 
     .DESCRIPTION
-        Reads a JSON manifest produced by Start-DowserTransfer and deletes ONLY the
-        source files recorded as hash-matched/verified in that manifest. Never runs as
-        a side effect of Start-DowserTransfer; a manifest path must always be given
-        explicitly, there is no implicit "last run" lookup. Before deleting each source
-        file, re-hashes both the source file and the destination file and compares each
-        against its recorded hash in the manifest, as a defense against a source file
-        that changed after transfer but before this deletion pass, and against a stale
-        or tampered manifest. Any entry whose source or destination hash no longer
-        matches is logged and skipped, never deleted. Supports -WhatIf.
+        Reads a manifest written by Start-DowserTransfer and deletes only the source files
+        it records as hash-verified. The manifest path is always explicit; nothing is
+        deleted as a side effect of a transfer. Before each delete, the source and
+        destination files are re-hashed and compared with the manifest, which guards
+        against files that changed after the transfer and against stale or tampered
+        manifests. An entry whose hashes no longer match is logged and skipped.
+        Supports -WhatIf.
 
     .PARAMETER ManifestPath
         Path to the JSON manifest written by Start-DowserTransfer.

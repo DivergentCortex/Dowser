@@ -14,7 +14,6 @@
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     Alias: dtest, dtestexe
     Related: Expand-DowserExe, Get-DowserProperty
-    Source: docs/exe-static-classification-reference.md
 
 .DESCRIPTION
     Analyzes EXE files to determine if they contain extractable archive payloads
@@ -77,9 +76,6 @@
     Confidence, FileCount, Details, and the raw Detections list.
 #>
 
-# EXE extractability probe. multi-tier static analysis + optional 7-Zip oracle.
-# does NOT execute the target binary. all analysis is read-only.
-
 function Test-DowserExtractable {
     [CmdletBinding()]
     param(
@@ -114,7 +110,7 @@ function Test-DowserExtractable {
             }
         }
 
-        # expand.exe for native CAB detection
+        # expand.exe is how cab files get sniffed without any third-party tools
         $expandExe = if ($IsWindows -eq $false) {
             $null 
         }
@@ -123,10 +119,7 @@ function Test-DowserExtractable {
         }
         $hasExpand = $expandExe -and (Test-Path $expandExe)
 
-        # -------------------------------------------------------------------
-        # 7z Type= values that indicate extractable content
-        # Source: 7-Zip CPP/7zip/Archive/ handlers
-        # -------------------------------------------------------------------
+        # 7z Type= values that mean there is something worth extracting
         $extractable7zTypes = @(
             'Nsis', '7z', 'Zip', 'Cab', 'Rar', 'Rar5', 'Inno',
             'Msi', 'Compound', 'Wim', 'Iso', 'Tar', 'GZip', 'BZip2',
@@ -136,9 +129,7 @@ function Test-DowserExtractable {
         )
         $nonExtractable7zTypes = @('PE', 'Elf', 'Macho', 'Swf', 'Te', 'Efi')
 
-        # -------------------------------------------------------------------
-        # PE section patterns (internal structure, not useful payloads)
-        # -------------------------------------------------------------------
+        # 7z will happily list a pe's own sections as "files"; these names are the binary itself, not a payload
         $peSectionPatterns = @(
             '^\.text$', '^\.rdata$', '^\.data$', '^\.reloc$', '^\.pdata$',
             '^\.edata$', '^\.idata$', '^\.tls$', '^\.debug$', '^\.bss$',
@@ -146,19 +137,13 @@ function Test-DowserExtractable {
             '^\[0\]$', '^\[1\]$'
         )
 
-        # -------------------------------------------------------------------
-        # Framework-specific PE section names [HIGH_CONFIDENCE]
-        # -------------------------------------------------------------------
         $sectionFingerprints = @{
             '.ndata'        = @{ Framework = 'NSIS'; Extractable = $true; Note = 'NSIS installer - unique section' }
             '.wixburn'      = @{ Framework = 'WiX_Burn'; Extractable = $true; Note = 'WiX Burn bootstrapper' }
             '.go.buildinfo' = @{ Framework = 'Go_Native'; Extractable = $false; Note = 'Go binary (1.13+)' }
         }
-        # UPX and Delphi checked separately (need multiple section matches)
+        # UPX and delphi are checked separately below, they need more than one section to match
 
-        # -------------------------------------------------------------------
-        # VersionInfo fingerprints (expanded from research)
-        # -------------------------------------------------------------------
         $frameworkFingerprints = [ordered]@{
             'NSIS'              = @{ Patterns = @('Nullsoft', 'NSIS', 'Nullsoft Install System'); Extractable = $true }
             'InnoSetup'         = @{ Patterns = @('Inno Setup', 'Jordan Russell', 'Martijn Laan'); Extractable = $true }
@@ -178,7 +163,7 @@ function Test-DowserExtractable {
             'Squirrel'          = @{ Patterns = @('Squirrel.Windows'); Extractable = $false }
         }
 
-        # Also check OriginalFilename separately (very reliable for some tools)
+        # OriginalFilename is checked on its own because it is very reliable for some tools
         $originalFilenameFingerprints = @{
             'AutoHotkey.exe'   = @{ Framework = 'AutoHotkey'; Extractable = $false }
             'AutoHotkey64.exe' = @{ Framework = 'AutoHotkey'; Extractable = $false }
@@ -192,10 +177,7 @@ function Test-DowserExtractable {
             'WZSEPE32.EXE'     = @{ Framework = 'WinZip_SFX'; Extractable = $true }
         }
 
-        # -------------------------------------------------------------------
-        # Overlay archive signatures (checked at overlay start)
-        # -------------------------------------------------------------------
-        # Format: Name, Bytes, MinLength
+        # archive signatures checked at the overlay start
         $overlaySignatures = @(
             @{ Name = '7z'; Bytes = [byte[]]@(0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C); Extractable = $true }
             @{ Name = 'RAR4'; Bytes = [byte[]]@(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00); Extractable = $true }
@@ -205,20 +187,18 @@ function Test-DowserExtractable {
             @{ Name = 'MSI'; Bytes = [byte[]]@(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1); Extractable = $true }
         )
 
-        # ZIP EOCD signature for backward scan
+        # ZIP EOCD signature, found by scanning backward from the end of the file
         $zipEOCD = [byte[]]@(0x50, 0x4B, 0x05, 0x06)
 
-        # PyInstaller PKG trailer magic (scan last 4096 bytes)
-        # Source: PyInstaller bootloader/src/pyi_archive.c
+        # PyInstaller PKG trailer magic, scanned in the last 4096 bytes (pyi_archive.c)
         $pyiMagic = [byte[]]@(0x4D, 0x45, 0x49, 0x0C, 0x0B, 0x0A, 0x0B, 0x0E)
 
-        # AutoIt v3 compiled script signature
         $autoItMagic = [byte[]]@(0x41, 0x55, 0x33, 0x21, 0x45, 0x41, 0x30, 0x36)
 
         # NSIS block magic (little-endian 0xDEADBEEF)
         $nsisDeadbeef = [byte[]]@(0xEF, 0xBE, 0xAD, 0xDE)
 
-        # Max file size for full byte read (100 MB)
+        # past 100 MB we read headers only instead of slurping the whole file
         $maxReadSize = 104857600
 
         function Test-ByteMatch {
@@ -305,9 +285,6 @@ function Test-DowserExtractable {
                     Detections      = [System.Collections.Generic.List[string]]::new()
                 }
 
-                # =============================================================
-                # Read file bytes
-                # =============================================================
                 $bytes = $null
                 $fullRead = $false
                 try {
@@ -326,7 +303,7 @@ function Test-DowserExtractable {
                     continue
                 }
 
-                # large file, headers only to skip a full read
+                # large file: read headers only
                 if (-not $fullRead) {
                     try {
                         $headerStream = [System.IO.File]::OpenRead($file.FullName)
@@ -343,9 +320,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 1: MZ / PE Validation
-                # =============================================================
+                # step 1: MZ / PE validation
                 if ($bytes.Length -lt 64 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
                     $result.Classification = 'NotPE'
                     $result.DetectionMethod = 'PEHeader'
@@ -369,15 +344,13 @@ function Test-DowserExtractable {
                     continue
                 }
 
-                # =============================================================
-                # Step 2: Parse COFF + Optional Header + COM_DESCRIPTOR
-                # =============================================================
+                # step 2: COFF, optional header and COM_DESCRIPTOR
                 $numSections = [BitConverter]::ToUInt16($bytes, $peOffset + 6)
                 $sizeOfOptHdr = [BitConverter]::ToUInt16($bytes, $peOffset + 20)
                 $optHeaderStart = $peOffset + 24
                 $sectionTableOff = $optHeaderStart + $sizeOfOptHdr
 
-                # PE32 vs PE32+
+                # PE32 vs PE32+: the data directories sit at different offsets
                 $optMagic = 0
                 $isPE32Plus = $false
                 if ($optHeaderStart + 2 -lt $bytes.Length) {
@@ -385,7 +358,7 @@ function Test-DowserExtractable {
                     $isPE32Plus = ($optMagic -eq 0x020B)
                 }
 
-                # COM_DESCRIPTOR (data directory index 14) - .NET detection
+                # data directory 14 is COM_DESCRIPTOR, and non-zero there means .NET
                 $ddBaseOffset = if ($isPE32Plus) {
                     112 
                 }
@@ -409,9 +382,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 3: Section Name Analysis
-                # =============================================================
+                # step 3: section names
                 $sections = @()
                 $maxSectionEnd = 0
                 for ($s = 0; $s -lt $numSections; $s++) {
@@ -431,7 +402,6 @@ function Test-DowserExtractable {
                 $sectionNameList = $sections | ForEach-Object { $_.Name }
                 $result.SectionNames = $sectionNameList -join ', '
 
-                # Check framework-specific section names
                 foreach ($secFp in $sectionFingerprints.GetEnumerator()) {
                     if ($sectionNameList -contains $secFp.Key) {
                         $sfVal = $secFp.Value
@@ -474,7 +444,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # Delphi detection: uppercase CODE/DATA sections or DVCLAL resource
+                # delphi shows up as uppercase CODE and DATA sections
                 if ($sectionNameList -contains 'CODE' -and $sectionNameList -contains 'DATA') {
                     $result.Detections.Add('Delphi: uppercase CODE/DATA sections [HIGH_CONFIDENCE]')
                     if (-not $result.InstallerType) {
@@ -487,9 +457,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 4: Overlay Analysis
-                # =============================================================
+                # step 4: overlay
                 $overlayOffset = $maxSectionEnd
                 $overlaySize = [Math]::Max(0, $file.Length - $overlayOffset)
                 $result.HasOverlay = ($overlaySize -gt 64)
@@ -580,9 +548,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 5: VersionInfo Fingerprinting
-                # =============================================================
+                # step 5: VersionInfo fingerprints
                 try {
                     $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName)
                     $versionFields = @(
@@ -595,7 +561,6 @@ function Test-DowserExtractable {
                     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
                     $allVersionText = $versionFields -join ' '
 
-                    # originalfilename is the most reliable version field
                     $origFn = $versionInfo.OriginalFilename
                     if ($origFn -and $originalFilenameFingerprints.ContainsKey($origFn)) {
                         $ofFp = $originalFilenameFingerprints[$origFn]
@@ -649,9 +614,7 @@ function Test-DowserExtractable {
                     Write-Log "Test-DowserExtractable failed reading VersionInfo for '$($file.Name)': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 }
 
-                # =============================================================
-                # Step 6: Binary String Scanning (first+last 1MB if full read)
-                # =============================================================
+                # step 6: binary string scan (first and last 1MB on a full read)
                 if ($fullRead -and $result.Classification -eq 'Unknown') {
                     $scanEnd = [Math]::Min($bytes.Length, 1048576)
                     $tailStart = [Math]::Max(0, $bytes.Length - 1048576)
@@ -740,9 +703,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 7: Native Windows Detection (no third-party tools)
-                # =============================================================
+                # step 7: native windows detection, no third-party tools
                 if ($result.Classification -eq 'Unknown' -or $result.Detections.Count -eq 0) {
                     try {
                         Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
@@ -785,9 +746,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Step 8: 7-Zip Oracle (definitive, overrides earlier tiers)
-                # =============================================================
+                # step 8: ask 7z, whose answer beats every earlier tier
                 if ($has7Zip) {
                     try {
                         $7zOutput = & $SevenZipPath l $file.FullName 2>&1 | Out-String
@@ -854,7 +813,6 @@ function Test-DowserExtractable {
                             }
                         }
 
-                        # 7z is the oracle, it overrides every earlier tier
                         if ($detectedArchiveType -or $realFiles.Count -gt 0) {
                             $result.Extractable = $true
                             $result.Classification = 'Extractable'
@@ -910,9 +868,7 @@ function Test-DowserExtractable {
                     }
                 }
 
-                # =============================================================
-                # Fallback Classification
-                # =============================================================
+                # nothing matched, so make a best guess from what we do know
                 if ($result.Classification -eq 'Unknown') {
                     if ($result.IsNET) {
                         $result.Extractable = $false

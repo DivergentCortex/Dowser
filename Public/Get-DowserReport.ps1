@@ -1,9 +1,5 @@
 #Requires -Version 5.1
 
-# two-phase parallel file report. gather dirs first, analyze chunks in phase 2.
-# runspace block has its own size formatter, cant reach Format-DowserSize from there
-# ConvertTo-DowserBytes handles MinSize/MaxSize string parsing from module Private.
-
 function Get-DowserReport {
     <#
     .SYNOPSIS
@@ -17,19 +13,10 @@ function Get-DowserReport {
         =-=-                       =-=-=-=-=-=-=-=                     -=-=
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-        Ported from: Get-FileReport.ps1 (standalone scripts)
-        Uses: Private\Format-DowserSize, Private\ConvertTo-DowserBytes
-        Note: The runspace analyzeScriptBlock contains a local inline size formatter
-              because module-scope functions are not reachable from runspace threads.
-              This is intentional. Do not refactor it out.
     .DESCRIPTION
-        Scans a single file, folder, or entire directory tree and produces a detailed
-        metrics report including file size, line count, word count, character count,
-        timestamps, attributes, and optionally file ownership.
-
-        Uses RunspacePool-based parallel processing for both file gathering and file
-        analysis phases.
+        Scans a single file, folder, or directory tree and reports size, line, word and
+        character counts, timestamps, attributes, and optionally file owner. File gathering
+        and file analysis both run on runspace pools.
     .PARAMETER Path
         The file or directory path(s) to analyze. Accepts pipeline input.
         Can be a single file, a folder, or multiple paths.
@@ -157,9 +144,7 @@ function Get-DowserReport {
             $resolvedPath = (Resolve-Path $p).ProviderPath
             $isSingleFile = (Test-Path $resolvedPath -PathType Leaf)
 
-            # ================================================================
-            # SINGLE FILE MODE - skip runspaces entirely
-            # ================================================================
+            # one file doesn't need a pool, so skip the runspaces entirely
             if ($isSingleFile) {
                 Write-Log "Single file mode: $resolvedPath" -Severity Verbose
                 $fileItem = Get-Item -LiteralPath $resolvedPath -Force -ErrorAction SilentlyContinue
@@ -222,9 +207,7 @@ function Get-DowserReport {
                 continue
             }
 
-            # ================================================================
-            # PHASE 1: FILE GATHERING (runspace pool, directory-partitioned)
-            # ================================================================
+            # phase 1: gather files, one runspace job per top-level directory
             Write-Progress -Activity "Get-DowserReport" -Status "Scanning directory structure..." -PercentComplete -1
 
             $filesFound = New-Object System.Collections.Concurrent.ConcurrentBag[string]
@@ -352,19 +335,15 @@ function Get-DowserReport {
 
             if ($fileCount -eq 0) {
                 Write-Log "Get-DowserReport no files found in '$resolvedPath' matching criteria" -Severity Warning
-                # -Depth 0 (the default) reads only files directly inside -Path, so a folder of
-                # folders silently reports nothing. Say so when that is the reason.
+                # -Depth 0 only looks at files directly in -Path, so a folder full of folders finds nothing; say so
                 if ($Depth -eq 0 -and @(Get-ChildItem -LiteralPath $resolvedPath -Directory -Force -ErrorAction SilentlyContinue).Count -gt 0) {
                     Write-Log "Get-DowserReport scanned only the top level of '$resolvedPath' (-Depth 0, the default), which has subfolders but no matching files; pass -Depth -1 to include every subfolder, or use Measure-DowserDirectory for per-folder recency" -Severity Warning
                 }
                 continue
             }
 
-            # ================================================================
-            # PHASE 2: FILE ANALYSIS (runspace pool, chunked processing)
-            # ================================================================
-
-            # inline formatter, runspace cant reach Format-DowserSize, dont redirect
+            # phase 2: analyze files in chunks. runspaces can't see module functions, which is
+            # why the size formatter below is inlined instead of calling Format-DowserSize
             $analyzeScriptBlock = {
                 param($FilePaths, $DoIncludeOwner, $ScanRoot)
 
@@ -410,7 +389,7 @@ function Get-DowserReport {
                         }
                     }
 
-                    # cant reach Format-DowserSize from runspace scope
+                    # a copy of Format-DowserSize, on purpose, see the phase 2 note
                     $bytes = $fileItem.Length
                     $sizeFormatted = "$bytes B"
                     if ($bytes -ge 1TB) {
@@ -556,7 +535,7 @@ function Get-DowserReport {
             $sortedResults = $script:allResults | Sort-Object @sortParams
         }
 
-        # grouped view only for multi-dir scans
+        # grouped view only earns its keep when more than one folder is in play
         if ($Depth -ne 0) {
             $groupedType = 'FileReport.GroupedResult'
             $ownerHeader = ''

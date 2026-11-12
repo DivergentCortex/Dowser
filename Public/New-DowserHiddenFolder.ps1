@@ -13,9 +13,6 @@ function New-DowserHiddenFolder {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-        Source: create-hiddenfolder (standalone scripts, was hardcoded to an internal project path)
-        Rewritten to accept -Path parameter; no hardcoded paths.
-
     .DESCRIPTION
         Creates a hidden/system folder that won't appear in normal directory listings.
         Useful for storing module-private data, config caches, or temporary work dirs
