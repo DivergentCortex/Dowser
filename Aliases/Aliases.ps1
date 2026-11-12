@@ -1,9 +1,4 @@
-# Aliases\Aliases.ps1
-# brandless verb-noun aliases for the dowser commands
-# not applied on import so a public load never squats generic names
-# opt in with Enable-DowserAliases or drop that line in your profile
-
-# file-scope map so psm1 can register aliases at module scope via a top-level loop
+# opt-in on purpose: importing a module shouldn't quietly claim Find-File and friends
 $DowserAliasMap = [ordered]@{
     'Compare-Directory'     = 'Compare-DowserDirectory'
     'Compare-Report'        = 'Compare-DowserReport'
@@ -48,18 +43,11 @@ function Enable-DowserAliases {
         Register short brandless aliases for the Dowser commands in the current session.
 
     .DESCRIPTION
-        Dowser exports its commands under branded verb-Dowser-noun names so importing the
-        module never drops generic names like Find-File or Get-Info into your session
-        uninvited. This function opts the current session into the natural verb-noun forms
-        by registering them as global aliases.
-
-        Put it in your PowerShell profile to have the aliases in every session:
-
-            Enable-DowserAliases
-
-        A name already taken by another command is left alone and reported, so this will not
-        clobber another module's Find-File or the system pstree on Linux. Pass -Force to
-        override a non-builtin name; builtins (cmdlets and native apps) are never touched.
+        Registers global aliases such as Find-File and Get-Info for the Dowser commands.
+        A name already taken by another command, for example the system pstree on Linux,
+        is skipped and logged. Pass -Force to override a non-builtin name; cmdlets and
+        native applications are never overridden. Add the call to a profile to enable
+        the aliases in every session.
 
     .PARAMETER Force
         Overwrite an alias or function name that already exists. Builtins are still skipped.
@@ -96,11 +84,10 @@ function Enable-DowserAliases {
     foreach ($alias in $DowserAliasMap.Keys) {
         $target = $DowserAliasMap[$alias]
 
-        # leave a name that already exists alone
         $existing = Get-Command -Name $alias -ErrorAction SilentlyContinue
         if ($existing) {
             if ($existing.CommandType -eq 'Alias' -and $existing.Definition -eq $target) {
-                continue   # already ours, nothing to do
+                continue
             }
             # never shadow a builtin, force or not
             if ($existing.CommandType -in 'Cmdlet', 'Application') {
