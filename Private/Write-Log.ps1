@@ -1,20 +1,8 @@
-# ===========================================================================
-#  Write-Log.ps1 - canonical dot-source logging helper
-#
-#  This is the single-file dot-source form of the DivergentCortex.Witness module.
-#  Same behavior, packaged as one file so it can be dot-sourced into scripts and
-#  embedded inside other modules. Dot-source it, set a log path, then call Write-Log.
-#
-#  $script:WitnessIsWindows is set once with a 5.1-safe probe. PS 5.1 has no
-#  $IsWindows automatic variable, its absence means Windows. Every function below
-#  reads $script:WitnessIsWindows, raw $IsWindows is never used.
-#
-#  Set-StrictMode is intentionally not set at file scope. The module sets it in
-#  isolated module scope. A dot-sourced file runs in the caller scope, so setting
-#  it here would force strict mode onto the consuming script.
-# ===========================================================================
+# single-file, dot-sourceable form of DivergentCortex.Witness: dot-source it, set $LogFilePath, call Write-Log
+# no Set-StrictMode at file scope on purpose, a dot-sourced file runs in the caller's scope and would drag strict mode onto the consuming script
 
-# absence of $IsWindows means PS 5.1 on Windows
+# 5.1 has no $IsWindows, so no variable at all means windows
+# everything below reads $script:WitnessIsWindows and never touches raw $IsWindows
 $script:WitnessIsWindows = if (Test-Path Variable:IsWindows) {
     $IsWindows
 }
@@ -142,10 +130,6 @@ function Write-Log {
         Version:                       2026.06.29.011
         ===========================================================================
 
-        Backported from the DivergentCortex.Witness module: cross-platform context
-        (Windows/Linux/macOS), native -Debug/-Verbose support, local-time timestamps,
-        UTF-8 no-BOM writes, rotation-on-rename-success, layered log path resolution.
-
         SETUP - Add these variables BEFORE dot-sourcing Write-Log.ps1:
 
         ## FOR SCCM PACKAGES/APPLICATIONS:
@@ -217,7 +201,6 @@ function Write-Log {
     )
 
     process {
-        # resolve log path, layered lookup
         $callerCandidate = $null
         if ($PSBoundParameters.ContainsKey('Logfile') -and -not [string]::IsNullOrWhiteSpace($Logfile)) {
             $callerCandidate = $Logfile
@@ -250,7 +233,7 @@ function Write-Log {
             $maxAgeDays = $Global:WriteLogMaxAgeDays 
         }
 
-        # GetVariableValue crosses the module boundary, direct read cant
+        # GetVariableValue reaches across the module boundary, a direct read can't
         $callerDebugPref = $PSCmdlet.GetVariableValue('DebugPreference')
         $callerVerbosePref = $PSCmdlet.GetVariableValue('VerbosePreference')
         $nativeDebugActive = ($null -ne $callerDebugPref) -and ($callerDebugPref -ne 'SilentlyContinue')
@@ -284,7 +267,6 @@ function Write-Log {
             $debugToConsole = $true; $debugToLogfile = $true 
         }
 
-        # map Information to Info
         if ($Severity -eq "Information") {
             $Severity = "Info"
         }
@@ -296,7 +278,7 @@ function Write-Log {
             return 
         }
 
-        # CMSite provider breaks filesystem ops
+        # the CMSite provider breaks filesystem ops, so hop to C: and come back in the finally
         $originalLocation = Get-Location
         $isSCCMDrive = $false
         if ($script:WitnessIsWindows) {
@@ -355,7 +337,7 @@ function Write-Log {
                 }
             }
         
-            # local time, utc confuses operators
+            # local time on purpose, utc just confuses whoever is reading the log
             $DateTime = Get-Date
             $LogDate = $DateTime.ToString('MM-dd-yyyy')
             $LogTime = $DateTime.ToString('HH:mm:ss.fff')
@@ -456,7 +438,6 @@ function Write-Log {
                 }
             }
 
-            # rotate when size exceeds limit
             if ($shouldWriteLogfile -and (Test-Path $Logfile)) {
                 $currentSize = (Get-Item $Logfile).Length / 1MB
                 if ($currentSize -ge $maxSizeMB) {
@@ -486,7 +467,7 @@ function Write-Log {
                         "type=`"1`" thread=`"$PID`" file=`"Write-Log.ps1`">"
 
                         $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-                        # cant use Write-Log here, file may not exist yet
+                        # can't call Write-Log from inside Write-Log's rotation, the file may not exist yet
                         try {
                             [System.IO.File]::WriteAllText($Logfile, "$rotationMsg$([System.Environment]::NewLine)", $utf8NoBom)
                         }
@@ -497,7 +478,7 @@ function Write-Log {
                 }
             }
 
-            # sentinel before call prevents recursion
+            # set the sentinel before cleaning up, cleanup logs through here and would recurse
             if ($autoCleanup -and (-not $script:WitnessCleanupRan) -and (Test-Path $Logfile)) {
                 $script:WitnessCleanupRan = $true
                 $logFolder = Split-Path $Logfile
@@ -651,7 +632,7 @@ function Write-LogFinal {
 
     Write-Log -Message $Message -Severity $Severity
 
-    # dont run cleanup twice
+    # don't run cleanup twice
     if ($script:WitnessCleanupRan) {
         return
     }
@@ -677,7 +658,7 @@ function Write-LogFinal {
         return
     }
 
-    # sentinel before call prevents recursion
+    # sentinel first, cleanup logs through Write-Log and would recurse
     $script:WitnessCleanupRan = $true
     try {
         Clear-LogFile -LogFolder $logFolder -MaxAgeDays $maxAgeDays
@@ -706,7 +687,7 @@ function Get-PlatformContext {
     [OutputType([pscustomobject])]
     param()
 
-    # $IsMacOS missing on 5.1
+    # $IsMacOS doesn't exist on 5.1
     $platformStr = 'Linux'
     if ($script:WitnessIsWindows) {
         $platformStr = 'Windows'
@@ -785,7 +766,7 @@ function Get-PlatformContext {
         }
     }
     else {
-        # loginctl doesnt exist on macOS
+        # loginctl doesn't exist on macOS
         if ($platformStr -ne 'macOS') {
             try {
                 $raw = loginctl list-sessions --no-legend 2>$null
@@ -985,7 +966,7 @@ function Initialize-Log {
         New-Item -Path $logDir -ItemType Directory -Force | Out-Null
     }
 
-    # bypass Write-Log so banner always appears regardless of gate settings
+    # bypass Write-Log so the banner shows up no matter what the verbose/debug gates say
     $now = Get-Date
     $LogDate = $now.ToString('MM-dd-yyyy')
     $LogTime = $now.ToString('HH:mm:ss.fff')

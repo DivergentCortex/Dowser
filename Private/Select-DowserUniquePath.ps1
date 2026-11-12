@@ -14,11 +14,10 @@ function Select-DowserUniquePath {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
-        Replaces `Select-Object -Unique` on large path arrays. Select-Object -Unique
+        Stands in for `Select-Object -Unique` on large path arrays. Select-Object -Unique
         compares each incoming item against every item it has already kept, which is
-        O(n^2). On a 40,000-path list that measures at ~37 seconds; a quarter-million
-        paths puts it past 20 minutes with no progress output, which reads as a hang.
-        A HashSet gives the same result in a single pass.
+        O(n^2) and looks like a hang on lists of tens of thousands of paths. A HashSet
+        gives the same result in a single pass.
 
         Comparison is Ordinal, matching Select-Object -Unique, which is case-sensitive
         on PowerShell 7. This is required on Linux, where File.txt and file.txt are two

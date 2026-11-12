@@ -42,7 +42,7 @@ function Format-DowserAge {
     if ($null -eq $Timestamp) {
         return ''
     }
-    # PowerShell unwraps a bound [Nullable[datetime]] to a plain DateTime, so .Value is $null.
+    # powershell unwraps a bound [Nullable[datetime]] into a plain DateTime, so .Value would be $null here
     $elapsed = $Now - [datetime]$Timestamp
     if ($elapsed.TotalSeconds -lt 0) {
         return 'in future'

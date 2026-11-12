@@ -17,15 +17,11 @@ function Invoke-DowserRunspacePool {
         Author: Curtis Leggett / Divergent Cortex
         Created: 2026-04-11
     .DESCRIPTION
-        This helper generalizes the RunspacePool pattern used across the Dowser module for bulk operations.
-        It consolidates the logic for:
-        - RunspacePool creation, lifecycle, and safe disposal.
-        - Chunking input arrays into equal batches to distribute across threads.
-        - Passing arguments consistently.
-        - Providing a wait loop with Write-Progress updates (both job-level and item-level via ConcurrentQueue).
-        - Result aggregation from all child runspaces.
-
-        This ensures 100% logic alignment with high-performance tools like Find-StringInFiles and Find-Files.
+        Splits -InputObject into chunks, runs -ScriptBlock on each chunk in a shared
+        RunspacePool, and returns the aggregated results. The calling thread reports
+        Write-Progress while it waits, per job by default or per item when
+        -UseProgressQueue is set. The pool and every PowerShell instance are disposed
+        before the function returns.
     .PARAMETER InputObject
         The array of items to process (e.g., file paths, directories).
     .PARAMETER ScriptBlock
