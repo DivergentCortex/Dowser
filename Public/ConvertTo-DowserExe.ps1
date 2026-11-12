@@ -40,7 +40,7 @@ function ConvertTo-DowserExe {
 
     Write-Log "Starting ConvertTo-DowserExe"
 
-    # eq false not -not, $IsWindows is null on 5.1
+    # 5.1 doesn't know what $IsWindows is, so test -eq $false instead of -not
     if ($IsWindows -eq $false) {
         Write-Log "ConvertTo-DowserExe requires Windows. Not available on this platform." -Severity Warning
         return $null
@@ -160,7 +160,7 @@ function ConvertTo-DowserExeConfuserEx {
 
     Write-Log "Starting ConvertTo-DowserExeConfuserEx"
 
-    # eq false not -not, $IsWindows is null on 5.1
+    # 5.1 doesn't know what $IsWindows is, so test -eq $false instead of -not
     if ($IsWindows -eq $false) {
         Write-Log "ConvertTo-DowserExeConfuserEx requires Windows. Not available on this platform." -Severity Warning
         return $null

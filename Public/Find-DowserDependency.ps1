@@ -79,7 +79,7 @@ function Find-DowserDependency {
         [switch]$ExportResults
     )
 
-    # IsWindows is null on ps 5.1 so -ne false means windows
+    # $IsWindows is null on 5.1, so "not false" is how we spot windows
     if (-not $PSBoundParameters.ContainsKey('ExcludePaths')) {
         if ($IsWindows -ne $false) {
             $ExcludePaths = @(

@@ -15,7 +15,7 @@ function Compare-DowserDirectory {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: Compare-Directory (opt-in via Enable-DowserAliases)
-        Original to Dowser (not ported). Read-only: never modifies either side.
+        Read-only: never modifies either side.
     .DESCRIPTION
         Walks both trees, pairs files by relative path, and classifies each one:
 
@@ -109,7 +109,6 @@ function Compare-DowserDirectory {
         throw "Compare-DowserDirectory: both paths must be folders or both must be files ('$refRoot' vs '$diffRoot')."
     }
 
-    # Bare strings match exactly; wildcards pass through unchanged.
     $patterns = @($ExcludePattern | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() })
     $excludeNames = if ($NoDefaultExcludes) { @() } else { @('.git', 'node_modules', '__pycache__', '.venv', 'venv') }
 
@@ -123,7 +122,7 @@ function Compare-DowserDirectory {
         }
     }
     else {
-        # Two files: pair them under the reference file's name.
+        # key both files by the reference name so they pair
         $refItem = Get-Item -LiteralPath $refRoot -Force
         $diffItem = Get-Item -LiteralPath $diffRoot -Force
         $refMap = @{ $refItem.Name = $refItem }

@@ -14,15 +14,11 @@ function Find-DowserRecentLog {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: dlog
-        Source: Find-MostRecentLog.ps1 (standalone scripts), a bare script, no params, hardcoded.
 
     .DESCRIPTION
         Useful for locating the canonical or newest copy of a shared helper (e.g. Write-Log.ps1)
         when multiple copies exist across a drive. Returns the newest match by default; use -All
         to get all copies ranked by LastWriteTime descending.
-
-        Replaces Find-MostRecentLog.ps1, which was a bare script hardcoded to hunt for
-        Write-Log_Ps20.ps1 on D:. This version is fully parameterized.
 
     .PARAMETER FileName
         The file name (or wildcard pattern) to search for. Example: 'Write-Log.ps1', '*.config'.

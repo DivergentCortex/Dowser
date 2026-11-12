@@ -67,9 +67,6 @@
     and Details properties.
 #>
 
-# extract payload from SFX/installer EXEs. runs Test-DowserExtractable first,
-# then 7z x to pull files. skips non-extractable binaries with a warning.
-
 function Expand-DowserExe {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(

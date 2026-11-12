@@ -280,7 +280,7 @@ function Find-DowserDuplicate {
     }
 
     if ($runContent) {
-        # Different byte lengths cannot have an identical full-file hash.
+        # files of different sizes can't hash the same, so only same-size files get hashed
         $contentCandidates = @($files | Group-Object Length | Where-Object Count -gt 1 | ForEach-Object Group)
         $hashGroups = [System.Collections.Generic.Dictionary[string, System.Collections.Generic.List[object]]]::new()
         $hashedFiles = 0

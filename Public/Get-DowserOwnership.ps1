@@ -1,8 +1,5 @@
 #Requires -Version 5.1
 
-# ownership + shell metadata reader. scans dir, pipes file paths to Get-FileMetaData.
-# Format-DowserSize replaces the old inline Get-FileSize inner function.
-
 function Get-DowserOwnership {
     <#
     .SYNOPSIS
@@ -16,9 +13,6 @@ function Get-DowserOwnership {
         =-=-                       =-=-=-=-=-=-=-=                     -=-=
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-        Ported from: Get-FileOwnership.ps1 (standalone scripts)
-        Uses: Private\Format-DowserSize for human-readable sizes
     .DESCRIPTION
         Scans a directory for files matching an extension filter and returns metadata
         including name, full path, size (human-readable via Format-DowserSize), read-only
@@ -112,8 +106,8 @@ function Get-DowserOwnership {
                     continue
                 }
 
-                # com metadata is windows only, fall back to unix fileinfo elsewhere
-                # $IsWindows is null on 5.1 so -ne $false means windows
+                # shell com is windows only, and 5.1 doesn't know what linux is: $IsWindows is null
+                # there, so -ne $false is how we say "windows"
                 $ShellApplication = $null
                 $ShellFolder = $null
                 $ShellFile = $null
@@ -128,7 +122,7 @@ function Get-DowserOwnership {
                     }
                 }
                 if ($IsWindows -eq $false) {
-                    # user/group/unixmode come from get-item on pwsh core unix
+                    # user, group and unixmode come straight off get-item on pwsh core unix
                     $MetaDataObject['Owner'] = $FileInformation.User
                     $MetaDataObject['Group'] = $FileInformation.Group
                     $MetaDataObject['UnixMode'] = $FileInformation.UnixMode

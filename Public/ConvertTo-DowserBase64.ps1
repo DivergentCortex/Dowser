@@ -14,20 +14,16 @@ function ConvertTo-DowserBase64 {
     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 .DESCRIPTION
-    In encode mode (default) the function reads an image file as bytes and returns
-    its Base64 representation. With -IncludeHeader the result is prefixed with a
-    'data:<mime>;base64,' data URI header, where the MIME type is inferred from the
-    file extension (png, jpg, jpeg, gif, svg, webp; anything else falls back to
-    application/octet-stream). The result is written to -OutputFile when supplied,
-    copied to the clipboard when -CopyToClipboard is set, and otherwise emitted to
-    the pipeline. When the clipboard is requested but unavailable (headless or
-    non-Windows session) the function warns and falls back to emitting the string.
+    Encode mode (default) reads an image file and returns its Base64 string. With
+    -IncludeHeader the result is prefixed with a 'data:<mime>;base64,' header; the MIME
+    type comes from the file extension (png, jpg, jpeg, gif, svg, webp, otherwise
+    application/octet-stream). The result goes to -OutputFile, the clipboard
+    (-CopyToClipboard), or the pipeline. If the clipboard is unavailable the function
+    warns and emits the string instead.
 
-    In decode mode (-Decode) the input is read either from a file (when -Path
-    resolves to one) or treated as a literal Base64 string. Any leading
-    'data:...;base64,' header is stripped before decoding, and the decoded bytes are
-    written to -OutputFile, which is required for decoding. The implementation is
-    pure PowerShell and .NET, with no external dependencies.
+    Decode mode (-Decode) reads -Path as a file when it resolves to one, otherwise as a
+    literal Base64 string, strips any 'data:...;base64,' header, and writes the decoded
+    bytes to -OutputFile, which is required.
 
 .PARAMETER Path
     Path to the input image file when encoding, or a path to a text file (or a
@@ -121,7 +117,6 @@ function ConvertTo-DowserBase64 {
                 $b64Str = $Path
             }
 
-            # strip data uri header before decode
             if ($b64Str -match "base64,") {
                 $b64Str = $b64Str.Split(",")[1]
             }
@@ -176,7 +171,7 @@ function ConvertTo-DowserBase64 {
                 Write-Log "Saved Base64 output to file: '$OutputFile'" -Severity Verbose
             }
 
-            # set-clipboard missing in headless sessions, warn not throw
+            # set-clipboard is missing in headless sessions, so warn instead of throwing
             if ($CopyToClipboard) {
                 $clipboardOk = $false
                 if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
@@ -199,7 +194,7 @@ function ConvertTo-DowserBase64 {
             }
 
             if (-not $OutputFile -and -not $CopyToClipboard) {
-                # no destination, emit to pipeline so callers can use it
+                # nowhere else for it to go, so hand it to the pipeline
                 Write-Output $b64
             }
             elseif (-not $OutputFile) {

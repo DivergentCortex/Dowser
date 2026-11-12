@@ -1,8 +1,5 @@
 #Requires -Version 5.1
 
-# deep file inspector. shell COM, VersionInfo, PE header, .NET assembly, optional signature.
-# shell COM is slow on UNC, thats expected. IncludeSignature adds another 0.5-2s per file.
-
 function Get-DowserProperty {
     <#
     .SYNOPSIS
@@ -16,9 +13,6 @@ function Get-DowserProperty {
         =-=-                       =-=-=-=-=-=-=-=                     -=-=
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-        Ported from: Get-FilePropertyDetails.ps1 (standalone scripts)
-        Uses: Private\Format-DowserSize for human-readable file sizes
     .DESCRIPTION
         Extracts all possible metadata, version information, extended properties, and file
         attributes from a given file using multiple methods: .NET classes, COM objects, and
@@ -64,9 +58,6 @@ function Get-DowserProperty {
 
         [switch]$IncludeSignature,
 
-        # When a directory path is provided (common when piping Get-ChildItem results),
-        # include it instead of writing a "not found" error. File-only metadata (hashes,
-        # version info, signatures, PE/assembly parsing) will be skipped for directories.
         [switch]$IncludeDirectories
     )
 
@@ -204,7 +195,8 @@ function Get-DowserProperty {
                 Write-Log "Version information not available or error: $($_.Exception.Message)" -Severity Verbose
             }
 
-            # shell COM is windows only, $IsWindows null on 5.1 means windows
+            # shell com is windows only and crawls on unc paths, which is expected. $IsWindows is
+            # null on 5.1, so -ne $false is how we say "windows"
             if ($IsWindows -ne $false) {
                 Write-Log "Getting extended properties using COM object..." -Severity Verbose
                 try {
@@ -270,7 +262,7 @@ function Get-DowserProperty {
                 Write-Log "Hash calculation error: $($_.Exception.Message)" -Severity Verbose
             }
 
-            # opt-in, slow, windows only
+            # opt-in because authenticode costs 0.5 to 2s per file, and it only exists on windows
             if (($IsWindows -ne $false) -and $IncludeSignature) {
                 Write-Log "Getting digital signature information..." -Severity Verbose
                 try {
@@ -338,6 +330,7 @@ function Get-DowserProperty {
                     $BinaryReader = New-Object System.IO.BinaryReader($FileStream)
                     $dosHeader = $BinaryReader.ReadBytes(64)
                     if ($dosHeader[0] -eq 0x4D -and $dosHeader[1] -eq 0x5A) {
+                        # e_lfanew sits at offset 60 and points at the pe signature
                         $peOffset = [BitConverter]::ToInt32($dosHeader, 60)
                         $FileStream.Seek($peOffset, [System.IO.SeekOrigin]::Begin) | Out-Null
                         $peSignature = $BinaryReader.ReadBytes(4)
