@@ -6,8 +6,7 @@ Describe 'Measure-DowserDiskUsage' {
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Build a temp tree with known file sizes.
-        # All paths use nested Join-Path calls for cross-platform correctness.
+        # temp tree with known sizes, so every total below is checkable by hand:
         #
         #   $tmpRoot/
         #     BigDir/
@@ -17,12 +16,10 @@ Describe 'Measure-DowserDiskUsage' {
         #       small.txt           1,000 bytes
         #       tiny.dat              100 bytes
         #     root.ps1             10,000 bytes
-        #     noext                   500 bytes   (extensionless -- tests '<none>' bucket)
+        #     noext                   500 bytes   (no extension, lands in the '<none>' bucket)
         #
-        # Total bytes: 1,000,000 + 500,000 + 1,000 + 100 + 10,000 + 500 = 1,511,600
-        # BigDir rollup  : 1,500,000
-        # SmallDir rollup:     1,100
-        # Root-level files (treemap remainder): 10,000 + 500 = 10,500
+        # total: 1,511,600  BigDir rollup: 1,500,000  SmallDir rollup: 1,100
+        # root-level files (the treemap remainder): 10,500
         $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) "DduTest_$([System.IO.Path]::GetRandomFileName())"
         $null = New-Item -ItemType Directory -Path $tmpRoot -Force
         $null = New-Item -ItemType Directory -Path (Join-Path $tmpRoot 'BigDir') -Force
@@ -149,7 +146,7 @@ Describe 'Measure-DowserDiskUsage' {
         It 'Excludes files below MinSize from file ranking' {
             $filtered = Measure-DowserDiskUsage -Path $script:tmpRoot -TopN 15 -MinSize '100KB'
             $fileRows = $filtered | Where-Object { $_.Section -eq 'BiggestFiles' }
-            # Only huge.bin (1MB) and medium.bin (500KB) exceed 100KB
+            # only huge.bin and medium.bin are over 100KB
             $fileRows.Count | Should -Be 2
             $fileRows | ForEach-Object { $_.SizeBytes | Should -BeGreaterOrEqual (100 * 1KB) }
         }
@@ -260,9 +257,8 @@ Describe 'Measure-DowserDiskUsage' {
         }
 
         It 'Treemap block widths sum to approximately 100% of total (proportionality check)' {
-            # Extract width:NN.NN% values from all ddu-block style attributes (immediate-child
-            # blocks + remainder block). Their widths must be proportional to TotalBytes and
-            # must together sum close to 100 (all bytes accounted for).
+            # pull width:NN.NN% out of every ddu-block (child blocks plus the remainder);
+            # between them they should account for all the bytes
             $allWidths = [System.Collections.Generic.List[double]]::new()
             $rx = [System.Text.RegularExpressions.Regex]::new(
                 "class='ddu-block[^']*'[^>]*style='[^']*width:([\d.]+)%")
@@ -275,15 +271,13 @@ Describe 'Measure-DowserDiskUsage' {
             foreach ($w in $allWidths) {
                 $totalWidth += $w 
             }
-            # All blocks (immediate children + remainder) must together represent the full
-            # tree -- sum should be within 1% of 100 to account for rounding.
+            # within 1% of 100 to leave room for rounding
             $totalWidth | Should -BeGreaterThan 99
             $totalWidth | Should -BeLessOrEqual 101
         }
 
         It 'Largest treemap block width is proportional to BigDir fraction of total' {
-            # BigDir = 1500000 / 1511600 = ~99.2% of total.
-            # The largest ddu-block width must be >= 98 (immediate-child block for BigDir).
+            # BigDir is 1500000 of 1511600, about 99.2%, so the widest block should clear 98
             $rx = [System.Text.RegularExpressions.Regex]::new(
                 "class='ddu-block[^']*'[^>]*style='[^']*width:([\d.]+)%")
             $widths = $rx.Matches($script:htmlContent) | ForEach-Object { [double]$_.Groups[1].Value }
@@ -291,8 +285,8 @@ Describe 'Measure-DowserDiskUsage' {
         }
 
         It 'Remainder block for root-level files is present in treemap' {
-            # root.ps1 (10000) + noext (500) = 10500 bytes live directly in root,
-            # not under any immediate subdir -- must appear as a remainder block.
+            # root.ps1 and noext sit directly in the root, not under any subdir, so they
+            # can only show up as the remainder block
             $script:htmlContent | Should -Match 'ddu-remainder'
         }
     }
@@ -301,7 +295,7 @@ Describe 'Measure-DowserDiskUsage' {
         It 'Skips excluded directory and its files' {
             $excl = Measure-DowserDiskUsage -Path $script:tmpRoot -TopN 15 -ExcludePath 'BigDir'
             $summary = $excl | Where-Object { $_.Section -eq 'Summary' }
-            # BigDir had 1500000 bytes; total should be 1511600 - 1500000 = 11600
+            # 1511600 total minus BigDir's 1500000 leaves 11600
             $summary.TotalBytes | Should -Be 11600
         }
     }
@@ -354,8 +348,8 @@ Describe 'Measure-DowserDiskUsage' {
         }
 
         It 'Scans a symlinked root directory correctly (non-Windows only)' -Skip:($IsWindows -ne $false) {
-            # Symlink pointing at the temp tree; function must scan it without skipping
-            # (FIX #2: root reparse point is allowed even though it is a symlink).
+            # a root that is itself a symlink must still be scanned, not skipped like a
+            # reparse point found mid-tree
             $symlinkPath = Join-Path ([System.IO.Path]::GetTempPath()) "DduSymlink_$([System.IO.Path]::GetRandomFileName())"
             $created = $false
             try {

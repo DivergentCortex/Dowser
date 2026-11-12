@@ -17,15 +17,14 @@
     - Write-Log -Severity Warning always lands in the log file.
     - Every entry uses the CMTrace wire format (<![LOG[...]LOG]!>).
 
-    Run from the module root:
-        Invoke-Pester -Path ./Tests/Test-DowserLogging.Tests.ps1 -Output Detailed
+.EXAMPLE
+    Invoke-Pester -Path ./Tests/Test-DowserLogging.Tests.ps1 -Output Detailed
 #>
 
 BeforeAll {
     $script:ModuleRoot = Split-Path -Parent $PSScriptRoot
 
-    # Dot-source Write-Log.ps1 directly so these tests own the Write-Log
-    # definitions. No module import; we are testing the helper in isolation.
+    # dot-source Write-Log.ps1 instead of importing the module, so the helper is tested on its own
     . (Join-Path $script:ModuleRoot 'Private/Write-Log.ps1')
 
     $script:TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dowserlogltest_" + [guid]::NewGuid().ToString('N'))
@@ -181,7 +180,7 @@ Describe 'CMTrace wire format' {
 Describe 'Write-Log throws when no log path configured' {
 
     It 'throws FATAL when called with no path set and no Initialize-Log' {
-        # Temporarily clear the script-scope path to exercise the throw branch.
+        # blank out the script-scope path (restored afterwards) so the throw branch runs
         $saved = $script:WitnessLogFilePath
         $script:WitnessLogFilePath = $null
         $savedGlobal = if (Test-Path Variable:Global:LogFilePath) { $Global:LogFilePath } else { $null }

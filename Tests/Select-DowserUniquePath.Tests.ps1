@@ -11,7 +11,7 @@ Describe 'Select-DowserUniquePath' {
     }
 
     It 'treats case-differing paths as distinct, matching Select-Object -Unique' {
-        # on Linux /b/File.txt and /b/file.txt are different files; both must survive
+        # linux paths are case-sensitive, so both must survive
         $result = @(Select-DowserUniquePath -Path @('/b/File.txt', '/b/file.txt'))
         $result.Count | Should -Be 2
     }
@@ -27,8 +27,8 @@ Describe 'Select-DowserUniquePath' {
     }
 
     It 'deduplicates 50,000 paths in under 5 seconds' {
-        # Select-Object -Unique is O(n^2): 40k paths measured at ~37s, 50k extrapolates to ~58s.
-        # This is the regression guard for the Find-DowserString stall.
+        # Select-Object -Unique is quadratic: at this size it takes about a minute
+        # and looks exactly like a hang, so keep the time limit honest
         $paths = 1..50000 | ForEach-Object { "/home/u/projects/deep/path/file$_.ps1" }
 
         $sw = [Diagnostics.Stopwatch]::StartNew()

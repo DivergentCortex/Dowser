@@ -6,15 +6,13 @@ Describe 'Measure-DowserDirectory freshness report' {
         Remove-Module Dowser -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
 
-        # Controlled timestamps: 'now' files count as today, a 3-day-old file is inside the
-        # default 7-day window but not today, a 30-day-old file is outside it.
+        # fixture ages: today, inside the default 7-day window, and way outside it
         $root = Join-Path ([System.IO.Path]::GetTempPath()) 'DowserMeasureDirRoot'
         Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
         foreach ($rel in @('A/sub', 'B', 'C', '.hidden')) {
             $null = New-Item -ItemType Directory -Path (Join-Path $root $rel) -Force
         }
-        # Fixed reference instant (today at noon) passed as -Now, so the buckets cannot flip
-        # if the run straddles local midnight (Muninn 1831 finding 5).
+        # pin -Now to noon so a run that crosses midnight can't shuffle the age buckets
         $now = (Get-Date).Date.AddHours(12)
         $files = @(
             @{ Rel = 'loose.txt'; Bytes = 5; When = $now.AddMinutes(-1) }
@@ -28,7 +26,7 @@ Describe 'Measure-DowserDirectory freshness report' {
             [System.IO.File]::WriteAllBytes($full, (New-Object byte[] $f.Bytes))
             (Get-Item -LiteralPath $full).LastWriteTime = $f.When
         }
-        # A symlink inside A pointing back at the root: following it would loop or double-count.
+        # symlink in A pointing back at the root: follow it and you count everything twice, forever
         $script:canLink = $false
         try {
             $null = New-Item -ItemType SymbolicLink -Path (Join-Path $root 'A/loop') -Target $root -ErrorAction Stop
