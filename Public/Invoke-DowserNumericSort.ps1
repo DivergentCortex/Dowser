@@ -16,8 +16,6 @@ function Invoke-DowserNumericSort {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: dsort, dnsort
-        Source: Invoke-NumericalSorting.ps1 (standalone scripts), Sort-Numerical function
-        Private helper: Get-DowserSortKey (extracted from source Get-SortKey)
         Related: Find-DowserFile, Find-DowserDuplicate
 
     .DESCRIPTION
@@ -146,8 +144,8 @@ function Invoke-DowserNumericSort {
     }
 }
 
-# tab-completion for -Property tries to infer available properties from whatever
-# is flowing through the pipeline. falls back to generic suggestions if it can't.
+# tab completion for -Property peeks at the variable being piped in and offers its property
+# names. if it can't tell, it falls back to a few generic guesses
 Register-ArgumentCompleter -CommandName Invoke-DowserNumericSort -ParameterName Property -ScriptBlock {
     param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
 

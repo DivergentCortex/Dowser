@@ -14,9 +14,6 @@ function Get-DowserTemplate {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: dtemplate
-        Source: Get-FolderTemplate.ps1 (standalone scripts, had live execution code outside function)
-        Fixed: live execution code removed; -folderPath renamed to -Path; [CmdletBinding()] added.
-        Shell.Application GetDetailsOf loop (0..500) can be slow, so Write-Progress is included.
 
     .DESCRIPTION
         Uses Shell.Application COM to query a folder's current Explorer view mode
@@ -49,7 +46,7 @@ function Get-DowserTemplate {
 
     begin {
         Write-Log "Starting Get-DowserTemplate"
-        # needs shell.application com, IsWindows null on 5.1 means windows
+        # needs shell.application com. $IsWindows is null on 5.1, which counts as windows
         $unsupported = $IsWindows -eq $false
         if ($unsupported) {
             Write-Log "Get-DowserTemplate requires Windows Shell.Application COM. Not available on this platform." -Severity Warning
@@ -80,6 +77,7 @@ function Get-DowserTemplate {
             $viewMode = $folder.CurrentViewMode
 
             $columns = [System.Collections.Generic.List[object]]::new()
+            # 501 trips through com is slow enough to deserve a progress bar
             for ($i = 0; $i -le 500; $i++) {
                 if ($i % 50 -eq 0) {
                     Write-Progress -Activity "Get-DowserTemplate" -Status "Reading column $i / 500" -PercentComplete ($i / 5)

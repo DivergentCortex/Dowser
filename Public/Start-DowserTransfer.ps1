@@ -18,21 +18,19 @@ function Start-DowserTransfer {
         Date Created:   2026-08-16
 
     .DESCRIPTION
-        Enumerates every file under each -Source path, sums the bytes to move, and
-        confirms the -Destination volume has enough free space (with a safety headroom
-        margin) before touching a single byte. Reparse points (symlinks and junctions)
-        found while walking a directory source are skipped and logged, never followed.
-        If two sources would resolve to the same destination path, the whole run is
-        refused before any byte moves rather than letting two workers race the same
-        file. Copies run across a shared runspace pool:
-        each file is hashed (SHA256) at the source before copy, copied, hashed again at
-        the destination, and marked verified only when the two hashes match. A hash
-        mismatch is a hard per-file failure and that file is never reported as migrated.
-        This function only copies and verifies; it never deletes source files. After a
-        real run it writes a JSON manifest of every file's verification result. That
-        manifest is the required input to Remove-DowserTransferSource for a later,
-        separate deletion pass. Supports -WhatIf: a dry run reports the real file count
-        and byte total it would move and touches nothing.
+        Enumerates every file under each -Source path, sums the bytes to move, and checks
+        that the -Destination volume has enough free space plus a headroom margin before
+        copying. Symlinks and junctions found inside a directory source are skipped and
+        logged, not followed. If two sources resolve to the same destination path, the
+        run is refused before anything is copied.
+
+        Files are copied on a shared runspace pool. Each file is hashed (SHA256) at the
+        source, copied, hashed again at the destination, and marked verified only when
+        the hashes match; a mismatch is a per-file failure. Source files are never
+        deleted. After a real run a JSON manifest of every verification result is
+        written; Remove-DowserTransferSource takes that manifest as input for a separate
+        deletion pass. Supports -WhatIf: a dry run reports the file count and byte
+        total it would move and changes nothing.
 
     .PARAMETER Source
         One or more source file or directory paths. Accepts pipeline input. Directory

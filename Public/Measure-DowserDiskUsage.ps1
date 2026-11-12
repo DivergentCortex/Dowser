@@ -89,7 +89,6 @@ function Measure-DowserDiskUsage {
 
     begin {
         Write-Log "Starting Measure-DowserDiskUsage"
-        # parse once so process can filter cheaply
         $minBytes = $null
         if ($PSBoundParameters.ContainsKey('MinSize') -and $MinSize) {
             $minBytes = ConvertTo-DowserBytes -SizeString $MinSize
@@ -192,7 +191,7 @@ function Measure-DowserDiskUsage {
                                 Extension = $ext
                             })
 
-                        # roll size up every ancestor through resolvedRoot
+                        # credit the file's size to every folder between it and the root
                         $ancestor = $currentDir.FullName
                         while ($true) {
                             if (-not $dirSizes.ContainsKey($ancestor)) {
@@ -419,7 +418,7 @@ function Measure-DowserDiskUsage {
     }
 }
 
-# lives here, only Measure-DowserDiskUsage calls it
+# only Measure-DowserDiskUsage calls this, so it lives next door instead of in Private
 function _Build-DduHtml {
     param(
         [PSCustomObject]$SummaryObject,
