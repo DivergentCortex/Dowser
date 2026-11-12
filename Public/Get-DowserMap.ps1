@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+#requires -version 5.1
 
 # visual tree builder. self-recursive. dont reorder the filter logic unless you enjoy broken connectors.
 # size and .ps1 count annotations bolt onto the folder line, computed lazily per folder.
@@ -47,6 +47,11 @@ function Get-DowserMap {
         the tree to. Without a file filter, renders only matching folders and the routes to
         them. Files and unrelated descendants stay hidden. With -IncludeFilePatterns or
         -IncludeExtensions, searches the matched folders' subtrees for matching files.
+        A name entry also matches the same name with a leading dot ('research' finds '.research'),
+        and a matched hidden folder is listed without -IncludeHidden.
+    .PARAMETER Search
+        Treat -IncludeFolders names as a search: 'research' matches any folder whose name
+        contains it, such as '.research', 'research-notes' or 'ai_research'. No wildcards needed.
     .PARAMETER ExcludePathPatterns
         Path patterns to exclude by full or relative path match.
     .PARAMETER NoDefaultExcludes
@@ -132,32 +137,33 @@ function Get-DowserMap {
         System.String
         One string per rendered tree line.
     #>
-    # PositionalBinding off: only -Path binds by position. Without this, a typo such as
-    # "-FoldersOnly max 1" silently bound 'max' to -IncludeFilePatterns and '1' to
-    # -IncludeExtensions, filtering the tree down to nothing with no error.
+    # positionalbinding off: only -path binds by position. without this, a typo such as
+    # "-foldersonly max 1" silently bound 'max' to -includefilepatterns and '1' to
+    # -includeextensions, filtering the tree down to nothing with no error.
     [CmdletBinding(PositionalBinding = $false)]
     param(
         [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
         [Alias('FullName')]
         [string]$Path,
 
-        # Data Annotation Switches (from merged scripts)
-        [switch]$IncludeSize,             # Append folder size to each branch
+        # data annotation switches (from merged scripts)
+        [switch]$includesize,             # append folder size to each branch
         [Alias('IncludePsCount')]
-        [switch]$IncludeFileCount,        # Append file count to each branch
+        [switch]$includefilecount,        # append file count to each branch
 
-        # File/Folder Filtering
+        # file/folder filtering
         [string[]]$IncludeFilePatterns,
         [string[]]$IncludeExtensions,
         [string[]]$ExcludeExtensions,
         [string[]]$ExcludeFolders,
         [string[]]$ExcludeFiles,
         [string[]]$IncludeFolders,
+        [switch]$Search,
         [string[]]$ExcludePathPatterns,
         [switch]$NoDefaultExcludes,
         [switch]$FoldersOnly,
 
-        # Display Options
+        # display options
         [Alias('Max')]
         [int]$MaxDepth = 3,
         [Alias('S')]
@@ -170,17 +176,17 @@ function Get-DowserMap {
         [switch]$IncludeHidden,
         [switch]$FollowReparse,
 
-        # Performance Options
+        # performance options
         [switch]$UseRunspaces = $true,
         [int]$MaxThreads = ([Math]::Max(1, [Environment]::ProcessorCount - 1)),
         [string]$SevenZipPath,
 
-        # Output Options
+        # output options
         [string]$OutputFile,
         [string]$MarkdownFile,
         [switch]$EmitSummary,
 
-        # Internal (for recursion), dont mess with these
+        # internal (for recursion), dont mess with these
         [string]$Indent = "",
         [int]$CurrentDepth = 0,
         [Parameter(DontShow = $true)]
@@ -215,10 +221,10 @@ function Get-DowserMap {
         return
     }
 
-    # Summary auto-enables for markdown output (-AsMarkdown, -MarkdownFile, or an -OutputFile
-    # ending in .md) so a report file is never generated without one. An explicit -EmitSummary
-    # (true or false) always wins over this default. Only evaluated at the top-level call;
-    # recursive calls already receive the resolved value via -EmitSummary:$EmitSummary.
+    # summary auto-enables for markdown output (-asmarkdown, -markdownfile, or an -outputfile
+    # ending in .md) so a report file is never generated without one. an explicit -emitsummary
+    # (true or false) always wins over this default. only evaluated at the top-level call;
+    # recursive calls already receive the resolved value via -emitsummary:$emitsummary.
     if ($CurrentDepth -eq 0 -and -not $PSBoundParameters.ContainsKey('EmitSummary')) {
         $markdownOutputRequested = $AsMarkdown -or [bool]$MarkdownFile -or ($OutputFile -and $OutputFile -match '\.md$')
         if ($markdownOutputRequested) {
@@ -304,10 +310,10 @@ function Get-DowserMap {
         }
         catch {
             Write-Log "Get-DowserMap: failed to list archive '$ArchivePath': $($_.Exception.Message)" -Severity Warning
-            # Same object shape as the success-path return below, zeroed out. The caller
-            # (Complete-DowserArchiveMapOutput) always reads .Lines/.FolderCount/etc off
+            # same object shape as the success-path return below, zeroed out. the caller
+            # (complete-dowserarchivemapoutput) always reads .lines/.foldercount/etc off
             # whatever this function returns; if this early-failure path returned a bare
-            # string array instead, .Lines would silently resolve to $null on it and this
+            # string array instead, .lines would silently resolve to $null on it and this
             # error line would vanish from the final output instead of being shown.
             return [PSCustomObject]@{
                 Lines                     = @("$eChar ARCHIVE UNREADABLE: $ArchivePath ($($_.Exception.Message))")
@@ -443,13 +449,13 @@ function Get-DowserMap {
             }
             return $true
         }
-        # Mirrors Test-ArcFile's exact branch order and precedence, but answers a
+        # mirrors test-arcfile's exact branch order and precedence, but answers a
         # different question: was this rejection an actual exclude rule (worth naming in
         # the summary, the same way an excluded top-level folder is) or an
-        # -IncludeExtensions/-IncludeFilePatterns allowlist mismatch (declared scope
-        # narrowing, not a surprise). Archive mode has no -ExcludePathPatterns equivalent
-        # to check first, unlike the filesystem path's Test-FileExcludedByRule. Only
-        # meaningful to call on a name Test-ArcFile already rejected.
+        # -includeextensions/-includefilepatterns allowlist mismatch (declared scope
+        # narrowing, not a surprise). archive mode has no -excludepathpatterns equivalent
+        # to check first, unlike the filesystem path's test-fileexcludedbyrule. only
+        # meaningful to call on a name test-arcfile already rejected.
         function Test-ArcFileExcludedByRule($name) {
             $e = ConvertTo-NormExt ([System.IO.Path]::GetExtension($name))
             if ($normInclude -and ($normInclude -notcontains $e)) {
@@ -553,9 +559,9 @@ function Get-DowserMap {
                     continue
                 }
                 if (-not (Test-ArcFolderHasMatch $f)) {
-                    # Matches the filesystem summary's own convention: a folder skipped only
+                    # matches the filesystem summary's own convention: a folder skipped only
                     # because it holds no file matching an active include filter is counted
-                    # as skipped, but not named in ExcludedTopLevelNames -- that list exists
+                    # as skipped, but not named in excludedtoplevelnames -- that list exists
                     # to explain a surprisingly small total, and scope-narrowing the caller
                     # asked for via a filter is not a surprise the same way an exclude is.
                     $stats.SkippedFolders++
@@ -638,17 +644,17 @@ function Get-DowserMap {
         $rootNode = [PSCustomObject]@{ Name = ''; IsDirectory = $true; Size = 0; Children = $root }
         $output += Write-ArcNode $rootNode $baseIndent 0 $stats
 
-        # Total size and per-top-level-entry size, mirroring the filesystem summary's own
-        # depth-1-only rule (see Complete-DirectoryMapOutput): a top-level folder's size
+        # total size and per-top-level-entry size, mirroring the filesystem summary's own
+        # depth-1-only rule (see complete-directorymapoutput): a top-level folder's size
         # already includes everything under it, so only the archive root's direct children
         # are summed/ranked here, never their nested descendants too -- ranking a nested
         # entry alongside its own parent would double-count the same bytes under two labels.
         $topFolders = @()
         $totalBytes = 0
-        # A root-level file rejected here used to vanish from the total with no signal at
-        # all, the identical blind spot the filesystem path's Test-FileExcludedByRule
+        # a root-level file rejected here used to vanish from the total with no signal at
+        # all, the identical blind spot the filesystem path's test-fileexcludedbyrule
         # closes -- missed here initially even though this same total-size loop was being
-        # touched in the same changeset (Huginn review, decision recorded 2026-09-15).
+        # touched in the same changeset (huginn review, decision recorded 2026-09-15).
         $excludedTopLevelFileNames = @()
         $topKids = @($root.Values)
         foreach ($k in ($topKids | Where-Object { $_.IsDirectory })) {
@@ -684,11 +690,11 @@ function Get-DowserMap {
         }
     }
 
-    # ConvertTo-WslPath translates a Windows drive/UNC path into a /mnt style path.
-    # It needs backslash-normalized input for its regex, so it normalizes locally.
-    # Fully self-contained (only reads its own $inputPath parameter), so defining it here
+    # convertto-wslpath translates a windows drive/unc path into a /mnt style path.
+    # it needs backslash-normalized input for its regex, so it normalizes locally.
+    # fully self-contained (only reads its own $inputpath parameter), so defining it here
     # rather than down with the other path-normalization helpers costs nothing and is what
-    # lets Complete-DowserArchiveMapOutput below use it for -LinuxPaths markdown output.
+    # lets complete-dowserarchivemapoutput below use it for -linuxpaths markdown output.
     function ConvertTo-WslPath {
         param([string]$inputPath)
         if ([string]::IsNullOrWhiteSpace($inputPath)) {
@@ -717,27 +723,27 @@ function Get-DowserMap {
         return ($normalized -replace '\\', '/')
     }
 
-    # Archive-mode counterpart to Complete-DirectoryMapOutput: appends the same Summary:
-    # block shape (Scan/Folders/Files/Skipped/Total size/Largest folders), and handles
-    # -OutputFile/-MarkdownFile writing, for a tree rendered from inside an archive.
+    # archive-mode counterpart to complete-directorymapoutput: appends the same summary:
+    # block shape (scan/folders/files/skipped/total size/largest folders), and handles
+    # -outputfile/-markdownfile writing, for a tree rendered from inside an archive.
     #
-    # This does NOT call Complete-DirectoryMapOutput, or ConvertTo-ForwardSlashPath,
-    # ConvertTo-NativeSeparator, or Test-IncludeFile/Test-ExcludeByPath -- every one of
-    # those is defined LATER in this function body (Complete-DirectoryMapOutput itself
-    # sits roughly 900 lines below the archive-mode check that needs this), and PowerShell
+    # this does not call complete-directorymapoutput, or convertto-forwardslashpath,
+    # convertto-nativeseparator, or test-includefile/test-excludebypath -- every one of
+    # those is defined later in this function body (complete-directorymapoutput itself
+    # sits roughly 900 lines below the archive-mode check that needs this), and powershell
     # does not hoist function definitions ahead of the sequential statement that defines
     # them: calling any of them from here throws "term not recognized," confirmed by
-    # direct execution before writing this comment. The real barrier to reusing
-    # Complete-DirectoryMapOutput directly is not just that ordering, though: that
-    # function's size-rollup logic reads $SizeCache (keyed by real filesystem paths under
-    # $rootFull) and calls Get-ChildItem -LiteralPath $Path -File directly against $Path --
+    # direct execution before writing this comment. the real barrier to reusing
+    # complete-directorymapoutput directly is not just that ordering, though: that
+    # function's size-rollup logic reads $sizecache (keyed by real filesystem paths under
+    # $rootfull) and calls get-childitem -literalpath $path -file directly against $path --
     # neither holds for an entry inside an archive, so a straight call would need
-    # extensive branching inside the shared function regardless of ordering. Defining a
+    # extensive branching inside the shared function regardless of ordering. defining a
     # self-contained archive finalizer right here, immediately after
-    # Get-DowserArchiveTreeLines and well before the archive-mode check, avoids the
+    # get-dowserarchivetreelines and well before the archive-mode check, avoids the
     # ordering hazard; the cost is a small amount of duplicated summary-text and
-    # file-writing logic between this function and Complete-DirectoryMapOutput. ONE
-    # exception: ConvertTo-WslPath (immediately above) is fully self-contained with no such
+    # file-writing logic between this function and complete-directorymapoutput. one
+    # exception: convertto-wslpath (immediately above) is fully self-contained with no such
     # data-shape dependency, so it was relocated up here instead of being duplicated --
     # both finalizers call the same function.
     function Complete-DowserArchiveMapOutput {
@@ -772,8 +778,8 @@ function Get-DowserMap {
                 $summaryLines += "  Skipped: $skippedFolderCount folders, $skippedFileCount files"
                 $summaryBullets += "- Skipped: $skippedFolderCount folders, $skippedFileCount files"
             }
-            # Archives have no symlink concept in this tree model, so there is no
-            # "Symlinks: N" line to consider here, matching the filesystem summary's own
+            # archives have no symlink concept in this tree model, so there is no
+            # "symlinks: n" line to consider here, matching the filesystem summary's own
             # convention of only showing that line when the count is actually above zero.
 
             if ($IncludeSize) {
@@ -786,10 +792,10 @@ function Get-DowserMap {
                     $summaryLines += "  Total size excludes filtered top-level folders: $excludedTopLevelJoined"
                     $summaryBullets += "- Total size excludes filtered top-level folders: $excludedTopLevelJoined"
                 }
-                # File-side counterpart to the folder line above. Missed on the first pass
-                # (Huginn review, decision recorded 2026-09-15): a root-level archive entry
-                # excluded by an actual rule used to vanish from TotalBytes with no name at
-                # all, the identical blind spot Test-FileExcludedByRule closed on the
+                # file-side counterpart to the folder line above. missed on the first pass
+                # (huginn review, decision recorded 2026-09-15): a root-level archive entry
+                # excluded by an actual rule used to vanish from totalbytes with no name at
+                # all, the identical blind spot test-fileexcludedbyrule closed on the
                 # filesystem path in the very same changeset.
                 $excludedTopLevelFiles = @($ArchiveResult.ExcludedTopLevelFileNames)
                 if ($excludedTopLevelFiles.Count -gt 0) {
@@ -838,15 +844,15 @@ function Get-DowserMap {
                     New-Item -ItemType Directory -Path $mdDir -Force | Out-Null
                 }
                 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-                # Matches Complete-DirectoryMapOutput's own -LinuxPaths handling of the
-                # markdown Root header. Missed on the first pass (Huginn review, decision
+                # matches complete-directorymapoutput's own -linuxpaths handling of the
+                # markdown root header. missed on the first pass (huginn review, decision
                 # recorded 2026-09-15): the two finalizers are meant to produce the same
-                # Summary: block shape, and a Windows-shaped root path on an archive scanned
-                # from WSL/Linux with -LinuxPaths broke that parity.
+                # summary: block shape, and a windows-shaped root path on an archive scanned
+                # from wsl/linux with -linuxpaths broke that parity.
                 $archiveDisplayRoot = if ($LinuxPaths) { ConvertTo-WslPath $ArchivePath } else { $ArchivePath }
-                $mdLines = @('# Directory Map', '', ('**Root:** `{0}`' -f $archiveDisplayRoot), ('**Generated:** {0}' -f $timestamp))
+                $mdlines = @('# directory map', '', ('**root:** `{0}`' -f $archivedisplayroot), ('**generated:** {0}' -f $timestamp))
                 if ($summaryBullets.Count -gt 0) {
-                    $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets
+                    $mdlines += ''; $mdlines += '#### summary'; $mdlines += $summarybullets
                 }
                 $mdLines += ''; $mdLines += '```text'
                 if ($treeLines.Count -gt 0) {
@@ -878,11 +884,11 @@ function Get-DowserMap {
             if ($archiveExt -in @('.zip', '.7z', '.rar', '.tar', '.gz')) {
                 Write-Log "Get-DowserMap: '$resolvedLeafPath' is an archive file, rendering internal contents" -Severity Verbose
                 $archiveResult = Get-DowserArchiveTreeLines -ArchivePath $resolvedLeafPath -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -ExcludeFolders $ExcludeFolders -ExcludeFiles $ExcludeFiles -IncludeFilePatterns $IncludeFilePatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -MaxDepth $MaxDepth -ShowFullPathTree:$ShowFullPathTree -ShowFullPathTreeBound $PSBoundParameters.ContainsKey('ShowFullPathTree') -LinuxPaths:$LinuxPaths -Ascii:$Ascii -AsHtml:$AsHtml -SevenZipPath $SevenZipPath
-                # Archive-mode inputs used to return $archiveLines directly here, bypassing
-                # Complete-DirectoryMapOutput entirely -- -EmitSummary, -OutputFile, and
-                # -MarkdownFile were all silently no-ops for a .zip/.7z/.rar/.tar/.gz -Path.
-                # Complete-DowserArchiveMapOutput (defined just above Get-DowserArchiveTreeLines)
-                # is the archive-mode counterpart that actually honors all three. Fixed
+                # archive-mode inputs used to return $archivelines directly here, bypassing
+                # complete-directorymapoutput entirely -- -emitsummary, -outputfile, and
+                # -markdownfile were all silently no-ops for a .zip/.7z/.rar/.tar/.gz -path.
+                # complete-dowserarchivemapoutput (defined just above get-dowserarchivetreelines)
+                # is the archive-mode counterpart that actually honors all three. fixed
                 # 2026-09-15.
                 $finalArchiveLines = Complete-DowserArchiveMapOutput -ArchiveResult $archiveResult -ArchivePath $resolvedLeafPath -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -MaxDepth $MaxDepth -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsMarkdown:$AsMarkdown -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile
                 Write-Log "Ending Get-DowserMap"
@@ -905,11 +911,11 @@ function Get-DowserMap {
         }
     }
 
-    # One walk feeds both annotations. $InScope is false for a folder that is only the
-    # route to an -IncludeFolders match: its files are outside the declared scope, so only
-    # bytes and files inside matched descendants count. Without this, 'py/' shown as the
-    # route to 'py/pysecrets' annotated and totalled all of py. Inside scope, folders obey
-    # the ordinary exclude rules (Test-FolderExcludedByRule), never the include bypass.
+    # one walk feeds both annotations. $inscope is false for a folder that is only the
+    # route to an -includefolders match: its files are outside the declared scope, so only
+    # bytes and files inside matched descendants count. without this, 'py/' shown as the
+    # route to 'py/pysecrets' annotated and totalled all of py. inside scope, folders obey
+    # the ordinary exclude rules (test-folderexcludedbyrule), never the include bypass.
     function Measure-FolderScope {
         param([string]$folderPath, [bool]$InScope)
         $bytes = [int64]0
@@ -918,12 +924,15 @@ function Get-DowserMap {
         $walkStack.Push([PSCustomObject]@{ Path = $folderPath; InScope = $InScope })
         while ($walkStack.Count -gt 0) {
             $entry = $walkStack.Pop()
-            $dirItems = if ($IncludeHidden) {
+            $dirItems = if ($IncludeHidden -or $hiddenByName) {
                 Get-ChildItem -LiteralPath $entry.Path -Force -ErrorAction SilentlyContinue
             } else {
                 Get-ChildItem -LiteralPath $entry.Path -ErrorAction SilentlyContinue
             }
             foreach ($di in $dirItems) {
+                if (-not (Test-HiddenAdmitted $di)) {
+                    continue
+                }
                 if ($di.PSIsContainer) {
                     if ($entry.InScope) {
                         if (-not (Test-FolderExcludedByRule $di)) {
@@ -943,7 +952,7 @@ function Get-DowserMap {
         return [PSCustomObject]@{ Bytes = $bytes; Count = $count }
     }
 
-    # --- Folder annotation helper: builds the "[1.2 GB] [14 files]" suffix ---
+    # --- folder annotation helper: builds the "[1.2 gb] [14 files]" suffix ---
     function Get-FolderAnnotation {
         param([string]$folderPath, [bool]$InScope = $true)
         $annotation = ''
@@ -975,7 +984,7 @@ function Get-DowserMap {
         return $annotation
     }
 
-    # Precompute normalized extension filters
+    # precompute normalized extension filters
     $normInclude = @()
     if ($IncludeExtensions) {
         $normInclude = @($IncludeExtensions | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
@@ -1001,7 +1010,7 @@ function Get-DowserMap {
         $normExclude = @($allExcludeExts | ForEach-Object { ConvertTo-NormalizedExtension $_ }) 
     }
 
-    # folder exclude defaults, opinionated but documented. use -NoDefaultExcludes to bypass.
+    # folder exclude defaults, opinionated but documented. use -nodefaultexcludes to bypass.
     $defaultExcludes = @(
         '__pycache__', 'node_modules', '.git', '.svn', '.hg', '.vs', '.vscode', 'obj', '.idea',
         'dist', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv', 'env', '.env',
@@ -1067,9 +1076,9 @@ function Get-DowserMap {
     }
 
     # path normalization helpers
-    # Internal path comparison/filtering uses the platform separator so that
-    # Get-ChildItem -LiteralPath calls and string compares stay valid on Linux
-    # (forward slash) as well as Windows (backslash). $sep is computed once.
+    # internal path comparison/filtering uses the platform separator so that
+    # get-childitem -literalpath calls and string compares stay valid on linux
+    # (forward slash) as well as windows (backslash). $sep is computed once.
     $sep = [string][IO.Path]::DirectorySeparatorChar
     function ConvertTo-NativeSeparator {
         param([string]$s) if ($null -eq $s) {
@@ -1081,18 +1090,18 @@ function Get-DowserMap {
             return ($s -replace '/', '\') 
         } 
     }
-    # ConvertTo-ForwardSlashPath: canonical comparison form -- forward slash on all platforms.
-    # Used for rootFull/excludePaths so Test-ExcludeByPath comparisons work on Linux.
+    # convertto-forwardslashpath: canonical comparison form -- forward slash on all platforms.
+    # used for rootfull/excludepaths so test-excludebypath comparisons work on linux.
     function ConvertTo-ForwardSlashPath {
         param([string]$s)
         if ($null -eq $s) { return $null }
         return ($s -replace '\\', '/')
     }
-    # ConvertTo-WslPath moved up next to Complete-DowserArchiveMapOutput (which now needs
-    # it for -LinuxPaths markdown output) since it is fully self-contained (only reads its
-    # own $inputPath parameter, no dependency on anything computed later in this function),
+    # convertto-wslpath moved up next to complete-dowserarchivemapoutput (which now needs
+    # it for -linuxpaths markdown output) since it is fully self-contained (only reads its
+    # own $inputpath parameter, no dependency on anything computed later in this function),
     # so relocating it ahead of the archive-mode check changes nothing about its behavior
-    # from any call site after its new position. Decision recorded 2026-09-15.
+    # from any call site after its new position. decision recorded 2026-09-15.
 
     $rootFull = $Path
     try {
@@ -1110,7 +1119,7 @@ function Get-DowserMap {
         $excludePaths = @($ExcludePathPatterns | ForEach-Object { ConvertTo-ForwardSlashPath $_ }) 
     }
 
-    # IncludeFolders breakdown: exact names, wildcards, exact paths, wildcard paths
+    # includefolders breakdown: exact names, wildcards, exact paths, wildcard paths
     $includeExactNames = @(); $includeWildcardNames = @()
     $includeExactPaths = @(); $includeWildcardPaths = @()
     if ($IncludeFolders) {
@@ -1131,11 +1140,14 @@ function Get-DowserMap {
                 }
             }
             else {
-                if ($normalizedEntry -notmatch '[\*\?\[\]]') {
-                    $includeExactNames += $normalizedEntry.ToLowerInvariant() 
+                if ($normalizedEntry -match '[\*\?\[\]]') {
+                    $includeWildcardNames += $normalizedEntry 
+                }
+                elseif ($Search) {
+                    $includeWildcardNames += "*$normalizedEntry*"
                 }
                 else {
-                    $includeWildcardNames += $normalizedEntry 
+                    $includeExactNames += $normalizedEntry.ToLowerInvariant() 
                 }
             }
         }
@@ -1163,10 +1175,10 @@ function Get-DowserMap {
             ExcludedTopLevelNames = @()
         }
     }
-    # Every recursive call re-derives $rootFull from its own -Path, which made relative
-    # paths (used by -IncludeFolders path entries and -ExcludePathPatterns) relative to the
-    # CURRENT folder instead of the scan root. The top-level call records the true root in
-    # the shared TraversalState; nested calls adopt it.
+    # every recursive call re-derives $rootfull from its own -path, which made relative
+    # paths (used by -includefolders path entries and -excludepathpatterns) relative to the
+    # current folder instead of the scan root. the top-level call records the true root in
+    # the shared traversalstate; nested calls adopt it.
     if ($CurrentDepth -eq 0 -or -not $TraversalState.ContainsKey('RootFull')) {
         $TraversalState['RootFull'] = $rootFull
     }
@@ -1174,145 +1186,7 @@ function Get-DowserMap {
         $rootFull = $TraversalState['RootFull']
     }
 
-    # --- Parallel Pre-scan Phase ---
-    if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($effectiveIncludePatterns -or $IncludeExtensions -or $IncludeFolders)) {
-        Write-Log "Get-DowserMap starting parallel pre-scan of '$Path' to populate caches" -Severity Verbose
-
-        $preScanScript = {
-            param($targetPath, $effectiveIncludePatterns, $normInclude, $normExclude, $excludeExactFiles, $excludeWildFiles, $excludeExact, $excludeWild, $excludePaths, $includeExactNames, $includeWildcardNames, $includeExactPaths, $includeWildcardPaths, $IncludeHidden, $MaxDepth, $FollowReparse, $FoldersOnly)
-
-            $matchPaths = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
-            $folderPaths = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
-
-            function Get-NormalizedExtension {
-                param($ext) if ([string]::IsNullOrEmpty($ext)) {
-                    return '' 
-                } $ext = $ext.ToLowerInvariant(); if ($ext -notmatch '^\.') {
-                    return ".$ext" 
-                }
-                else {
-                    return $ext 
-                } 
-            }
-
-            $params = @{ LiteralPath = $targetPath; File = $true; Recurse = $true; ErrorAction = 'SilentlyContinue'; Force = $IncludeHidden }
-            if ($MaxDepth -gt 0) {
-                $params['Depth'] = $MaxDepth 
-            }
-
-            Get-ChildItem @params | ForEach-Object {
-                $file = $_
-                $isMatch = $true
-                $ext = Get-NormalizedExtension $file.Extension
-                if ($normInclude -and ($normInclude -notcontains $ext)) {
-                    $isMatch = $false 
-                }
-                if ($isMatch -and $normExclude -and ($normExclude -contains $ext)) {
-                    $isMatch = $false 
-                }
-
-                $matchedByPattern = $false
-                if ($isMatch -and $effectiveIncludePatterns) {
-                    foreach ($p in $effectiveIncludePatterns) {
-                        if ($file.Name -like $p) {
-                            $matchedByPattern = $true; break 
-                        } 
-                    }
-                    if (-not $matchedByPattern) {
-                        $isMatch = $false 
-                    }
-                }
-                if ($isMatch -and -not $matchedByPattern) {
-                    if ($excludeExactFiles -and ($excludeExactFiles -contains $file.Name)) {
-                        $isMatch = $false 
-                    }
-                    if ($isMatch -and $excludeWildFiles) {
-                        foreach ($p in $excludeWildFiles) {
-                            if ($file.Name -like $p) {
-                                $isMatch = $false; break 
-                            } 
-                        } 
-                    }
-                }
-                if ($isMatch -and $excludePaths) {
-                    $full = ($file.FullName -replace '\\', '/')
-                    foreach ($p in $excludePaths) {
-                        if ($full -like "*$p*") {
-                            $isMatch = $false; break 
-                        } 
-                    }
-                }
-                if ($isMatch) {
-                    $curr = $file.DirectoryName
-                    while ($curr -and $curr.Length -ge $targetPath.Length) {
-                        [void]$matchPaths.Add($curr)
-                        $curr = Split-Path $curr -Parent
-                    }
-                }
-            }
-            return @{ MatchPaths = $matchPaths; FolderPaths = $folderPaths }
-        }
-
-        $topLevelItems = Get-ChildItem -LiteralPath $Path -Directory -ErrorAction SilentlyContinue
-        $scanTargets = @($Path)
-        if ($topLevelItems) {
-            $scanTargets += @($topLevelItems.FullName) 
-        }
-
-        $pool = [RunspaceFactory]::CreateRunspacePool(1, $MaxThreads)
-        $pool.Open()
-        $jobs = New-Object System.Collections.ArrayList
-
-        foreach ($target in $scanTargets) {
-            $ps = [PowerShell]::Create()
-            $ps.RunspacePool = $pool
-            [void]$ps.AddScript($preScanScript)
-            [void]$ps.AddArgument($target)
-            [void]$ps.AddArgument($effectiveIncludePatterns)
-            [void]$ps.AddArgument($normInclude)
-            [void]$ps.AddArgument($normExclude)
-            [void]$ps.AddArgument($excludeExactFiles)
-            [void]$ps.AddArgument($excludeWildFiles)
-            [void]$ps.AddArgument($excludeExact)
-            [void]$ps.AddArgument($excludeWild)
-            [void]$ps.AddArgument($excludePaths)
-            [void]$ps.AddArgument($includeExactNames)
-            [void]$ps.AddArgument($includeWildcardNames)
-            [void]$ps.AddArgument($includeExactPaths)
-            [void]$ps.AddArgument($includeWildcardPaths)
-            [void]$ps.AddArgument($IncludeHidden)
-            [void]$ps.AddArgument($MaxDepth)
-            [void]$ps.AddArgument($FollowReparse)
-            [void]$ps.AddArgument($FoldersOnly)
-            [void]$jobs.Add([PSCustomObject]@{ Pipe = $ps; Result = $ps.BeginInvoke() })
-        }
-
-        while (@($jobs | Where-Object { -not $_.Result.IsCompleted }).Count -gt 0) {
-            Start-Sleep -Milliseconds 100 
-        }
-
-        foreach ($j in $jobs) {
-            try {
-                $res = $j.Pipe.EndInvoke($j.Result)
-                if ($res.MatchPaths) {
-                    foreach ($p in $res.MatchPaths) {
-                        $MatchCache[$p.ToLowerInvariant()] = $true 
-                    }
-                }
-            }
-            catch {
-                Write-Log "Error in pre-scan thread: $_" -Severity Verbose
-            }
-            finally {
-                $j.Pipe.Dispose() 
-            }
-        }
-        $pool.Close()
-        $pool.Dispose()
-        Write-Log "Get-DowserMap pre-scan complete. Match cache populated with $($MatchCache.Count) folder paths." -Severity Verbose
-    }
-
-    # --- Filter helper functions ---
+    # --- filter helper functions ---
     function ConvertTo-RelativePath {
         param([string]$full)
         $fwd = ConvertTo-ForwardSlashPath $full
@@ -1358,20 +1232,22 @@ function Get-DowserMap {
         if (-not $IncludeFolders -or (@($IncludeFolders).Count -eq 0)) {
             return $true 
         }
+        # 'research' also finds '.research', nobody types the dot
         $nameKey = $item.Name.ToLowerInvariant()
-        if ((@($includeExactNames).Count -gt 0) -and ($includeExactNames -contains $nameKey)) {
+        $bareName = $item.Name.TrimStart('.')
+        if ((@($includeExactNames).Count -gt 0) -and (($includeExactNames -contains $nameKey) -or ($includeExactNames -contains $bareName.ToLowerInvariant()))) {
             return $true 
         }
         if ((@($includeWildcardNames).Count -gt 0)) {
             foreach ($pattern in $includeWildcardNames) {
-                if ($item.Name -like $pattern) {
+                if ($item.Name -like $pattern -or $bareName -like $pattern) {
                     return $true 
                 } 
             }
         }
-        # Path entries match against the item's path relative to the scan root (the
-        # original root, see TraversalState.RootFull), so 'py/pyconfig' selects exactly that
-        # folder. Previously only the first segment was compared, which made 'py/pyconfig'
+        # path entries match against the item's path relative to the scan root (the
+        # original root, see traversalstate.rootfull), so 'py/pyconfig' selects exactly that
+        # folder. previously only the first segment was compared, which made 'py/pyconfig'
         # select all of 'py' and never match anything below the top level.
         if ((@($includeExactPaths).Count -gt 0) -or (@($includeWildcardPaths).Count -gt 0)) {
             $relKey = (ConvertTo-RelativePath $item.FullName).TrimEnd('/').ToLowerInvariant()
@@ -1390,8 +1266,8 @@ function Get-DowserMap {
         }
         return $false
     }
-    # True when the item is a strict ancestor of an -IncludeFolders path entry, e.g. 'py'
-    # for 'py/pyconfig'. Such a folder is rendered as a passthrough so the tree can reach
+    # true when the item is a strict ancestor of an -includefolders path entry, e.g. 'py'
+    # for 'py/pyconfig'. such a folder is rendered as a passthrough so the tree can reach
     # the target, but its other contents stay filtered.
     function Test-FolderIsIncludePathAncestor {
         param($item)
@@ -1459,18 +1335,7 @@ function Get-DowserMap {
         }
         return $true
     }
-    # Test-IncludeFile answers one question ("does this file count?") by folding two
-    # different reasons for "no" into a single $false: the file does not match an active
-    # -IncludeExtensions/-IncludeFilePatterns allowlist (declared scope narrowing the
-    # caller asked for), or the file matches an actual exclude rule (default excludes,
-    # -ExcludeExtensions, -ExcludeFiles). A caller that only has Test-IncludeFile's bool
-    # cannot tell those two apart -- which is exactly the distinction the root-level-file
-    # naming in the size summary needs, matching the same D-1 boundary already established
-    # for -IncludeFolders (an allowlist mismatch is not a surprise worth naming; an actual
-    # exclude rule is, the same way an excluded top-level folder is named). This mirrors
-    # Test-IncludeFile's exact branch order and precedence and is only meaningful to call
-    # on an item Test-IncludeFile already rejected; on an item it would accept, this
-    # returns $false too (nothing to name).
+
     function Test-FileExcludedByRule {
         param($item)
         $ext = ConvertTo-NormalizedExtension $item.Extension
@@ -1510,16 +1375,16 @@ function Get-DowserMap {
         }
         return (Test-FolderExcludedByRule $item)
     }
-    # The exclude rules alone (-ExcludePathPatterns, default and -ExcludeFolders names),
-    # with no -IncludeFolders bypass. Used directly by Measure-FolderScope inside an
+    # the exclude rules alone (-excludepathpatterns, default and -excludefolders names),
+    # with no -includefolders bypass. used directly by measure-folderscope inside an
     # included subtree, where the ordinary rules apply.
     function Test-FolderExcludedByRule {
         param($item)
         if (Test-ExcludeByPath $item) {
             return $true 
         }
-        # When -IncludeHidden is active, hidden items bypass the name-based exclude list.
-        # The user explicitly asked to see hidden items; defaultExcludes should not silently discard them.
+        # when -includehidden is active, hidden items bypass the name-based exclude list.
+        # the user explicitly asked to see hidden items; defaultexcludes should not silently discard them.
         if ($IncludeHidden -and (Test-IsHidden $item)) {
             return $false 
         }
@@ -1569,6 +1434,14 @@ function Get-DowserMap {
             return $false 
         }
     }
+    # hidden stays hidden, unless you asked for that folder by name
+    function Test-HiddenAdmitted {
+        param($item)
+        if ($IncludeHidden -or -not (Test-IsHidden $item)) {
+            return $true
+        }
+        return [bool]($hiddenByName -and $item.PSIsContainer -and (Test-FolderMatchesInclude $item))
+    }
 
     function Test-FolderContainsMatchingFiles {
         param([string]$folderPath, [int]$maxDepthToCheck = 50)
@@ -1589,13 +1462,16 @@ function Get-DowserMap {
                 continue 
             }
             try {
-                $items = if ($IncludeHidden) {
+                $items = if ($IncludeHidden -or $hiddenByName) {
                     Get-ChildItem -LiteralPath $current.Path -Force -ErrorAction Stop 
                 }
                 else {
                     Get-ChildItem -LiteralPath $current.Path -ErrorAction Stop 
                 }
                 foreach ($item in $items) {
+                    if (-not (Test-HiddenAdmitted $item)) {
+                        continue
+                    }
                     if (-not $item.PSIsContainer) {
                         if (Test-IncludeFile $item) {
                             $MatchCache[$cacheKey] = $true; return $true 
@@ -1636,13 +1512,16 @@ function Get-DowserMap {
                 continue 
             }
             try {
-                $items = if ($IncludeHidden) {
+                $items = if ($IncludeHidden -or $hiddenByName) {
                     Get-ChildItem -LiteralPath $current.Path -Force -Directory -ErrorAction Stop 
                 }
                 else {
                     Get-ChildItem -LiteralPath $current.Path -Directory -ErrorAction Stop 
                 }
                 foreach ($item in $items) {
+                    if (-not (Test-HiddenAdmitted $item)) {
+                        continue
+                    }
                     if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
                         continue 
                     }
@@ -1667,7 +1546,57 @@ function Get-DowserMap {
         return $false
     }
 
-    # auto-enable HTML when output file ends in .html
+    # walk the tree once on every core and answer "anything in here?" for every folder up front,
+    # otherwise the two walkers above re-crawl each subtree at every level and you go make coffee
+    $includeFoldersActive = [bool]($IncludeFolders -and @($IncludeFolders).Count -gt 0)
+    $hiddenByName = $includeFoldersActive
+    $indexFileFilter = [bool]($effectiveIncludePatterns -or $IncludeExtensions)
+    if ($CurrentDepth -eq 0 -and $UseRunspaces -and ($indexFileFilter -or $includeFoldersActive)) {
+        $helperDefinitions = @{}
+        foreach ($name in 'ConvertTo-NativeSeparator', 'ConvertTo-ForwardSlashPath', 'ConvertTo-RelativePath',
+            'ConvertTo-NormalizedExtension', 'Test-MatchAny', 'Test-ExcludeByPath', 'Test-IsHidden',
+            'Test-FolderExcludedByRule', 'Test-FolderMatchesInclude', 'Test-FolderIsIncludePathAncestor', 'Test-IncludeFile') {
+            $helperDefinitions[$name] = (Get-Command -Name $name -CommandType Function).ScriptBlock.ToString()
+        }
+        $helperVariables = @{}
+        foreach ($name in 'sep', 'rootFull', 'excludePaths', 'IncludeFolders', 'includeExactNames', 'includeWildcardNames',
+            'includeExactPaths', 'includeWildcardPaths', 'IncludeHidden', 'excludeExact', 'excludeWild', 'normInclude',
+            'normExclude', 'effectiveIncludePatterns', 'excludeExactFiles', 'excludeWildFiles') {
+            $helperVariables[$name] = Get-Variable -Name $name -ValueOnly -ErrorAction SilentlyContinue
+        }
+        $extensionSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if (@($normInclude) -notcontains '') {
+            foreach ($ext in @($normInclude)) {
+                [void]$extensionSet.Add($ext)
+            }
+        }
+        $indexRoot = $rootFull.TrimEnd('/')
+        if (-not $indexRoot -or $indexRoot.EndsWith(':')) {
+            $indexRoot = "$indexRoot/"
+        }
+        $index = Invoke-DowserMapIndexScan -RootPath $indexRoot -FunctionDefinition $helperDefinitions -Variable $helperVariables -ThreadCount $MaxThreads -Options @{
+            FileFilterActive     = $indexFileFilter
+            IncludeFoldersActive = $includeFoldersActive
+            IncludeHidden        = [bool]$IncludeHidden
+            FollowReparse        = [bool]$FollowReparse
+            DepthLimit           = $MaxDepth + 50
+            IncludeExtensionSet  = $extensionSet
+        }
+        if ($index.Success) {
+            if ($indexFileFilter) {
+                foreach ($key in $index.MatchCache.Keys) {
+                    $MatchCache[$key] = $index.MatchCache[$key]
+                }
+            }
+            if ($includeFoldersActive) {
+                foreach ($key in $index.IncludeFolderCache.Keys) {
+                    $IncludeFolderCache[$key] = $index.IncludeFolderCache[$key]
+                }
+            }
+        }
+    }
+
+    # auto-enable html when output file ends in .html
     if (-not $PSBoundParameters.ContainsKey('AsHtml') -and $OutputFile -and ($OutputFile -match '\.html?$')) {
         $AsHtml = $true 
     }
@@ -1687,7 +1616,7 @@ function Get-DowserMap {
     }
     $fileFilterActive = ($patternCount -gt 0 -or $extCount -gt 0)
 
-    # best effort UTF-8 for console unicode rendering
+    # best effort utf-8 for console unicode rendering
     try {
         if (-not $AsHtml -and -not $Ascii) {
             $isUtf8 = $false
@@ -1712,7 +1641,7 @@ function Get-DowserMap {
     }
     else {
         $branch = if ($AsHtml) {
-            '&#x251C;&#x2500;' 
+            '&#x251c;&#x2500;' 
         }
         else {
             [string]([char]0x251C) + [char]0x2500 
@@ -1731,19 +1660,19 @@ function Get-DowserMap {
         }
         $treeChars = @{ Branch = $branch; Last = $last; Pipe = $pipe; Space = '  ' }
         $fileChar = if ($AsHtml) {
-            '&#x00B7;' 
+            '&#x00b7;' 
         }
         else {
             [char]0x00B7 
         }
         $folderChar = if ($AsHtml) {
-            '&#x25A0;' 
+            '&#x25a0;' 
         }
         else {
             [char]0x25A0 
         }
         $errorChar = if ($AsHtml) {
-            '&#x00D7;' 
+            '&#x00d7;' 
         }
         else {
             [char]0x00D7 
@@ -1755,7 +1684,7 @@ function Get-DowserMap {
             [char]0x2192 
         }
         $targetChar = if ($AsHtml) {
-            '&#x21B3;' 
+            '&#x21b3;' 
         }
         else {
             [char]0x21B3 
@@ -1773,7 +1702,7 @@ function Get-DowserMap {
             return $Line 
         }
         if ($AsHtml) {
-            return "<span style='color:#888888'>$Line</span>" 
+            return "<span style='color:#888888'>$line</span>" 
         }
         if ($null -ne $ansiGray -and $null -ne $ansiReset) {
             return "$ansiGray$Line$ansiReset" 
@@ -1789,8 +1718,8 @@ function Get-DowserMap {
 
     function Get-Children {
         param([string]$p)
-        if ($IncludeHidden) {
-            $allItems = @(Get-ChildItem -Path $p -Force -ErrorAction Stop) 
+        if ($IncludeHidden -or $hiddenByName) {
+            $allItems = @(Get-ChildItem -Path $p -Force -ErrorAction Stop | Where-Object { Test-HiddenAdmitted $_ }) 
         }
         else {
             $allItems = @(Get-ChildItem -Path $p -ErrorAction Stop) 
@@ -1805,11 +1734,7 @@ function Get-DowserMap {
         if (-not $TreeLines) {
             $TreeLines = $Lines 
         }
-        # @() wrapping is load-bearing: Where-Object unwraps a single surviving result to a
-        # bare [string] instead of a one-element array. Without it, "$filteredLines +
-        # $summaryLines" below silently becomes string concatenation (fusing the tree line
-        # and every summary line into one corrupted string) instead of array concatenation,
-        # whenever exactly one non-blank line survives filtering.
+
         $filteredLines = @()
         if ($Lines) {
             $filteredLines = @($Lines | Where-Object { $_ -and $_.Trim() -ne '' })
@@ -1844,16 +1769,6 @@ function Get-DowserMap {
                 $summaryBullets += "- Symlinks: $linkCount" 
             }
 
-            # Size rollup reuses $SizeCache, which Get-FolderAnnotation already populated for
-            # every top-level and rendered nested folder during the tree walk above -- no extra
-            # traversal of any subtree. Ranking and the total both use ONLY the depth-1 (direct
-            # child of root) entries: a depth-1 folder's cached size already includes every byte
-            # under it, so ranking deeper entries alongside it double-lists the same bytes under
-            # two labels (e.g. "A" and "A/Nested" both large because Nested's bytes are inside
-            # A's total). One bounded, non-recursive listing of the root's OWN files is added on
-            # top, because Get-FolderAnnotation is only ever called on subfolders, never on the
-            # scan root itself -- without it, files sitting loose at the root vanish from the
-            # total with no signal that anything was dropped.
             if ($IncludeSize) {
                 $summaryTopFolderCount = 10
                 $sizedFolders = @()
@@ -1870,19 +1785,8 @@ function Get-DowserMap {
                     }
                 }
                 $rootFileBytes = 0
-                # A root-level file rejected here used to vanish from the total with no
-                # signal at all -- unlike an excluded top-level FOLDER (named below via
-                # ExcludedTopLevelNames), an excluded top-level FILE had no equivalent.
-                # Named the same way folders are: a -ExcludePathPatterns rejection (checked
-                # first, matching the folder loop's own precedence) or an actual exclude
-                # rule (Test-FileExcludedByRule) gets named; a plain -IncludeExtensions/
-                # -IncludeFilePatterns allowlist mismatch does not, matching the same D-1
-                # boundary already established for -IncludeFolders.
+
                 $excludedRootFileNames = @()
-                # With -IncludeFolders active, loose root files are outside the declared scope
-                # and are never rendered, so they must not count toward the total either
-                # (Muninn review 1452: 'selected/ [10.0B]' rendered, 'Total size: 30.0B'
-                # reported). Same D-1 boundary: out-of-scope, so not named as excluded.
                 $rootFilesInScope = -not ($IncludeFolders -and @($IncludeFolders).Count -gt 0)
                 try {
                     $rootFileItems = if (-not $rootFilesInScope) {
@@ -1916,25 +1820,12 @@ function Get-DowserMap {
                 $summaryLines += "  Total size: $(Format-DowserSize $totalBytes)"
                 $summaryBullets += "- Total size: $(Format-DowserSize $totalBytes)"
 
-                # Excluded top-level folders (default excludes or -ExcludeFolders) never reach
-                # Get-FolderAnnotation, so they contribute nothing to the total above and would
-                # otherwise vanish behind a bare "Skipped: N folders" count with no name and no
-                # size. Naming them here costs nothing extra -- the name was already in hand at
-                # the point Test-ExcludeFolder rejected it -- and lets a reader who sees a
-                # suspiciously small total go check one of these by name (-NoDefaultExcludes or
-                # -IncludeFolders) instead of trusting a number that silently left something out.
                 $excludedTopLevel = @($TraversalState.ExcludedTopLevelNames)
                 if ($excludedTopLevel.Count -gt 0) {
                     $excludedTopLevelJoined = $excludedTopLevel -join ', '
                     $summaryLines += "  Total size excludes filtered top-level folders: $excludedTopLevelJoined"
                     $summaryBullets += "- Total size excludes filtered top-level folders: $excludedTopLevelJoined"
                 }
-                # Same affordance, file side: a root-level file rejected by an actual exclude
-                # rule or -ExcludePathPatterns is named here so a suspiciously small total has
-                # a name to check, exactly like the folder line above. A separate line, not a
-                # merge into the folder line above, so the existing "filtered top-level
-                # folders" wording and its established tests stay untouched when there is
-                # nothing to add here (the common case).
                 if ($excludedRootFileNames.Count -gt 0) {
                     $excludedRootFilesJoined = $excludedRootFileNames -join ', '
                     $summaryLines += "  Total size excludes filtered top-level files: $excludedRootFilesJoined"
@@ -2017,9 +1908,9 @@ function Get-DowserMap {
                         $displayRoot = $Path 
                     }
                     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-                    $mdLines = @( '# Directory Map', '', ('**Root:** `{0}`' -f $displayRoot), ('**Generated:** {0}' -f $timestamp) )
+                    $mdlines = @( '# directory map', '', ('**root:** `{0}`' -f $displayroot), ('**generated:** {0}' -f $timestamp) )
                     if ($summaryBullets.Count -gt 0) {
-                        $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets 
+                        $mdlines += ''; $mdlines += '#### summary'; $mdlines += $summarybullets 
                     }
                     $mdLines += ''; $mdLines += '```text'
                     if ($treeOnly.Count -gt 0) {
@@ -2042,7 +1933,7 @@ function Get-DowserMap {
         return $finalLines
     }
 
-    # --- Non-ShowFullPathTree rendering ---
+    # --- non-showfullpathtree rendering ---
     if (-not $ShowFullPathTree) {
         $rawItems = @()
         $itemsLoaded = $true
@@ -2063,13 +1954,13 @@ function Get-DowserMap {
             return Complete-DirectoryMapOutput -Lines $errorLines -TreeLines $errorLines
         }
 
-        # pre-filter items before calculating isLast (fixes tree connector bug)
+        # pre-filter items before calculating islast (fixes tree connector bug)
         $filteredFolders = @(); $filteredLinks = @(); $filteredFiles = @()
         # folder searches retain the filter at every depth; file searches clear it inside a match
         $includeScopeActive = ($IncludeFolders -and @($IncludeFolders).Count -gt 0)
         foreach ($item in $rawItems) {
             if (-not $FollowReparse -and (Test-ReparsePoint $item)) {
-                # Links obey -ExcludePathPatterns like any other item (Huginn review 1454:
+                # links obey -excludepathpatterns like any other item (huginn review 1454:
                 # a file symlink matching the pattern still rendered in this branch).
                 if (Test-ExcludeByPath $item) {
                     if ($item.PSIsContainer) {
@@ -2086,8 +1977,8 @@ function Get-DowserMap {
                     }
                 }
                 elseif (-not $includeScopeActive -and (-not $FoldersOnly -or $fileFilterActive)) {
-                    # File symlinks obey the same -FoldersOnly and file filter rules as plain
-                    # files; they used to bypass both, so -FoldersOnly still listed them.
+                    # file symlinks obey the same -foldersonly and file filter rules as plain
+                    # files; they used to bypass both, so -foldersonly still listed them.
                     if (Test-IncludeFile $item) {
                         $filteredLinks += $item
                     }
@@ -2166,7 +2057,7 @@ function Get-DowserMap {
                 $TraversalState.LinkCount++
             }
             elseif ($item.PSIsContainer) {
-                # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
+                # --- size/count annotation: bolted onto the folder name ---
                 $annotation = Get-FolderAnnotation -folderPath $item.FullName -InScope (-not $includeScopeActive -or [bool](Test-FolderMatchesInclude $item))
                 $line = "$Indent$connector $folderChar $($item.Name)$folderSuffix$annotation"
                 $output += Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
@@ -2174,7 +2065,7 @@ function Get-DowserMap {
                 if ($CurrentDepth -lt $MaxDepth) {
                     # file filters search the matched subtree; folder searches keep matching
                     $childIncludeFolders = if ($fileFilterActive -and (Test-FolderMatchesInclude $item)) { $null } else { $IncludeFolders }
-                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                    $output += Get-DowserMap -Path $item.FullName -Indent $nextIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -Search:$Search -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$ShowFullPathTree -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 }
             }
             else {
@@ -2186,7 +2077,7 @@ function Get-DowserMap {
         return Complete-DirectoryMapOutput -Lines $output -TreeLines $output
     }
 
-    # --- ShowFullPathTree logic ("trunk" with artistic connectors) ---
+    # --- showfullpathtree logic ("trunk" with artistic connectors) ---
     $segments = @()
     if ($LinuxPaths) {
         $displayPath = ConvertTo-WslPath $Path
@@ -2259,7 +2150,7 @@ function Get-DowserMap {
     }
 
     # filter folders
-    # See the matching comment in the non-ShowFullPathTree branch: with -IncludeFolders set
+    # see the matching comment in the non-showfullpathtree branch: with -includefolders set
     # at this level, only folders on the way to (or matching) an include entry are shown.
     $includeScopeActive = ($IncludeFolders -and @($IncludeFolders).Count -gt 0)
     $folders = @(); $links = @()
@@ -2350,14 +2241,14 @@ function Get-DowserMap {
             $TraversalState.LinkCount++
         }
         elseif ($item.PSIsContainer) {
-            # --- SIZE/COUNT ANNOTATION: bolted onto the folder name ---
+            # --- size/count annotation: bolted onto the folder name ---
             $annotation = Get-FolderAnnotation -folderPath $item.FullName -InScope (-not $includeScopeActive -or [bool](Test-FolderMatchesInclude $item))
             $line = "$childrenBaseIndent$connector $folderChar $($item.Name)$folderSuffix$annotation"
             $line = Format-HiddenLine -Line $line -IsHidden:(Test-IsHidden $item)
             if ($CurrentDepth -lt $MaxDepth) {
                 $TraversalState.FolderCount++
                 $childIncludeFolders = if ($fileFilterActive -and (Test-FolderMatchesInclude $item)) { $null } else { $IncludeFolders }
-                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
+                $subTree = Get-DowserMap -Path $item.FullName -Indent $recursiveIndent -MaxDepth $MaxDepth -CurrentDepth ($CurrentDepth + 1) -IncludeExtensions $IncludeExtensions -ExcludeExtensions $ExcludeExtensions -IncludeFilePatterns $IncludeFilePatterns -ExcludeFiles $ExcludeFiles -ExcludeFolders $ExcludeFolders -IncludeFolders $childIncludeFolders -Search:$Search -ExcludePathPatterns $ExcludePathPatterns -NoDefaultExcludes:$NoDefaultExcludes -FoldersOnly:$FoldersOnly -AsHtml:$AsHtml -AsMarkdown:$AsMarkdown -Ascii:$Ascii -IncludeHidden:$IncludeHidden -FollowReparse:$FollowReparse -ShowFullPathTree:$false -LinuxPaths:$LinuxPaths -OutputFile $OutputFile -MarkdownFile $MarkdownFile -EmitSummary:$EmitSummary -IncludeSize:$IncludeSize -IncludeFileCount:$IncludeFileCount -MatchCache $MatchCache -IncludeFolderCache $IncludeFolderCache -TraversalState $TraversalState -SizeCache $SizeCache -PsCountCache $PsCountCache
                 $output += @($line) + $subTree
             }
             else {

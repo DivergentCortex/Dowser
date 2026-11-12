@@ -30,10 +30,9 @@ function Find-DowserFile {
         Wildcard pattern(s) to exclude, tested against both the item's bare name and its
         full path (e.g., "*.rustup*", "*node_modules*"). A bare string without wildcard
         characters is auto-wrapped the same way -Pattern is: "rustup" becomes "*rustup*".
-        A directory matching any exclude pattern is pruned outright -- Find-DowserFile
-        never descends into it, so excluding a large toolchain or dependency tree also
-        cuts search time, not just result noise. A file matching an exclude pattern is
-        dropped from the results the same way.
+        A directory matching any exclude pattern is pruned and never descended into, so
+        excluding a large toolchain or dependency tree also cuts search time. A matching
+        file is dropped from the results.
 
     .PARAMETER Recurse
         Search subdirectories recursively. Default is $true. Pass -Recurse:$false to disable.
@@ -140,17 +139,15 @@ function Find-DowserFile {
             }
         )
 
-        # -Filter is a filesystem-level filter and takes exactly one pattern, so it stays
-        # the fast path for the single-pattern case. Multiple patterns enumerate once and
-        # test names in-process; one pass, no cross-pattern duplicates.
+        # -Filter runs at the filesystem level but takes exactly one pattern, so it stays the
+        # fast path for a single pattern. several patterns enumerate once and test names
+        # in-process, which also avoids cross-pattern duplicates
         $nameTest = $Pattern.Count -gt 1
 
-        # Same auto-wrap rule as -Pattern. Tested against both Name and FullName so a bare
-        # folder name ("node_modules") and a path fragment ("/cache/") both work. A blank
-        # element is dropped rather than wrapped: "" would otherwise become "**", which
-        # -like matches against everything, silently excluding the entire tree with no
-        # error -- a plausible outcome of building the list from a split string with a
-        # stray leading/trailing comma.
+        # same auto-wrap as -Pattern, tested against Name and FullName so a bare folder name
+        # ("node_modules") and a path fragment ("/cache/") both work. blank entries are
+        # dropped: "" would wrap to "**", match everything, and silently exclude the whole
+        # tree (easy to hit with a stray comma in a split string)
         $ExcludePattern = @(
             foreach ($pat in $ExcludePattern) {
                 if ([string]::IsNullOrWhiteSpace($pat)) {
@@ -182,45 +179,27 @@ function Find-DowserFile {
             $filesFound = [System.Collections.Concurrent.ConcurrentBag[string]]::new()
             
             if ($UseRunspaces) {
-                # partition by top-level dirs to spread across threads. @() around the
-                # enumeration matters: on a flat directory Get-ChildItem returns nothing,
-                # $null.FullName is $null, and @($p) + @($null) hands the pool a target
-                # list with a null in it, which its mandatory -InputObject rejects.
-                # -Force matters here: without it a hidden top-level directory never shows up
-                # in this listing at all, and once $p's own worker below stops recursing
-                # through every subdirectory (see the double-scan fix further down), nothing
-                # else would ever scan a hidden directory's contents either.
-                # Skipped entirely when -Recurse:$false: $scanTargets falls straight to
-                # @($p) below regardless of what this would compute, so the enumeration and
-                # its filtering would only be discarded work.
+                # split by top-level dirs to spread work across threads. the @() matters: on a
+                # flat directory Get-ChildItem returns nothing, and a $null in the target list
+                # makes the pool's mandatory -InputObject throw
+                # -Force so hidden top-level dirs show up, since nothing else scans their contents
+                # skipped for -Recurse:$false, where $scanTargets is just @($p) anyway
                 $topLevelItems = @()
                 if ($Recurse) {
                     $topLevelItems = @(Get-ChildItem -Path $p -Directory -Force -ErrorAction SilentlyContinue)
                     if ($topLevelItems.Count -gt 0) {
-                        # A top-level subdirectory becomes its own parallel scan target below, its
-                        # FullName handed to a worker as the explicit root of that worker's walk.
-                        # Get-ChildItem -Recurse never follows a symlinked directory it ENCOUNTERS
-                        # mid-walk, but that rule does not apply to the root a worker is explicitly
-                        # told to start at, so a reparse-point directory sitting directly at the top
-                        # level must be dropped here unconditionally, not only when -ExcludePattern
-                        # happens to be active. Left in, its dedicated worker walks straight through
-                        # it and every file under the real target comes back a second time, reported
-                        # under the symlink's own path (confirmed by direct execution, decision
-                        # recorded 2026-09-15). Matches Get-DowserMap's documented -FollowReparse
-                        # default-off convention: a symlink's content is reachable through its real
-                        # path, never through the link.
+                        # each top-level dir becomes its own scan root. Get-ChildItem -Recurse skips
+                        # symlinked dirs it meets mid-walk but not one it is told to start in, so
+                        # drop reparse points here or the real target's files come back twice under
+                        # the link's path. a link's content is reachable through its real path only
                         $topLevelItems = @($topLevelItems | Where-Object {
                                 ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0
                             })
                     }
                     if ($hasExclude -and $topLevelItems.Count -gt 0) {
-                        # A top-level subdirectory becomes its own parallel scan target below (its
-                        # FullName is pushed straight onto that worker's stack as the walk root), so
-                        # it must be tested here too -- the in-worker exclusion check only fires for
-                        # CHILDREN discovered during a walk, never for a worker's own starting point.
-                        # Skipping this would let an excluded top-level folder (".rustup" sitting
-                        # directly under the searched root) get its own dedicated worker that walks
-                        # it in full, defeating the exclusion for exactly the case it exists to catch.
+                        # the in-worker exclude check only sees children found mid-walk, never a
+                        # worker's own starting dir, so filter excluded top-level dirs here or a
+                        # folder like .rustup still gets a dedicated worker that walks it in full
                         $topLevelItems = @($topLevelItems | Where-Object {
                                 $item = $_
                                 -not (@($ExcludePattern) | Where-Object { $item.Name -like $_ -or $item.FullName -like $_ })
@@ -234,13 +213,11 @@ function Find-DowserFile {
                     $scanTargets = @($p)
                 }
 
-                # Shared across every worker so one worker finding a match can stop every
-                # other worker's walk too, not just its own. A plain variable would not do
-                # this: each runspace only sees the value it was handed at dispatch time.
-                # A synchronized hashtable is a reference type every worker holds a live
-                # handle to and can both read and mutate, the same mechanism already used
-                # for $progressQueue in Invoke-DowserRunspacePool. Only created when
-                # actually needed so the common case (no -StopOnFirstMatch) pays nothing.
+                # shared by every worker so one match can stop all the walks. a plain variable
+                # wouldn't work since each runspace only sees the value it was handed at
+                # dispatch. a synchronized hashtable is a live reference they can all read and
+                # write (same trick as $progressQueue in Invoke-DowserRunspacePool). only built
+                # for -StopOnFirstMatch so the common case pays nothing
                 $stopSignal = if ($StopOnFirstMatch) { [hashtable]::Synchronized(@{ Stop = $false }) } else { $null }
 
                 $scriptBlock = {
@@ -266,59 +243,34 @@ function Find-DowserFile {
                     }
 
                     foreach ($targetPath in $chunk) {
-                        # Checked before starting each new target, not only inside one: a
-                        # queued chunk that has not begun yet sees this the moment it starts,
-                        # so a match found by a different, already-running worker stops a
-                        # not-yet-started one from doing any work at all.
+                        # check before each new target too, so a queued chunk that hasn't started
+                        # bails as soon as another worker has found a match
                         if ($stopOnFirst -and $stopSignal.Stop) {
                             break
                         }
 
-                        # $rootPath (the original search root, $p in the caller) is always
-                        # walked non-recursively here: every one of its subdirectories already
-                        # has its own dedicated target elsewhere in $chunk, or in another
-                        # thread's chunk, each walking its own subtree in full. Recursing
-                        # through $rootPath on top of that walked every subtree twice, once
-                        # through $rootPath's own pass and once through each subdirectory's
-                        # dedicated worker (confirmed by direct execution, decision recorded
-                        # 2026-09-15). A target that is not $rootPath keeps the caller's real
-                        # $recurse value.
+                        # the search root ($p in the caller) is walked non-recursively: each of its
+                        # subdirectories already has its own target, so recursing here too would
+                        # scan every subtree twice
                         $targetRecurse = $recurse -and ($targetPath -ne $rootPath)
 
                         if (@($excludePatterns).Count -gt 0 -or $stopOnFirst) {
-                            # Manual, per-directory stack walk instead of Get-ChildItem -Recurse.
-                            # Needed for -ExcludePattern (pruning, so an excluded directory is
-                            # never pushed and never descended into -- Get-ChildItem -Exclude
-                            # only hides a matched item from output, it does not stop recursion
-                            # into it) AND now also for -StopOnFirstMatch on its own: measured by
-                            # direct execution that Get-ChildItem -Recurse largely BUFFERS its
-                            # entire recursive listing before a consuming foreach loop can even
-                            # begin iterating (breaking after the very first of 50,000
-                            # recursively-enumerated items still cost 77% of the time to
-                            # enumerate all 50,000). That made an earlier version of this fix
-                            # only skip PER-ITEM PROCESSING after a match, never the actual disk
-                            # enumeration -- confirmed independently by adversarial review
-                            # measuring only a 16% saving against a large non-matching sibling
-                            # directory, far short of "halts every other worker's walk." A
-                            # per-directory, non-recursive Get-ChildItem call bounds the work
-                            # between stop-signal checks to one directory's worth of children
-                            # at a time, which is what actually lets one worker's match
-                            # interrupt another worker mid-walk of a large sibling. Decision
-                            # recorded 2026-09-15.
+                            # manual per-directory stack walk instead of Get-ChildItem -Recurse. it is
+                            # needed for -ExcludePattern (an excluded dir is never pushed, whereas
+                            # -Exclude only hides it from output and still recurses) and for
+                            # -StopOnFirstMatch (Get-ChildItem -Recurse buffers most of its listing
+                            # before the loop sees the first item, so breaking early saves almost
+                            # nothing). one directory per Get-ChildItem call keeps the gap between
+                            # stop-signal checks small
                             #
-                            # A symlinked/reparse-point directory is never pushed either, matching
-                            # Get-ChildItem -Recurse's own default (and Get-DowserMap's documented
-                            # -FollowReparse default-off convention) -- without this check, a plain
-                            # symlink returns the same file twice under two paths, and a cycle
-                            # (A/link -> A) grows the stack without bound until an OS path-length
-                            # limit intervenes, since nothing here would ever detect the loop.
+                            # reparse-point dirs are never pushed, matching Get-ChildItem -Recurse:
+                            # a symlink would return the same file under two paths, and a cycle
+                            # (A/link -> A) would grow the stack until the OS path limit
                             $stack = New-Object 'System.Collections.Generic.Stack[string]'
                             $stack.Push($targetPath)
-                            # Labeled so a match (this worker's own, or the stop-signal check
-                            # seeing another worker's) can break both this while loop and the
-                            # foreach below in one step; an unlabeled break here would only
-                            # exit the foreach, leaving the while loop to pop and walk
-                            # whatever the stack still holds.
+                            # labeled so one break leaves both the while and the foreach; a plain
+                            # break would only exit the foreach and the while would keep walking
+                            # whatever is left on the stack
                             :walkLoop while ($stack.Count -gt 0) {
                                 if ($stopOnFirst -and $stopSignal.Stop) {
                                     break walkLoop
@@ -326,10 +278,8 @@ function Find-DowserFile {
                                 $currentDir = $stack.Pop()
                                 $children = Get-ChildItem -LiteralPath $currentDir -Force -ErrorAction SilentlyContinue
                                 foreach ($child in $children) {
-                                    # Checked per child, not only per directory: a directory can
-                                    # hold thousands of entries on its own, and this is what lets
-                                    # another worker's match be noticed within a single directory
-                                    # listing, not only between them.
+                                    # per child too, so a match elsewhere is noticed inside a
+                                    # directory with thousands of entries
                                     if ($stopOnFirst -and $stopSignal.Stop) {
                                         break walkLoop
                                     }
@@ -373,11 +323,8 @@ function Find-DowserFile {
                             continue
                         }
 
-                        # Reached only when neither -ExcludePattern nor -StopOnFirstMatch is
-                        # active, so this fast Get-ChildItem -Recurse path (with its -Filter
-                        # optimization for the single-pattern case) never needs to support
-                        # early termination -- the whole target is always meant to be scanned
-                        # here, matching every caller that reaches this branch.
+                        # fast path, only reached without -ExcludePattern or -StopOnFirstMatch,
+                        # so it never needs early termination
                         $params = @{
                             Path        = $targetPath
                             File        = $true
@@ -430,14 +377,10 @@ function Find-DowserFile {
                 }
             }
             elseif ($hasExclude) {
-                # Manual stack walk: an excluded directory is never pushed, so the walk never
-                # descends into it. Get-ChildItem -Exclude only hides a matched item from
-                # output; it does not stop recursion into it. A symlinked/reparse-point
-                # directory is never pushed either, matching Get-ChildItem -Recurse's own
-                # default (and Get-DowserMap's documented -FollowReparse default-off
-                # convention) -- without this check, a plain symlink returns the same file
-                # twice under two paths, and a cycle (A/link -> A) grows the stack without
-                # bound until an OS path-length limit intervenes.
+                # manual stack walk so an excluded dir is never pushed (-Exclude only hides
+                # output, it doesn't stop recursion). reparse-point dirs are skipped too,
+                # otherwise a symlink returns the same file twice and a cycle (A/link -> A)
+                # grows the stack until the OS path limit
                 $stack = New-Object 'System.Collections.Generic.Stack[string]'
                 $stack.Push($p)
                 while ($stack.Count -gt 0) {
@@ -511,16 +454,9 @@ function Find-DowserFile {
                     $params['Filter'] = $Pattern[0] 
                 }
                 
-                # foreach, not Get-ChildItem | ForEach-Object: a plain "return" inside a
-                # ForEach-Object script block only skips to the pipeline's next input item,
-                # it never stops Get-ChildItem's own enumeration -- identical to the gap
-                # already fixed in the runspace scriptblock's fast path (2026-09-15), missed
-                # here in this plain serial (-UseRunspaces:$false, no -ExcludePattern) branch
-                # at the time, confirmed by independent adversarial review executing a
-                # controlled repro against this exact branch: a match placed first vs. last
-                # in enumeration order showed no timing difference, proving the full listing
-                # was walked regardless of -StopOnFirstMatch. A real foreach loop is required
-                # so "break" genuinely halts enumeration.
+                # foreach, not Get-ChildItem | ForEach-Object: a return inside ForEach-Object only
+                # skips to the next pipeline item and never stops enumeration, so
+                # -StopOnFirstMatch would still walk the whole listing. a real loop lets break halt it
                 foreach ($item in (Get-ChildItem @params)) {
                     $ok = $true
                     if ($nameTest) {
@@ -554,8 +490,8 @@ function Find-DowserFile {
                 }
             }
 
-            # @() keeps an empty result an empty array. Unwrapped, no matches leaves $allPaths
-            # $null, @($null).Count is 1, and the formatter below emits one row of nulls.
+            # @() keeps no-match as an empty array; unwrapped it is $null, @($null).Count is 1,
+            # and the formatter below would emit a row of nulls
             $allPaths = @(Select-DowserUniquePath -Path $filesFound.ToArray())
             $count = @($allPaths).Count
             Write-Log "Found $count files matching basic criteria." -Severity Verbose
@@ -579,8 +515,8 @@ function Find-DowserFile {
                     $allPaths | ForEach-Object {
                         $f = Get-Item -LiteralPath $_ -ErrorAction SilentlyContinue
                         if (-not $f) {
-                            # path was enumerated but will not resolve: dangling symlink, or it
-                            # was deleted mid-scan. Emitting it yields a row of null properties.
+                            # enumerated but won't resolve (dangling symlink, or deleted mid-scan);
+                            # emitting it would give a row of null properties
                             Write-Log "Skipping unresolvable path: $_" -Severity Verbose
                             return
                         }

@@ -15,7 +15,6 @@ function Find-DowserString {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-        Source: standalone scripts\find-stringinfiles.ps1
         Threading via Invoke-DowserRunspacePool (Private helper)
         Aho-Corasick compiled inline (C# Add-Type), shared across runspaces via AppDomain
 
@@ -25,7 +24,7 @@ function Find-DowserString {
         (SearchMode auto or aho). Single patterns or regex fall back to per-line scan.
 
         File gathering and string searching are both parallelized via directory partitioning
-        and chunked file processing, the same strategy as the original Find-StringInFiles.
+        and chunked file processing.
 
     .PARAMETER Path
         Directory to search. Defaults to current directory. Accepts pipeline input.
@@ -69,7 +68,7 @@ function Find-DowserString {
     .PARAMETER OutputMode
         grouped - directory header, files indented underneath with match count and line numbers (default).
                   text output, optimized for console readability.
-        counts  - one PSCustomObject per file with FilePath, MatchCount, LineNumbers. legacy default;
+        counts  - one PSCustomObject per file with FilePath, MatchCount, LineNumbers.
                   use this when you need to pipe results downstream.
         files   - just file paths.
         matches - one row per match; include line text with IncludeLineContent.
@@ -237,10 +236,7 @@ function Find-DowserString {
             return
         }
 
-        # ==================================================================
-        # FILE-PATH SHORT-CIRCUIT
-        # workers don't inherit drive mappings so mapped paths resolve to unc
-        # ==================================================================
+        # workers don't inherit drive mappings, so mapped paths resolve to unc
         $isFilePath = $false
         try {
             if ([System.IO.File]::Exists($Path)) {
@@ -268,10 +264,7 @@ function Find-DowserString {
         }
         else {
 
-            # ==================================================================
-            # PHASE 1/3 - DIRECTORY ENUMERATION
-            # prune excluded folders at branch level so we never descend their subtrees
-            # ==================================================================
+            # prune excluded folders at the branch so we never descend their subtrees
 
             $excludeSet = New-Object 'System.Collections.Generic.HashSet[string]'([System.StringComparer]::OrdinalIgnoreCase)
             foreach ($name in $ExcludeFolders) {
@@ -312,7 +305,7 @@ function Find-DowserString {
                         }
                     }
                     catch {
-                        # access denied / reparse points / vanished dirs - skip silently
+                        # access denied, reparse points and vanished dirs just get skipped
                         Write-Log "Find-DowserString skipped inaccessible directory '$current': $($_.Exception.Message)" -Severity Verbose
                     }
                 }
@@ -375,7 +368,7 @@ function Find-DowserString {
                 -UseProgressQueue
 
             # Select-Object -Unique is O(n^2) and stalls for tens of minutes on a
-            # quarter-million paths. Select-DowserUniquePath is a single-pass HashSet.
+            # quarter-million paths, so use Select-DowserUniquePath (single-pass HashSet)
             $allFiles = @(Select-DowserUniquePath -Path $gatherResults)
             $phase2Duration = (Get-Date) - $phase2Start
             Write-Log ("Find-DowserString Phase 2/4: Matched {0:N0} files in {1:N1}s" -f $allFiles.Count, $phase2Duration.TotalSeconds)
@@ -387,11 +380,7 @@ function Find-DowserString {
             return
         }
 
-        # ==================================================================
-        # PHASE 3/3 - STRING SEARCHING
         # aho for multi-pattern literal, regex or manual otherwise
-        # ==================================================================
-
         $searchScriptBlock = {
             param($FilePaths, $Patterns, $UseRegex, $CaseSensitive, $UseAho, $AhoCode, $IncludeLineContent, $ProgressQueue)
 
@@ -550,10 +539,7 @@ function Find-DowserString {
     end {
         $results = @($allResults)
 
-        # ==================================================================
-        # PHASE 4/4 - OUTPUT FORMATTING
         # grouping and sorting a large match set is real work, not free
-        # ==================================================================
         $phase4Start = Get-Date
         Write-Log ("Find-DowserString Phase 4/4: Formatting {0:N0} match rows as '{1}'" -f $results.Count, $OutputMode)
         Write-Progress -Activity 'Find-DowserString' -Status ("Phase 4/4: Formatting {0:N0} match rows..." -f $results.Count) -PercentComplete 0

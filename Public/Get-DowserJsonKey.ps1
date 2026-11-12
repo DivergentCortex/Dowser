@@ -11,11 +11,8 @@ function Get-DowserJsonKey {
         path. Use -Compare to group files by complete key layout, identify the dominant layout,
         and show representative variants with key differences and sample files. Add
         -ShowKeyComparison when individual key-path comparison rows are needed.
-
-    .NOTES
-        -Validation classifies file-level path coverage. It does not load source documents.
-        Results from the most recent comparison remain available in
-        $global:DowserJsonLastComparison and $global:DowserJsonLastValidation.
+        The most recent comparison is kept in $global:DowserJsonLastComparison and
+        $global:DowserJsonLastValidation.
 
     .PARAMETER Path
         JSON or JSONL file, or a directory containing those files. Accepts pipeline input.

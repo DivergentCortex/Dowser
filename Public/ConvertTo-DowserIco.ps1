@@ -12,22 +12,18 @@ function ConvertTo-DowserIco {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
-        Loads a source image through System.Drawing (GDI+) and writes a Windows ICO
-        file containing one PNG-compressed entry per requested size. UNC source paths
-        are staged to a temp file first because GDI+ reads them unreliably, and the
-        image is read into memory before decoding for the same reason. Each entry is
-        rendered at 32bpp ARGB with high-quality bicubic resampling, and the ICONDIR
-        and directory entries are written manually, using a width/height byte of 0 for
-        sizes of 256 or larger as the ICO format requires.
+        Loads a source image through System.Drawing (GDI+) and writes an ICO file with one
+        PNG-compressed entry per requested size, each rendered at 32bpp ARGB with
+        high-quality bicubic resampling. UNC sources are staged to a temp file and read
+        into memory first because GDI+ reads them unreliably.
 
-        Requested sizes are validated against 16, 32, 48, 64, 128, 256, and 512;
-        invalid sizes are warned about and skipped, and when none remain the function
-        falls back to 512. The output path defaults to the source name with a .ico
-        extension in the source directory when -OutputFile is not given, and any
-        missing output directory is created.
+        Sizes must be 16, 32, 48, 64, 128, 256, or 512. Invalid sizes are skipped with a
+        warning, and if none remain the function uses 512. Without -OutputFile the icon is
+        written next to the source with a .ico extension. A missing output directory is
+        created.
 
-        Requires Windows because it depends on System.Drawing and GDI+; on other
-        platforms it warns and returns $null.
+        Requires Windows (System.Drawing and GDI+); on other platforms it warns and
+        returns $null.
     .PARAMETER InputFilePath
         Path to the source image to convert. UNC paths are supported and staged to
         temp before decoding.
@@ -65,14 +61,13 @@ function ConvertTo-DowserIco {
         [int[]]
         $IcoSizes = @(256),
         [Parameter(Mandatory=$false)]
-        # MaxSize > 256 will produce a separate PNG alongside the ICO; default 0 disables.
         [int]
         $MaxSize = 0
     )
 
     Write-Log "Starting ConvertTo-DowserIco"
 
-    # eq false not -not, $IsWindows is null on 5.1
+    # 5.1 doesn't know what $IsWindows is, so test -eq $false instead of -not
     if ($IsWindows -eq $false) {
         Write-Log "ConvertTo-DowserIco requires Windows (System.Drawing/GDI+). Not available on this platform." -Severity Warning
         return $null
@@ -87,7 +82,7 @@ function ConvertTo-DowserIco {
 
     $InputFilePath = (Resolve-Path $InputFilePath).Path
 
-    # gdi+ chokes on unc, stage to temp first
+    # gdi+ and unc paths don't get along, so work from a local temp copy
     $tempFile = $null
     if ($InputFilePath -like '\\*') {
         $tempFile = Join-Path $env:TEMP "$([System.IO.Path]::GetRandomFileName())"
@@ -127,7 +122,6 @@ function ConvertTo-DowserIco {
         return $false
     }
 
-    # png-compressed ico, dir width/height byte is 0 for sizes >=256
     $IcoSizes = @($IcoSizes)
     if (-not $IcoSizes -or (@($IcoSizes) | Measure-Object).Count -eq 0) {
         $IcoSizes = @(256)
@@ -174,19 +168,19 @@ function ConvertTo-DowserIco {
         $fs = [System.IO.File]::Open($OutputFile, [System.IO.FileMode]::Create)
         $bw = New-Object System.IO.BinaryWriter($fs)
 
-        # ICONDIR: Reserved(2) = 0, Type(2)=1 for icons, Count(2)
+        # ICONDIR: reserved(2)=0, type(2)=1 for icons, count(2)
         $bw.Write([UInt16]0)
         $bw.Write([UInt16]1)
         $bw.Write([UInt16]($images.Count))
 
-        # Calculate header size: 6 + 16 * count
+        # 6-byte ICONDIR plus 16 bytes per entry
         $headerSize = 6 + 16 * $images.Count
         $offset = $headerSize
 
         foreach ($img in $images) {
             $s = $img[0]
             $bytes = $img[1]
-            # width/height byte is 0 for 256 or larger
+            # a byte can't hold 256, so the format uses 0 for 256 and up
             if ($s -ge 256) {
                 $widthByte = [byte]0
             } else {
@@ -235,7 +229,4 @@ function ConvertTo-DowserIco {
         }
     }
 }
-
-# Usage:
-# ConvertTo-Ico -InputFilePath "\\server\share\logo.jpg" -OutputFile "\\server\share\logo.ico"
 

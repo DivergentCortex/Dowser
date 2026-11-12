@@ -14,15 +14,11 @@ function Find-DowserScript {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: dscript
-        Source: Find-Scripts.ps1 (standalone scripts), was hardcoded to a network share.
 
     .DESCRIPTION
         General-purpose script-file finder. Searches a path for files matching
         common scripting extensions (.ps1, .psm1, .py, .vbs, .sh, .bat, .cmd, etc.).
         Optionally filters to files modified within a recency window.
-
-        Ported from standalone Find-Scripts.ps1, which was hardcoded to a single
-        network share and is now generalized to any path and extension set.
 
     .PARAMETER Path
         Root path(s) to search. Defaults to the current directory. Accepts pipeline input.

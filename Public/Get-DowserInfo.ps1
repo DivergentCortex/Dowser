@@ -12,9 +12,8 @@ function Get-DowserInfo {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
-        Module version is SemVer-style and lives in Dowser.psd1 (ModuleVersion).
-        Per-script / per-feature history lives in docs/CHANGELOG.md and uses
-        YYYY.MM.DD.XXX entries. Both are surfaced here. They are independent.
+        Reads ModuleVersion from Dowser.psd1 and the newest YYYY.MM.DD.XXX entry
+        from docs/CHANGELOG.md. The two versions are independent.
     .EXAMPLE
         Get-DowserInfo
 

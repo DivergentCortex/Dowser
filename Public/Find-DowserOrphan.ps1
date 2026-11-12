@@ -14,7 +14,7 @@ function Find-DowserOrphan {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
     .DESCRIPTION
-        This function performs the following steps:
+        Works in these steps:
         1. Recursively finds all files in the specified SearchPath.
         2. Identifies "Scanner" files (text-based files like .ps1, .xml, .json, etc.) that might contain references.
         3. Reads the content of all Scanner files and tokenizes them (splits by common delimiters).
