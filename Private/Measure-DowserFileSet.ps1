@@ -14,8 +14,7 @@ function Measure-DowserFileSet {
     .DESCRIPTION
         Walks -Files once and returns total bytes, file count, the largest, newest, and
         oldest file, and how many files were modified since -TodayStart, since -RecentCutoff,
-        and before -RecentCutoff. Replaces three full Sort-Object passes per folder in
-        Measure-DowserDirectory.
+        and before -RecentCutoff.
     .PARAMETER Files
         FileInfo objects to measure. Directories should already be filtered out.
     .PARAMETER TodayStart

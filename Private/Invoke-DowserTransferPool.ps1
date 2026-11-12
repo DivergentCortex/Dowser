@@ -6,14 +6,12 @@ function Invoke-DowserTransferPool {
         Builds the shared runspace pool and runs Invoke-DowserTransferWorker across it.
 
     .DESCRIPTION
-        Owns the full runspace lifecycle for a transfer run: builds an InitialSessionState
-        with Invoke-DowserTransferWorker registered via SessionStateFunctionEntry, opens a
-        single shared RunspacePool sized to the item count and -ThreadCount, and starts one
-        worker PowerShell instance per pool slot. Each worker instance loops internally over
-        $Sync.Pending, so there is never a runspace-per-file. The main thread drains
-        $Sync.LogQueue into Write-Log and reports Write-Progress from the (non-destructive)
-        snapshot of $Sync.Results until every worker completes, then calls EndInvoke and
-        Dispose on every PowerShell instance and Close/Dispose on the pool.
+        Registers Invoke-DowserTransferWorker in an InitialSessionState, opens one shared
+        RunspacePool sized to the item count and -ThreadCount, and starts one worker per
+        pool slot. Workers loop over $Sync.Pending, so there is no runspace per file. The
+        main thread drains $Sync.LogQueue into Write-Log and reports Write-Progress from
+        a snapshot of $Sync.Results until every worker finishes, then ends and disposes
+        each PowerShell instance and the pool.
 
     .PARAMETER TransferItem
         Objects with SourcePath and DestinationPath to copy and verify.

@@ -6,14 +6,13 @@ function Invoke-DowserTransferWorker {
         Runspace worker: dequeues transfer items and performs hash-copy-hash-verify.
 
     .DESCRIPTION
-        Pulls transfer items from $Sync.Pending until the queue is empty. For each item:
-        hashes the source file (SHA256), copies it to the destination, hashes the
-        destination, and marks the item verified only when the two hashes match. Each
-        step is its own try/catch; a failed step skips the remaining steps for that item
-        but the loop continues to the next item. Never calls Write-Log directly (workers
-        are not guaranteed thread-safe against the log file) -- log lines go onto
-        $Sync.LogQueue for the main thread to drain. Never throws; every item produces a
-        structured result on $Sync.Results.
+        Pulls transfer items from $Sync.Pending until the queue is empty. For each item it
+        hashes the source (SHA256), copies it, hashes the destination, and marks the item
+        verified only when the two hashes match. Each step has its own try/catch; a failed
+        step skips the rest of that item and the loop moves on. Never calls Write-Log
+        directly, since it is not guaranteed thread-safe against the log file; log lines go
+        onto $Sync.LogQueue for the main thread to drain. Never throws; every item produces
+        a structured result on $Sync.Results.
 
     .PARAMETER Sync
         Synchronized hashtable shared across the pool. Requires Pending (ConcurrentQueue
