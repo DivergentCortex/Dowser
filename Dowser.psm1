@@ -28,20 +28,15 @@
         exports the public command surface.
 #>
 
-# Platform compat: PS 5.1 lacks $IsWindows/$IsLinux/$IsMacOS automatic variables.
-# Set at module scope so dot-sourced functions can read them via scope resolution.
-# On pwsh 6+ they are read-only engine automatics: direct assignment fails there and
-# the analyzer flags the statement even inside a guard, so gate on version and set
-# them through Set-Variable instead.
+# 5.1 doesn't know what linux is, bless it, so we hand it $IsWindows/$IsLinux/$IsMacOS
+# on pwsh 6+ those are read-only automatics, hence the version gate and Set-Variable
 if ($PSVersionTable.PSVersion.Major -lt 6) {
     Set-Variable -Name 'IsWindows' -Value $true  -Scope Script
     Set-Variable -Name 'IsLinux'   -Value $false -Scope Script
     Set-Variable -Name 'IsMacOS'   -Value $false -Scope Script
 }
 
-# Write-Log FATAL-throws when $LogFilePath is empty. Set a module-root default
-# here so every dot-sourced function logs with no per-function setup. A caller
-# can still override by setting $LogFilePath before import or passing -Logfile.
+# Write-Log throws on an empty $LogFilePath, so give it one before anything logs
 $script:DowserRoot = $PSScriptRoot
 
 $ScriptName = $MyInvocation.MyCommand.Name -replace '\.ps1$'
@@ -60,7 +55,7 @@ if ([string]::IsNullOrWhiteSpace($LogFilePath)) {
 $Public = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Public') '*.ps1') -ErrorAction SilentlyContinue)
 $Private = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Private') '*.ps1') -ErrorAction SilentlyContinue)
 
-# Write-Log sources before everything else so any file that logs at dot-source time resolves it
+# Write-Log goes first so anything that logs at dot-source time can find it
 $Private = @($Private | Sort-Object { $_.Name -ne 'Write-Log.ps1' })
 
 foreach ($file in @($Private + $Public)) {
@@ -88,9 +83,12 @@ if (Test-Path -LiteralPath $changelogPath) {
     }
 }
 
-# open every session with the identity and context header
 Initialize-Log -ScriptName 'Dowser' -Version $script:DowserVersion
 
-# Compare-DowserReport is a public function dot-sourced inside Get-DowserReport.ps1,
-# so it is not a Public/ basename and must be named explicitly to export it.
-Export-ModuleMember -Function ($Public.BaseName + 'Compare-DowserReport' + 'Enable-DowserAliases') -Alias *
+# one shared state bag for every pooled worker, exported so you can poke at it after a run
+$script:SyncHash = [hashtable]::Synchronized(@{
+        LogQueue = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
+    })
+
+# Compare-DowserReport lives inside Get-DowserReport.ps1, so it isn't a Public/ basename and gets exported by name
+Export-ModuleMember -Function ($Public.BaseName + 'Compare-DowserReport' + 'Enable-DowserAliases') -Alias * -Variable SyncHash
