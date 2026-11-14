@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../Script_Mgmt"
 		}
 	],
 	"settings": {}
