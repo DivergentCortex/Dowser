@@ -2,6 +2,27 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.14.299] - Agent working folders out of the public tree
+### Agent working folders out of the public tree
+
+Changed
+- docs/superpowers (a July design spec and plan for the archive map, which shipped) is archived out of docs.
+- .gitignore now covers .archive, .remember and docs/superpowers.
+
+Not done
+- Anything in those folders committed before the ignore rules existed is still tracked until it is removed from the index.
+
+## [2026.11.14.298] - README corrections ahead of public release
+### README corrections ahead of public release
+
+Changed
+- docs/README.md: the command count is now thirty-six, matching the manifest. Compare-DowserDirectory was exported but missing from the README and is now described under "Understand a project".
+- Install section shows the git clone step.
+- Removed a double hyphen from the transfer paragraph.
+
+Verified
+- Counted against FunctionsToExport in Dowser.psd1. The root README.md is a link to docs/README.md and carries the same text.
+
 ## [2026.11.05.297] - 2026-11-05
 Tests comment cleanup, third pass: comments in Tests/Test-DowserIntegrity, Test-DowserLinuxBehavior, Test-DowserLogging, Test-DowserPlatformGuards, Test-DowserAliasCoverage, Start-DowserTransfer, Measure-DowserDiskUsage and Get-DowserMap test files rewritten to short lowercase notes; review ids, task numbers and dated fix narration removed; help blocks keep SYNOPSIS, DESCRIPTION and EXAMPLE only. Comment text only, no code or string changes.
 

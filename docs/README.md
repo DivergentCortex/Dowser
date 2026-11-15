@@ -9,6 +9,7 @@ Runs on Windows PowerShell 5.1 and PowerShell 7+, across Windows, Linux, and mac
 ## Install
 
 ```powershell
+git clone https://github.com/DivergentCortex/Dowser.git
 Import-Module ./Dowser/Dowser.psd1 -Force
 Get-Command -Module Dowser
 ```
@@ -45,11 +46,11 @@ Export-DowserJsonCsv -Path ./exports/events.jsonl -OutputPath ./events.csv
 
 ## What it does
 
-Thirty-five functions, grouped by the question they answer.
+Thirty-six commands, grouped by the question they answer.
 
 **Find things.** `Find-DowserFile` is a multi-threaded search by attribute, size, and date. `Find-DowserString` runs multi-pattern text search with Aho-Corasick matching; `Invoke-DowserFastSearch` is the single-pattern parallel variant. `Find-DowserDuplicate` catches duplicates by name, size, or chunked hash. `Find-DowserModified` pulls files changed on a given date, `Find-DowserRecentLog` grabs the newest log in a directory, and `Find-DowserScript` walks a tree for script files by type.
 
-**Understand a project.** `Find-DowserOrphan` surfaces files nothing references. `Find-DowserDependency` scans scripts for calls and dot-source links. `Get-DowserReport` builds a file-metrics report with parallel processing and export, and `Compare-DowserReport` diffs two of those snapshots into NEW, CHANGED, REMOVED, and UNCHANGED.
+**Understand a project.** `Find-DowserOrphan` surfaces files nothing references. `Find-DowserDependency` scans scripts for calls and dot-source links. `Get-DowserReport` builds a file-metrics report with parallel processing and export, and `Compare-DowserReport` diffs two of those snapshots into NEW, CHANGED, REMOVED, and UNCHANGED. `Compare-DowserDirectory` compares two folders or two files by content and reports what is missing, extra, or changed, without modifying either side.
 
 **See the shape of a tree.** `Get-DowserMap` draws a directory tree with optional size and PS1 annotations. `Get-DowserTopology` renders a tree for any PSProvider path, not just the filesystem. `Measure-DowserDirectory` reports per-folder freshness (files modified today, within N days, and older) plus size and the largest/newest/oldest file; `Measure-DowserDiskUsage` is the WinDirStat-style recursive rollup with an HTML treemap.
 
@@ -57,7 +58,7 @@ Thirty-five functions, grouped by the question they answer.
 
 **Convert and tuck away.** `ConvertTo-DowserBase64` moves images to and from Base64. `ConvertTo-DowserExe` wraps a PowerShell script in a C# EXE, `ConvertTo-DowserIco` builds .ico files from images, and `Expand-DowserExe` pulls files out of extractable EXE archives. `New-DowserHiddenFolder` hides a directory the right way per platform (NTFS Hidden plus System on Windows, a leading-dot rename on Linux and macOS). `Invoke-DowserNumericSort` sorts naturally, so Item-2 lands before Item-10. `Get-DowserInfo` reports the module version and latest changelog entry; `Get-DowserTemplate` reads Explorer folder-template configs on Windows.
 
-**Move files safely.** `Start-DowserTransfer` copies files or directories to a destination, hashing every file before and after the copy and reporting it migrated only on a match; a real run writes a JSON verification manifest, though ManifestPath comes back $null if that write itself fails (disk full, permissions). `Remove-DowserTransferSource` takes that manifest and deletes only the entries it verified, re-hashing the destination immediately before each delete -- it never runs on its own as a side effect of the transfer.
+**Move files safely.** `Start-DowserTransfer` copies files or directories to a destination, hashing every file before and after the copy and reporting it migrated only on a match; a real run writes a JSON verification manifest, though ManifestPath comes back $null if that write itself fails (disk full, permissions). `Remove-DowserTransferSource` takes that manifest and deletes only the entries it verified, re-hashing the destination immediately before each delete. It never runs on its own as a side effect of the transfer.
 
 **Make sense of JSON exports.** `Get-DowserJsonKey` streams JSON and JSONL files token by token to report key paths and occurrence counts, and with `-Compare` groups a whole directory by schema, naming the dominant layout and every variant; `-Validation` classifies each key's file coverage from AlwaysPresent down to Rare. `Export-DowserJsonCsv` writes scalar values out as a long-form CSV without loading a full document. `Test-DowserJson` diagnoses a file before you touch it: valid JSON, valid JSONL, comment-bearing, a Dowser RECORD banner, tagged transcript text, or a parser error. `Repair-DowserJson` acts on that diagnosis, writing a repaired copy only for the deterministic cases (RECORD banners, JSON comments) and never guessing at anything else. `Export-DowserJsonAssessment` runs the `-Compare` scan once and writes it straight to three CSV reports: directory summary, schema profiles, and key-validation coverage.
 
