@@ -850,9 +850,9 @@ function Get-DowserMap {
                 # summary: block shape, and a windows-shaped root path on an archive scanned
                 # from wsl/linux with -linuxpaths broke that parity.
                 $archiveDisplayRoot = if ($LinuxPaths) { ConvertTo-WslPath $ArchivePath } else { $ArchivePath }
-                $mdlines = @('# directory map', '', ('**root:** `{0}`' -f $archivedisplayroot), ('**generated:** {0}' -f $timestamp))
+                $mdLines = @('# Directory Map', '', ('**Root:** `{0}`' -f $archiveDisplayRoot), ('**Generated:** {0}' -f $timestamp))
                 if ($summaryBullets.Count -gt 0) {
-                    $mdlines += ''; $mdlines += '#### summary'; $mdlines += $summarybullets
+                    $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets
                 }
                 $mdLines += ''; $mdLines += '```text'
                 if ($treeLines.Count -gt 0) {
@@ -924,7 +924,7 @@ function Get-DowserMap {
         $walkStack.Push([PSCustomObject]@{ Path = $folderPath; InScope = $InScope })
         while ($walkStack.Count -gt 0) {
             $entry = $walkStack.Pop()
-            $dirItems = if ($IncludeHidden -or $hiddenByName) {
+            $dirItems = if ($IncludeHidden -or $hiddenByName -or $hiddenFileByName) {
                 Get-ChildItem -LiteralPath $entry.Path -Force -ErrorAction SilentlyContinue
             } else {
                 Get-ChildItem -LiteralPath $entry.Path -ErrorAction SilentlyContinue
@@ -1057,12 +1057,17 @@ function Get-DowserMap {
     }
 
     $effectiveIncludePatterns = @()
+    # a pattern typed with a leading dot names dotfiles, which are hidden on linux and macos
+    $hiddenFileByName = $false
     if ($IncludeFilePatterns) {
         foreach ($pattern in $IncludeFilePatterns) {
             if ([string]::IsNullOrWhiteSpace($pattern)) {
                 continue 
             }
             $p = $pattern.Trim()
+            if ($p.StartsWith('.')) {
+                $hiddenFileByName = $true
+            }
             if ($p -notmatch '[\*\?\[\]]') {
                 if ($p.StartsWith('.')) {
                     $p = "*$p" 
@@ -1440,6 +1445,9 @@ function Get-DowserMap {
         if ($IncludeHidden -or -not (Test-IsHidden $item)) {
             return $true
         }
+        if ($hiddenFileByName -and -not $item.PSIsContainer) {
+            return [bool](Test-IncludeFile $item)
+        }
         return [bool]($hiddenByName -and $item.PSIsContainer -and (Test-FolderMatchesInclude $item))
     }
 
@@ -1462,7 +1470,7 @@ function Get-DowserMap {
                 continue 
             }
             try {
-                $items = if ($IncludeHidden -or $hiddenByName) {
+                $items = if ($IncludeHidden -or $hiddenByName -or $hiddenFileByName) {
                     Get-ChildItem -LiteralPath $current.Path -Force -ErrorAction Stop 
                 }
                 else {
@@ -1578,6 +1586,7 @@ function Get-DowserMap {
             FileFilterActive     = $indexFileFilter
             IncludeFoldersActive = $includeFoldersActive
             IncludeHidden        = [bool]$IncludeHidden
+            HiddenFileByName     = [bool]$hiddenFileByName
             FollowReparse        = [bool]$FollowReparse
             DepthLimit           = $MaxDepth + 50
             IncludeExtensionSet  = $extensionSet
@@ -1718,7 +1727,7 @@ function Get-DowserMap {
 
     function Get-Children {
         param([string]$p)
-        if ($IncludeHidden -or $hiddenByName) {
+        if ($IncludeHidden -or $hiddenByName -or $hiddenFileByName) {
             $allItems = @(Get-ChildItem -Path $p -Force -ErrorAction Stop | Where-Object { Test-HiddenAdmitted $_ }) 
         }
         else {
@@ -1908,9 +1917,9 @@ function Get-DowserMap {
                         $displayRoot = $Path 
                     }
                     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-                    $mdlines = @( '# directory map', '', ('**root:** `{0}`' -f $displayroot), ('**generated:** {0}' -f $timestamp) )
+                    $mdLines = @( '# Directory Map', '', ('**Root:** `{0}`' -f $displayRoot), ('**Generated:** {0}' -f $timestamp) )
                     if ($summaryBullets.Count -gt 0) {
-                        $mdlines += ''; $mdlines += '#### summary'; $mdlines += $summarybullets 
+                        $mdLines += ''; $mdLines += '#### Summary'; $mdLines += $summaryBullets 
                     }
                     $mdLines += ''; $mdLines += '```text'
                     if ($treeOnly.Count -gt 0) {
@@ -1972,7 +1981,11 @@ function Get-DowserMap {
                     continue
                 }
                 if ($item.PSIsContainer) {
-                    if (-not $includeScopeActive -or (Test-FolderMatchesInclude $item)) {
+                    # a folder link is not followed, so under a file filter it can never show a match
+                    if ($fileFilterActive) {
+                        $TraversalState.SkippedFolders++
+                    }
+                    elseif (-not $includeScopeActive -or (Test-FolderMatchesInclude $item)) {
                         $filteredLinks += $item
                     }
                 }
@@ -2163,7 +2176,10 @@ function Get-DowserMap {
                 $TraversalState.SkippedFolders++
                 continue
             }
-            if (-not $includeScopeActive -or (Test-FolderMatchesInclude $child)) {
+            if ($fileFilterActive) {
+                $TraversalState.SkippedFolders++
+            }
+            elseif (-not $includeScopeActive -or (Test-FolderMatchesInclude $child)) {
                 $links += $child
             }
             continue

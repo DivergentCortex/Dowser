@@ -47,8 +47,11 @@ function Invoke-DowserMapIndexWorker {
             foreach ($item in [IO.DirectoryInfo]::new($dirPath).EnumerateFileSystemInfos()) {
                 $isDir = $item -is [IO.DirectoryInfo]
                 if (-not $opts.IncludeHidden -and ($item.Attributes -band $skipAttributes)) {
-                    # a hidden folder you named still gets in, the rest of the dotfiles stay home
-                    if (-not ($isDir -and $opts.IncludeFoldersActive -and (Test-FolderMatchesInclude $item))) {
+                    # a hidden folder you named still gets in, and so does a dotfile when the
+                    # file pattern was typed with its dot. the rest of the dotfiles stay home
+                    $namedFolder = $isDir -and $opts.IncludeFoldersActive -and (Test-FolderMatchesInclude $item)
+                    $namedFile = (-not $isDir) -and $opts.HiddenFileByName
+                    if (-not ($namedFolder -or $namedFile)) {
                         continue
                     }
                 }
