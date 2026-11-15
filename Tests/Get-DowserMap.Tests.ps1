@@ -871,3 +871,63 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         }
     }
 }
+
+Describe 'Get-DowserMap file filter with dotfiles and links' {
+    BeforeAll {
+        $modulePath = Split-Path $PSScriptRoot -Parent
+        Remove-Module Dowser -Force -ErrorAction SilentlyContinue
+        Import-Module (Join-Path $modulePath 'Dowser.psd1') -Force -ErrorAction Stop
+
+        $script:dotRoot = Join-Path $TestDrive 'dotroot'
+        $script:dotTarget = Join-Path $TestDrive 'dottarget'
+        foreach ($d in @((Join-Path $script:dotRoot 'a/inner'), (Join-Path $script:dotRoot 'b'), (Join-Path $script:dotRoot '.secret'), $script:dotTarget)) {
+            $null = New-Item -ItemType Directory -Path $d -Force
+        }
+        [System.IO.File]::WriteAllText((Join-Path $script:dotRoot 'a/inner/.mcp.json'), '{}')
+        [System.IO.File]::WriteAllText((Join-Path $script:dotRoot 'a/.other'), 'x')
+        [System.IO.File]::WriteAllText((Join-Path $script:dotRoot 'a/plain.json'), '{}')
+        [System.IO.File]::WriteAllText((Join-Path $script:dotRoot 'b/readme.md'), 'x')
+        [System.IO.File]::WriteAllText((Join-Path $script:dotRoot '.secret/.mcp.json'), '{}')
+        [System.IO.File]::WriteAllText((Join-Path $script:dotTarget '.mcp.json'), '{}')
+        $script:dotCanLink = $false
+        try {
+            $null = New-Item -ItemType SymbolicLink -Path (Join-Path $script:dotRoot 'b/linked') -Target $script:dotTarget -ErrorAction Stop
+            $script:dotCanLink = $true
+        }
+        catch {
+            $script:dotCanLink = $false
+        }
+    }
+
+    It 'Finds a dotfile when the pattern is typed with its dot (pool=<pool>)' -ForEach @(@{ pool = $true }, @{ pool = $false }) {
+        $out = Get-DowserMap $script:dotRoot -IncludeFilePatterns '.mcp.json' -Ascii -UseRunspaces:$pool
+        @($out | Where-Object { $_ -match ' \.mcp\.json$' }).Count | Should -Be 1
+        $out | Where-Object { $_ -match ' inner[\\/]$' } | Should -Not -BeNullOrEmpty
+    }
+
+    It 'Keeps other dotfiles and hidden folders out of a dotfile search' {
+        $out = Get-DowserMap $script:dotRoot -IncludeFilePatterns '.mcp.json' -Ascii
+        $out | Where-Object { $_ -match '\.other' } | Should -BeNullOrEmpty
+        $out | Where-Object { $_ -match '\.secret' } | Should -BeNullOrEmpty
+    }
+
+    It 'Leaves folder links out when a file filter is active' {
+        if (-not $script:dotCanLink) {
+            Set-ItResult -Skipped -Because 'symbolic links cannot be created here'
+            return
+        }
+        $out = Get-DowserMap $script:dotRoot -IncludeFilePatterns 'plain.json' -Ascii
+        $out | Where-Object { $_ -match 'linked' } | Should -BeNullOrEmpty
+        $out | Where-Object { $_ -match ' b[\\/]$' } | Should -BeNullOrEmpty
+        $out | Where-Object { $_ -match 'plain\.json' } | Should -Not -BeNullOrEmpty
+    }
+
+    It 'Still shows folder links when no file filter is active' {
+        if (-not $script:dotCanLink) {
+            Set-ItResult -Skipped -Because 'symbolic links cannot be created here'
+            return
+        }
+        $out = Get-DowserMap $script:dotRoot -Ascii
+        $out | Where-Object { $_ -match 'linked' } | Should -Not -BeNullOrEmpty
+    }
+}
