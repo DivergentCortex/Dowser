@@ -27,9 +27,9 @@
 
 @{
     RootModule        = 'Dowser.psm1'
-    ModuleVersion     = '0.2.0'
+    ModuleVersion     = '2026.11.15.301'
     GUID              = '64c72862-caae-4d55-9a1f-0d5bf94d3695'
-    Author            = 'Curt Leggett'
+    Author            = 'Curtis Leggett'
     CompanyName       = 'Divergent Cortex'
     Copyright         = '(c) 2026 Curt Leggett. Licensed under the MIT License.'
     Description       = 'Dowser - filesystem recon and inspection kit. Find what you cannot see. Cross-platform (Windows/Linux/macOS).'

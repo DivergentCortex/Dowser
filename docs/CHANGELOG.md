@@ -2,6 +2,26 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.15.301] - Dowser manifest carries the changelog slot as its version
+Dowser manifest carries the changelog slot as its version
+
+`Dowser.psd1` declared `ModuleVersion = '0.2.0'`, a static version that said nothing about which change was loaded. `Get-Module Dowser` and `Import-Module -PassThru` showed 0.2.0, while the load banner, which reads the newest changelog heading, showed the real slot. The manifest now carries this entry's slot, so both report the same version.
+
+`Author` read `Curt Leggett` while every signature block reads `Curtis Leggett`. It now matches. The copyright line still names Curt Leggett, the same as the MIT LICENSE file.
+
+Files: Dowser.psd1.
+
+## [2026.11.15.300] - Get-DowserMap finds dotfiles by name and stops listing folder links under a file filter
+Get-DowserMap finds dotfiles by name and stops listing folder links under a file filter
+
+`Get-DowserMap -IncludeFilePatterns .mcp.json` found nothing on Linux and macOS, because a dotfile is hidden there and the map skipped hidden items unless `-IncludeHidden` was given. A pattern typed with its leading dot now admits hidden files that match it, in the serial walkers and in the index workers. Other dotfiles and hidden folders stay out.
+
+Under a file filter, folder symlinks were still listed with their targets, even though a link is never followed and so can never lead to a match. That made `-IncludeFilePatterns mcp.json` show `_modules`, `build`, `connection_manager` and similar links all over the tree. With a file filter active, folder links are now counted as skipped and left out of the tree. Without a filter they render as before.
+
+The Markdown output headings had been lowercased by an earlier comment-cleanup pass (`# directory map`, `**root:**`, `**generated:**`, `#### summary`) in both the directory and archive finalizers. They are restored to `# Directory Map`, `**Root:**`, `**Generated:**`, `#### Summary`, which fixes the Markdown summary placement test.
+
+Files: Public/Get-DowserMap.ps1, Private/Invoke-DowserMapIndexWorker.ps1, Tests/Get-DowserMap.Tests.ps1 (five new tests). Get-DowserMap.Tests.ps1: 70 passed, 0 failed.
+
 ## [2026.11.14.299] - Agent working folders out of the public tree
 ### Agent working folders out of the public tree
 
