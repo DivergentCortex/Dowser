@@ -1,5 +1,10 @@
 # Archive directory (removed/spent artifacts, not maintained)
+.archive/
 .archives/
+
+# Agent skill working folders
+.remember/
+docs/superpowers/
 
 # Test reports (regenerated on each run)
 Tests/Reports/
