@@ -2,6 +2,16 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.16.315] - Module version set to the final slot
+### Module version set to the final slot
+
+ModuleVersion in Dowser.psd1 equals this newest changelog slot after the birth read failure change.
+
+## [2026.11.16.314] - A failed birth time read is reported and fails the run
+### A failed birth time read is reported and fails the run
+
+When seats are running and the birth time of the version folders cannot be read (stat missing, a filesystem with no birth time, a parse failure), every version was already kept, but the run exited 0 with only a warning line. Get-DowserCacheVersionPlan now returns the failed Get-DowserFolderBirthTime result as BirthFailure, and Invoke-DowserCacheRetention records it once per run as a FolderBirthRead error, so the result is not successful and the exit code is non-zero while nothing is removed. A Pester case with the birth read mocked to fail checks the error, the exit code 13, every row kept and every folder still on disk.
+
 ## [2026.11.16.313] - Module version set to the final slot
 ### Module version set to the final slot
 

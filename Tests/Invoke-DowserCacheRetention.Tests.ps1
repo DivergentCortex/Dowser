@@ -383,6 +383,21 @@ Describe 'Invoke-DowserCacheRetention running seats' -Skip:(-not ($IsWindows -eq
         $scan.Seats[0].StartUtc | Should -BeGreaterThan ([datetime]::UtcNow.AddMinutes(-5))
     }
 
+    It 'keeps every version, reports the failure and exits non-zero when no birth time can be read' {
+        Mock -ModuleName 'Dowser' Get-DowserFolderBirthTime {
+            [pscustomobject]@{ Success = $false; Births = @{}; Reason = 'BirthTimeMissing'; ExceptionType = $null; Message = 'BirthTimeMissing'; ExitCode = 13 }
+        }
+        $fx = & $script:NewSeatFixture 'nobirth' $true
+        $run = Invoke-DowserCacheRetention -ConfigPath $fx.Config -Remove -Confirm:$false
+        $run.Success | Should -BeFalse
+        $run.ExitCode | Should -Be 13
+        @($run.Errors | Where-Object { $_.Operation -eq 'FolderBirthRead' }).Count | Should -Be 1
+        $run.CandidateCount | Should -Be 0
+        $run.RemovedCount | Should -Be 0
+        foreach ($row in $run.Folders) { $row.Reasons | Should -Contain 'BirthTimeUnknown' }
+        foreach ($version in '1.0.1', '1.0.2', '1.0.3', '1.0.4', '1.0.5', '1.0.6') { Test-Path -LiteralPath (Join-Path $fx.Plugin $version) | Should -BeTrue }
+    }
+
     It 'matches a process that names a version through a link to the cache root' {
         $fx = & $script:NewFixture 'alias'
         $alias = Join-Path $fx.Base 'viaalias'

@@ -27,7 +27,7 @@
 
 @{
     RootModule        = 'Dowser.psm1'
-    ModuleVersion     = '2026.11.16.313'
+    ModuleVersion     = '2026.11.16.315'
     GUID              = '64c72862-caae-4d55-9a1f-0d5bf94d3695'
     Author            = 'Curtis Leggett'
     CompanyName       = 'Divergent Cortex'
