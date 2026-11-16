@@ -14,8 +14,12 @@ Tests/Reports/
 
 # Logs
 *.log
-logs/
+logs/*
+!logs/README.md
 synapse-daemon.log
+
+# Link to the fleet modules tree, created per checkout (ln -s ~/projects/modules _modules)
+_modules
 
 # Claude agent state
 .claude/

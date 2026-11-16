@@ -75,7 +75,7 @@
     )
     AliasesToExport   = @('*')
     CmdletsToExport   = @()
-    VariablesToExport = @()
+    VariablesToExport = @('SyncHash')
     PrivateData = @{
         PSData = @{
             Tags = @('filesystem','recon','search','utility','dowser','cross-platform','linux')
