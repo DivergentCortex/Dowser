@@ -2,6 +2,36 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.16.313] - Module version set to the final slot
+### Module version set to the final slot
+
+ModuleVersion in Dowser.psd1 now equals this newest changelog slot after the last documentation and unit text edits.
+
+## [2026.11.16.312] - Retention docs and unit text wording
+### Retention docs and unit text wording
+
+Remaining wording edits to the scheduled retention README and docs made while correcting the install steps and the run once now warning; no behavior changes.
+
+## [2026.11.16.311] - Module version set to the final slot; link test no longer shares a prefix with the cache root
+### Module version set to the final slot; link test no longer shares a prefix with the cache root
+
+ModuleVersion in Dowser.psd1 now equals the newest changelog slot. The Pester case for a process that names a version through a link to the cache root uses a link name that does not begin with the root folder name, because the process pre-filter is a substring match on the root text and the earlier name made the unlinked run match by accident.
+
+## [2026.11.16.310] - Docs describe seat attribution, birth times and the new helpers
+### Docs describe seat attribution, birth times and the new helpers
+
+ARCHITECTURE, INDEX and the README describe how cache retention keeps the version a running claude or codex seat started on (from its start time against each folder's birth time), the RootAliases and SeatProcessNames rule fields, the symlinked-parent guard, and the sizing that no longer calls Measure-DowserDirectory per folder. ARCHITECTURE adds rows for Get-DowserProcessStartTime, Get-DowserFolderBirthTime and Get-DowserSeatVersionHold and corrects the private helper count to 35.
+
+## [2026.11.16.309] - Seat attribution reads the real birth time; scheduled unit uses the absolute pwsh path
+### Seat attribution reads the real birth time; scheduled unit uses the absolute pwsh path
+
+Candidate sizing, seat attribution, parent-link guards and the rule file landed in 308; this entry covers the pieces that make them correct on a live cache. Get-DowserFolderBirthTime reads each version folder's birth time with one stat call, because .NET reports the earlier of birth and last write time on Linux and a folder with a set-back write time would look older than it is; a folder with no readable birth time keeps every version of its plugin. Seat start times carry a two second allowance because boot time has whole-second resolution. A rule with no SeatProcessNames loads again (a missing list was read as one invalid name). Get-DowserProcessReference no longer passes a -replace expression as a method argument. The service unit runs /opt/microsoft/powershell/7/pwsh by absolute path; the deploy README adds systemd-analyze verification, states that a free-space breach only fails the unit and logs a warning, and marks Run once now as a real removal. New Pester cases cover seat attribution with fixture start and birth times, an unreadable start or birth time, a seat started before the newest two, a process naming a version through a link to the cache root, a symlinked parent folder and the real birth time of a folder whose write time was set back.
+
+## [2026.11.16.308] - Cache retention keeps the versions running seats started on
+### Cache retention keeps the versions running seats started on
+
+A claude seat reads its plugin files into memory at start and keeps nothing under the cache open, so the process scan could not see the versions live seats loaded; a preview would have marked them for removal. The scan now also returns each running seat (program name from the rule's SeatProcessNames) with its start time read from /proc/<pid>/stat, and a new Get-DowserSeatVersionHold keeps, per plugin, the newest version the cache held at that start time plus the next older one (reason InUseByStart). A seat with an unreadable start time, or a folder with no usable creation time, keeps every version of that plugin. Process matching now also takes <marketplace>/<plugin>/<version> as the tail of a held string and the rule's RootAliases as extra root spellings, so a path reached through a link to the cache root counts. A marketplace or plugin folder that is a symlink keeps its versions (ParentSymlink) and Remove-DowserCacheVersion refuses to delete beneath one. Candidate sizing no longer calls the public Measure-DowserDirectory per folder, so a run no longer writes an Info start and end pair per candidate. The rule file gains RootAliases and SeatProcessNames, with the Codex rule attributing by seat start time because Codex records no plugin version.
+
 ## [2026.11.16.307] - Module version set to the final slot; loader reports an import failure through Write-Log
 Module version set to the final slot; loader reports an import failure through Write-Log
 

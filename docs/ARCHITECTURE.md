@@ -11,7 +11,7 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 ```
 Dowser.psd1  -->  Dowser.psm1
                     |
-                    +-- Private/*.ps1    (32 helpers, not exported)
+                    +-- Private/*.ps1    (35 helpers, not exported)
                     +-- Public/*.ps1     (35 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  ($DowserAliasMap + Enable-DowserAliases, opt-in, sourced last)
 ```
@@ -51,11 +51,14 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | Get-DowserFilesystemSpace.ps1 | Free and total bytes of the filesystem holding a path (longest mount match on Linux and macOS); shared by Start-DowserTransfer and cache retention |
 | Get-DowserRetentionRule.ps1   | Loads and validates Config/CacheRetentionRules.psd1; a rule that fails validation is rejected, never widened |
 | Get-DowserInstalledPluginPath.ps1 | Reads the installPath of every plugin in installed_plugins.json                                       |
-| Get-DowserProcessReference.ps1 | Reads one /proc/pid folder (cwd, exe, descriptors, maps, cmdline, environ) for strings under given roots |
-| Get-DowserActiveProcessPath.ps1 | Collects the cache paths held by every running process through Get-DowserProcessReference               |
+| Get-DowserProcessReference.ps1 | Reads one /proc/pid folder (cwd, exe, descriptors, maps, cmdline, environ) for strings under given roots, and reports it as a seat when its program name matches |
+| Get-DowserProcessStartTime.ps1 | Reads when one Linux process started from /proc/pid/stat                                                  |
+| Get-DowserActiveProcessPath.ps1 | Collects the cache paths held by every running process and every running seat with its start time, through Get-DowserProcessReference |
+| Get-DowserFolderBirthTime.ps1 | Reads the real birth time of folders with one stat call (.NET reports the earlier of birth and write time on Linux) |
+| Get-DowserSeatVersionHold.ps1 | Decides which versions of a plugin the running seats loaded, from seat start times and folder birth times  |
 | Get-DowserCacheVersionPlan.ps1 | Lists version folders for a rule and decides Keep or Remove, with the reasons                            |
-| Measure-DowserCacheCandidate.ps1 | Sizes one version folder through Measure-DowserDirectory and refuses a result with missing subfolder rows |
-| Remove-DowserCacheVersion.ps1 | Deletes one version folder after re-checking depth under the rule root and that it is not a symlink       |
+| Measure-DowserCacheCandidate.ps1 | Sizes one version folder with Measure-DowserFileSet, logging at Verbose, and refuses a result with unreadable paths |
+| Remove-DowserCacheVersion.ps1 | Deletes one version folder after re-checking depth under the rule root and that neither it nor its marketplace or plugin folder is a symlink |
 | Test-DowserDiskThreshold.ps1  | Checks a DiskThreshold rule against free space                                                            |
 
 Archive-mode rendering for `Get-DowserMap` (auto-detecting a `.zip`/`.7z`/`.rar`/`.tar`/`.gz` `-Path` and rendering its internal contents as a tree) is not in this table: its helpers, `Get-DowserArchiveTreeLines` and `Complete-DowserArchiveMapOutput`, are private functions nested inside `Public/Get-DowserMap.ps1` itself rather than files under `Private/`. See Design decisions below for why, and `docs/INDEX.md`'s Get-DowserMap entry for the feature itself.
@@ -119,7 +122,7 @@ Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) 
 
 **No Write-Host in public functions.** Diagnostics go through `Write-Log` (Witness); data leaves a function as returned objects and long loops report through `Write-Progress`. This keeps function output streams clean for pipeline consumers. Find-DowserString uses `Write-Information -InformationAction Continue` for phase banners so users see progress without polluting the output stream.
 
-**Cache retention is rule-driven and preview-first.** `Invoke-DowserCacheRetention` reads `Config/CacheRetentionRules.psd1`. A VersionedCache rule covers `<Root>/<marketplace>/<plugin>/<version>`; a version is kept when it is the manifest's installPath, is held by a running process (/proc on Linux; a reduced executable-path check elsewhere), is one of the newest KeepNewest, is a symlink, has no numeric order, or was written inside QuietMinutes. If the installed manifest or the process scan cannot be read, the run removes nothing for it. A DiskThreshold rule only reports. Sizes come from Measure-DowserDirectory. Removal is behind `-Remove` and ShouldProcess, and the process scan is repeated just before deleting. `Invoke-DowserScheduledRetention.ps1` at the repository root is the scheduled entry point (one run, one exit code); `deploy/systemd/` carries the unit text and operator install steps. The command is serial because it has no per-item worker pool: the work is a bounded handful of folders sized one at a time, with Write-Progress and an ETA on the sizing and removal loops.
+**Cache retention is rule-driven and preview-first.** `Invoke-DowserCacheRetention` reads `Config/CacheRetentionRules.psd1`. A VersionedCache rule covers `<Root>/<marketplace>/<plugin>/<version>`; a version is kept when it is the manifest's installPath, is held by a running process (/proc on Linux; a reduced executable-path check elsewhere), is the version a running seat started on, is one of the newest KeepNewest, is a symlink or under a symlinked folder, has no numeric order, or was written inside QuietMinutes. A seat (a running claude or codex process, named by the rule's SeatProcessNames) reads its plugin files into memory and keeps none open, so its version is worked out from its start time against each folder's birth time: the newest version present at that start and the next older one are kept, and a seat or folder whose time cannot be read keeps every version of the plugin. A rule's RootAliases name other spellings of its root that a process may use. If the installed manifest or the process scan cannot be read, the run removes nothing for it. A DiskThreshold rule only reports. Candidates are sized with Measure-DowserFileSet, the statistics Measure-DowserDirectory uses, without calling the public command per folder. Removal is behind `-Remove` and ShouldProcess, and the process scan is repeated just before deleting. `Invoke-DowserScheduledRetention.ps1` at the repository root is the scheduled entry point (one run, one exit code); `deploy/systemd/` carries the unit text and operator install steps. The command is serial because it has no per-item worker pool: the work is a bounded handful of folders sized one at a time, with Write-Progress and an ETA on the sizing and removal loops.
 
 **Pattern parameters auto-wrap.** Bare strings passed to `-Pattern` or `-Filter` parameters that lack wildcard characters get wrapped in `*...*` before being passed to `Get-ChildItem -Filter`. This prevents the silent "zero results" failure when users pass a substring expecting a contains-match but the underlying API requires exact wildcard syntax.
 

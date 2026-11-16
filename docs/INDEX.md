@@ -294,10 +294,10 @@ These functions emit a warning and return `$null` on non-Windows:
 
 ### Invoke-DowserCacheRetention
 
-- Purpose: Prunes stale plugin cache versions by rule and reports low free disk space. Preview is the default; `-Remove` deletes behind ShouldProcess. A version is kept when it is the installPath in installed_plugins.json, is held by a running process (/proc scan on Linux), is one of the newest `KeepNewest`, is a symlink, has no numeric order, or was written inside `QuietMinutes`. When the manifest or the process scan cannot be read, nothing is removed for that rule.
+- Purpose: Prunes stale plugin cache versions by rule and reports low free disk space. Preview is the default; `-Remove` deletes behind ShouldProcess. A version is kept when it is the installPath in installed_plugins.json, is held by a running process (/proc scan on Linux), is the version a running seat (a `claude` or `codex` process named in the rule's `SeatProcessNames`) started on or the one before it, is one of the newest `KeepNewest`, is a symlink or under a symlinked folder, has no numeric order, or was written inside `QuietMinutes`. A seat keeps no plugin file open, so its version is worked out from its start time and each folder's birth time; an unreadable start or birth time keeps every version of the plugin. When the manifest or the process scan cannot be read, nothing is removed for that rule.
 - Inputs: `ConfigPath` (default `Config/CacheRetentionRules.psd1`), `RuleName`, `Remove`, `Now`, plus `-WhatIf` and `-Confirm`.
 - Outputs: One PSCustomObject: Mode, Success, ExitCode (0, 112 for a breached threshold, or the highest mapped failure code), CandidateCount, CandidateBytes, RemovedCount, FreedBytes, Folders (per version folder: Decision, Reasons, SizeBytes, Removed), DiskChecks, Errors.
-- Related: `Measure-DowserDirectory` (the sizing it reuses), `Measure-DowserDiskUsage`; `Invoke-DowserScheduledRetention.ps1` (repository root, the scheduled entry point) and `deploy/systemd/` (unit text and operator install steps)
+- Related: `Measure-DowserDirectory` (per-folder freshness and size rows), `Measure-DowserDiskUsage`; `Invoke-DowserScheduledRetention.ps1` (repository root, the scheduled entry point) and `deploy/systemd/` (unit text and operator install steps)
 - Source: Original to Dowser (not ported)
 - Aliases: `Invoke-CacheRetention` (opt-in via `Enable-DowserAliases`)
 
