@@ -28,6 +28,8 @@
         exports the public command surface.
 #>
 
+Import-Module (Join-Path $PSScriptRoot '_modules/ps/DivergentCortex.Witness')
+
 # 5.1 doesn't know what linux is, bless it, so we hand it $IsWindows/$IsLinux/$IsMacOS
 # on pwsh 6+ those are read-only automatics, hence the version gate and Set-Variable
 if ($PSVersionTable.PSVersion.Major -lt 6) {
@@ -36,27 +38,25 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
     Set-Variable -Name 'IsMacOS'   -Value $false -Scope Script
 }
 
-# Write-Log throws on an empty $LogFilePath, so give it one before anything logs
 $script:DowserRoot = $PSScriptRoot
+$script:DowserLogPath = Join-Path (Join-Path $PSScriptRoot 'logs') "dowser.module_$(Get-Date -Format 'yyyyMMdd').log"
 
-$ScriptName = $MyInvocation.MyCommand.Name -replace '\.ps1$'
-$logName = "$($ScriptName)_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-$LogDir = Join-Path $PSScriptRoot "logs"
-$LogFilePath = Join-Path $LogDir $logName
-
-if ([string]::IsNullOrWhiteSpace($LogFilePath)) {
-    $LogDir = Join-Path $PSScriptRoot 'logs'
-    if (-not (Test-Path $LogDir)) {
-        New-Item -Path $LogDir -ItemType Directory -Force | Out-Null 
+# version is the latest changelog slot, read at load so nothing hardcodes it
+$script:DowserVersion = 'unknown'
+$changelogPath = Join-Path (Join-Path $PSScriptRoot 'docs') 'CHANGELOG.md'
+if (Test-Path -LiteralPath $changelogPath) {
+    $head = Get-Content -LiteralPath $changelogPath |
+        Where-Object { $_ -match '^##\s*\[[^\]]+\]' } | Select-Object -First 1
+    if ($head -match '^##\s*\[(?<ver>[^\]]+)\]') {
+        $script:DowserVersion = $Matches['ver'] 
     }
-    $LogFilePath = Join-Path $LogDir ("Dowser_{0}.log" -f (Get-Date -Format 'yyyyMMdd'))
 }
+
+# the log path has to exist before any dot-sourced file can call Write-Log
+Initialize-Log -LogFilePath $script:DowserLogPath -ScriptName 'Dowser' -Version $script:DowserVersion
 
 $Public = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Public') '*.ps1') -ErrorAction SilentlyContinue)
 $Private = @(Get-ChildItem -Path (Join-Path (Join-Path $PSScriptRoot 'Private') '*.ps1') -ErrorAction SilentlyContinue)
-
-# Write-Log goes first so anything that logs at dot-source time can find it
-$Private = @($Private | Sort-Object { $_.Name -ne 'Write-Log.ps1' })
 
 foreach ($file in @($Private + $Public)) {
     try {
@@ -71,19 +71,6 @@ $aliasPath = Join-Path (Join-Path $PSScriptRoot 'Aliases') 'Aliases.ps1'
 if (Test-Path $aliasPath) {
     . $aliasPath
 }
-
-# version is the latest changelog slot, read at load so nothing hardcodes it
-$script:DowserVersion = 'unknown'
-$changelogPath = Join-Path (Join-Path $PSScriptRoot 'docs') 'CHANGELOG.md'
-if (Test-Path -LiteralPath $changelogPath) {
-    $head = Get-Content -LiteralPath $changelogPath |
-        Where-Object { $_ -match '^##\s*\[[^\]]+\]' } | Select-Object -First 1
-    if ($head -match '^##\s*\[(?<ver>[^\]]+)\]') {
-        $script:DowserVersion = $Matches['ver'] 
-    }
-}
-
-Initialize-Log -ScriptName 'Dowser' -Version $script:DowserVersion
 
 # one shared state bag for every pooled worker, exported so you can poke at it after a run
 $script:SyncHash = [hashtable]::Synchronized(@{

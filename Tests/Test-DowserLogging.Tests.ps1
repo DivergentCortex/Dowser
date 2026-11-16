@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Pester coverage for the Write-Log / Initialize-Log logging contract.
+    Pester coverage for the Write-Log / Initialize-Log logging contract Dowser consumes from Witness.
 
 .NOTES
     Author:       Curtis Leggett
@@ -9,7 +9,8 @@
     Version:      See docs/CHANGELOG.md
 
 .DESCRIPTION
-    Proves the logging contract for Private/Write-Log.ps1:
+    Proves the logging contract of DivergentCortex.Witness, imported through the project _modules link:
+    - Dowser's own Write-Log resolves to the Witness module, with no local copy.
     - Initialize-Log creates the file and writes the session-start banner.
     - Bare Write-Log (Info severity) always lands in the log file.
     - Write-Log -Severity Verbose is suppressed by default and appears when
@@ -24,8 +25,7 @@
 BeforeAll {
     $script:ModuleRoot = Split-Path -Parent $PSScriptRoot
 
-    # dot-source Write-Log.ps1 instead of importing the module, so the helper is tested on its own
-    . (Join-Path $script:ModuleRoot 'Private/Write-Log.ps1')
+    Import-Module (Join-Path $script:ModuleRoot '_modules/ps/DivergentCortex.Witness') -Force -ErrorAction Stop
 
     $script:TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dowserlogltest_" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $script:TempDir -Force | Out-Null
@@ -177,27 +177,35 @@ Describe 'CMTrace wire format' {
     }
 }
 
-Describe 'Write-Log throws when no log path configured' {
+Describe 'Write-Log with no log path configured' {
 
-    It 'throws FATAL when called with no path set and no Initialize-Log' {
-        # blank out the script-scope path (restored afterwards) so the throw branch runs
-        $saved = $script:WitnessLogFilePath
-        $script:WitnessLogFilePath = $null
+    It 'reports the missing path without throwing' {
         $savedGlobal = if (Test-Path Variable:Global:LogFilePath) { $Global:LogFilePath } else { $null }
         Remove-Variable -Name LogFilePath -Scope Global -ErrorAction SilentlyContinue
+        InModuleScope 'DivergentCortex.Witness' { $script:WitnessLogFilePath = $null }
 
-        $threw = $false
         try {
-            Write-Log 'should-not-land'
-        }
-        catch {
-            $threw = ($_.Exception.Message -match 'FATAL')
+            { Write-Log 'should-not-land' 2>$null } | Should -Not -Throw
         }
         finally {
-            $script:WitnessLogFilePath = $saved
             if ($null -ne $savedGlobal) { $Global:LogFilePath = $savedGlobal }
         }
+    }
+}
 
-        $threw | Should -BeTrue
+Describe 'Dowser logging wiring' {
+
+    BeforeAll {
+        Remove-Module Dowser -Force -ErrorAction SilentlyContinue
+        Import-Module (Join-Path $script:ModuleRoot 'Dowser.psd1') -Force -ErrorAction Stop
+    }
+
+    It 'resolves Write-Log inside the module to DivergentCortex.Witness' {
+        $source = & (Get-Module Dowser) { (Get-Command Write-Log -CommandType Function).Source }
+        $source | Should -Be 'DivergentCortex.Witness'
+    }
+
+    It 'carries no local copy of Write-Log' {
+        Test-Path -LiteralPath (Join-Path $script:ModuleRoot 'Private/Write-Log.ps1') | Should -BeFalse
     }
 }

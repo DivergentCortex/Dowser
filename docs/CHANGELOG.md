@@ -2,6 +2,17 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.16.302] - Dowser logs through DivergentCortex.Witness instead of a local Write-Log copy
+Dowser logs through DivergentCortex.Witness instead of a local Write-Log copy
+
+Dowser imported its own `Private/Write-Log.ps1`, a dot-sourceable copy of the fleet logger. The module now imports `DivergentCortex.Witness` through the project `_modules` link (`_modules/ps/DivergentCortex.Witness`) as the first statement of `Dowser.psm1`, and the local copy is archived. `_modules` is a per-checkout symlink to the fleet modules tree and is gitignored; create it with `ln -s ~/projects/modules _modules`.
+
+The module log path is now `logs/dowser.module_YYYYMMDD.log`, one file per day instead of one per import, and `logs/README.md` lists every log file the project writes. `Initialize-Log` now runs before any file is dot-sourced, so a load-time `Write-Log` has a path. `Dowser.psd1` exports the `SyncHash` variable the loader already exported by name.
+
+Tests: `Test-DowserLogging.Tests.ps1` and `Test-DowserPlatformGuards.Tests.ps1` now import Witness instead of dot-sourcing the local copy. The tests that checked the local copy's internals (a `throw` on a missing path, the `Cleanup-LogFiles` rename) are retargeted at Witness, whose contract is to report a missing path without throwing.
+
+Files: Dowser.psm1, Dowser.psd1, .gitignore, logs/README.md, Private/Write-Log.ps1 (archived), Tests/Test-DowserLogging.Tests.ps1, Tests/Test-DowserPlatformGuards.Tests.ps1.
+
 ## [2026.11.15.301] - Dowser manifest carries the changelog slot as its version
 Dowser manifest carries the changelog slot as its version
 
