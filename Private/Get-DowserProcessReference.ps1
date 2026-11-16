@@ -13,20 +13,31 @@ function Get-DowserProcessReference {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
         Reads, from one /proc/<pid> folder, the working directory, the executable, every open
-        file descriptor, the mapped files and the command line arguments, and keeps the ones
-        that contain any -RootPrefix text. A process that exits mid-read is not a failure. A
-        read the user is not allowed to make counts in Unreadable. Nothing is logged per
-        process; the caller reports the totals.
+        file descriptor, the mapped files, the command line arguments and the environment, and
+        keeps the ones that contain any -RootPrefix text. A process that exits mid-read is not a
+        failure. A read the user is not allowed to make counts in Unreadable. Nothing is logged
+        per process; the caller reports the totals.
+
+        A process is also reported as a seat when its program name, taken from the last part of
+        argv[0] or of the executable link, is one of -SeatName. A seat keeps no path under the
+        cache open, because its plugin files are read into memory when it starts, so the paths
+        above cannot show which version it loaded. Its start time can: the version it loaded is
+        the one the cache held when it started. SeatStartKnown is false when the start time
+        could not be read.
     .PARAMETER ProcDirectory
         The /proc/<pid> folder.
     .PARAMETER RootPrefix
-        Folder paths to look for.
+        Folder paths to look for, in every spelling a process might use.
+    .PARAMETER SeatName
+        Program names that count as a seat, such as claude.
+    .PARAMETER BootTimeUtc
+        When the machine booted; needed to turn a start tick count into a time.
     .EXAMPLE
         Get-DowserProcessReference -ProcDirectory /proc/1234 -RootPrefix '/home/me/.claude/plugins/cache'
 
         Returns the paths process 1234 holds under that cache.
     .OUTPUTS
-        PSCustomObject with Paths and Unreadable.
+        PSCustomObject with Paths, Unreadable, SeatName, SeatStartKnown and SeatStartUtc.
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -35,7 +46,11 @@ function Get-DowserProcessReference {
         [string]$ProcDirectory,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$RootPrefix
+        [string[]]$RootPrefix,
+
+        [string[]]$SeatName = @(),
+
+        [datetime]$BootTimeUtc
     )
 
     $held = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -51,9 +66,13 @@ function Get-DowserProcessReference {
         }
     }
 
+    $exeTarget = $null
+    $argumentList = @()
     foreach ($linkName in @('cwd', 'exe')) {
         try {
-            & $keepIfUnderRoot ([System.IO.FileInfo]::new((Join-Path $ProcDirectory $linkName)).LinkTarget)
+            $target = [System.IO.FileInfo]::new((Join-Path $ProcDirectory $linkName)).LinkTarget
+            if ($linkName -eq 'exe') { $exeTarget = $target }
+            & $keepIfUnderRoot $target
         }
         catch {
             if (Test-Path -LiteralPath $ProcDirectory) { $unreadable++ }
@@ -90,7 +109,8 @@ function Get-DowserProcessReference {
     }
 
     try {
-        foreach ($argument in [System.IO.File]::ReadAllText((Join-Path $ProcDirectory 'cmdline')).Split([char]0)) {
+        $argumentList = @([System.IO.File]::ReadAllText((Join-Path $ProcDirectory 'cmdline')).Split([char]0))
+        foreach ($argument in $argumentList) {
             & $keepIfUnderRoot $argument
         }
     }
@@ -111,5 +131,34 @@ function Get-DowserProcessReference {
         if (Test-Path -LiteralPath $ProcDirectory) { $unreadable++ }
     }
 
-    return [pscustomobject]@{ Paths = @($held); Unreadable = $unreadable }
+    $seat = $null
+    $startKnown = $false
+    $startUtc = $null
+    if ($SeatName.Count -gt 0) {
+        # a deleted executable reads as 'name (deleted)', and a launcher may add .exe or .js
+        $programName = {
+            param($path)
+            if ([string]::IsNullOrEmpty($path)) { return '' }
+            $live = $path -replace ' \(deleted\)$', ''
+            $leaf = [System.IO.Path]::GetFileName($live)
+            return ($leaf -replace '\.(exe|js)$', '')
+        }
+        $names = @((& $programName ($argumentList | Select-Object -First 1)), (& $programName $exeTarget))
+        foreach ($candidate in $SeatName) {
+            if ($names -contains $candidate) { $seat = $candidate; break }
+        }
+        if ($null -ne $seat -and $PSBoundParameters.ContainsKey('BootTimeUtc')) {
+            $start = Get-DowserProcessStartTime -ProcDirectory $ProcDirectory -BootTimeUtc $BootTimeUtc
+            $startKnown = $start.Success
+            $startUtc = $start.StartUtc
+        }
+    }
+
+    return [pscustomobject]@{
+        Paths          = @($held)
+        Unreadable     = $unreadable
+        SeatName       = $seat
+        SeatStartKnown = $startKnown
+        SeatStartUtc   = $startUtc
+    }
 }

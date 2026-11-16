@@ -15,7 +15,7 @@ function Invoke-DowserCacheRetention {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
         Alias: Invoke-CacheRetention (opt-in via Enable-DowserAliases)
-        Related: Measure-DowserDirectory (the sizing this command reuses), Measure-DowserDiskUsage
+        Related: Measure-DowserDirectory (per-folder freshness and size rows), Measure-DowserDiskUsage
         (what is eating the space under a folder)
 
     .DESCRIPTION
@@ -23,13 +23,20 @@ function Invoke-DowserCacheRetention {
 
         A VersionedCache rule covers <Root>/<marketplace>/<plugin>/<version> folders. A version
         is kept when it is the installPath named in the rule's installed_plugins.json, when a
-        running process has it as its working directory, executable, open file, mapped file or
-        command line argument, when it is one of the newest KeepNewest versions by dotted
-        number, when it is a symlink (a link is never followed or removed), when its version is
-        not a dotted number, or when a file in it was written inside the rule's QuietMinutes.
-        When the installed manifest or the process scan cannot be read, nothing is removed for
-        that run, because nothing can be shown to be unused. A folder whose size cannot be
-        measured is also kept.
+        running process has it as its working directory, executable, open file, mapped file,
+        command line argument or environment value (InUse), when a running seat started on it
+        (InUseByStart), when it is one of the newest KeepNewest versions by dotted number, when
+        it is a symlink or sits under a symlinked marketplace or plugin folder (a link is never
+        followed or removed), when its version is not a dotted number, or when a file in it was
+        written inside the rule's QuietMinutes. When the installed manifest or the process scan
+        cannot be read, nothing is removed for that run, because nothing can be shown to be
+        unused. A folder whose size cannot be measured is also kept.
+
+        A seat is a running process named in the rule's SeatProcessNames, such as claude. It
+        reads its plugin files into memory when it starts and keeps none open, so only its start
+        time shows what it loaded: the newest version the cache held at that moment and the next
+        older one are kept. A seat whose start time cannot be read keeps every version of that
+        plugin.
 
         A DiskThreshold rule reports when free space on the filesystem holding its Path is below
         MinFree. It never removes anything itself; it reads the space after any removal in the
@@ -40,7 +47,8 @@ function Invoke-DowserCacheRetention {
         marked Remove, each behind ShouldProcess, so -WhatIf and -Confirm work. Immediately
         before deleting, the process scan is repeated and a folder a process now holds is kept.
 
-        Sizes come from Measure-DowserDirectory. Every decision and removal is logged through
+        Only the folders marked Remove are sized, with the same file statistics Measure-DowserDirectory
+        uses. Every decision and removal is logged through
         Write-Log, and the result carries an ExitCode built from the mapped Windows error codes:
         0 when nothing failed and no threshold was breached, otherwise the highest code among
         the failures (112, disk full, for a breached threshold).
@@ -175,6 +183,8 @@ function Invoke-DowserCacheRetention {
     foreach ($rule in $rules) { $rulesByName[$rule.Name] = $rule }
     $versioned = @($rules | Where-Object { $_.Type -eq 'VersionedCache' })
     $roots = @($versioned | ForEach-Object { $_.Root } | Select-Object -Unique)
+    $prefixes = @($versioned | ForEach-Object { $_.Root; $_.RootAliases } | Where-Object { $_ } | Select-Object -Unique)
+    $seatNames = @($versioned | ForEach-Object { $_.SeatProcessNames } | Where-Object { $_ } | Select-Object -Unique)
     $installedByRule = @{}
 
     $planRule = {
@@ -190,11 +200,11 @@ function Invoke-DowserCacheRetention {
             $installedByRule[$rule.Name] = $manifest
         }
         $manifest = $installedByRule[$rule.Name]
-        Get-DowserCacheVersionPlan -Rule $rule -InstalledPath $manifest.Paths -InstalledKnown $manifest.Success -ProcessPath $scan.Paths -ProcessKnown $scan.Success
+        Get-DowserCacheVersionPlan -Rule $rule -InstalledPath $manifest.Paths -InstalledKnown $manifest.Success -ProcessPath $scan.Paths -ProcessKnown $scan.Success -Seat $scan.Seats
     }
 
     if ($versioned.Count -gt 0) {
-        $scan = Get-DowserActiveProcessPath -RootPrefix $roots
+        $scan = Get-DowserActiveProcessPath -RootPrefix $prefixes -SeatName $seatNames
         if (-not $scan.Success) {
             & $note 'ProcessScan' ($roots -join ';') $scan.ExceptionType "$($scan.Reason): $($scan.Message)" $scan.ExitCode
         }
@@ -231,6 +241,9 @@ function Invoke-DowserCacheRetention {
         }
         if ($candidates.Count -gt 0) {
             Write-Progress -Activity 'Invoke-DowserCacheRetention measuring candidates' -Completed
+            $sizedBytes = [long]0
+            foreach ($row in @($candidates | Where-Object { $null -ne $_.SizeBytes })) { $sizedBytes += [long]$row.SizeBytes }
+            Write-Log "CacheCandidateMeasure sized $($measured) candidate folder(s), $(Format-DowserSize -DataValue $sizedBytes) in total, in $([int]$measureClock.Elapsed.TotalSeconds) second(s)" -Severity Info
         }
 
         foreach ($group in @($folders | Group-Object -Property Rule, Marketplace, Plugin)) {
@@ -240,7 +253,7 @@ function Invoke-DowserCacheRetention {
         }
 
         if ($Remove -and @($folders | Where-Object { $_.Decision -eq 'Remove' }).Count -gt 0) {
-            $fresh = Get-DowserActiveProcessPath -RootPrefix $roots
+            $fresh = Get-DowserActiveProcessPath -RootPrefix $prefixes -SeatName $seatNames
             if (-not $fresh.Success) {
                 & $note 'ProcessScan' ($roots -join ';') $fresh.ExceptionType "$($fresh.Reason): $($fresh.Message)" $fresh.ExitCode
             }

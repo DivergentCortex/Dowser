@@ -1,7 +1,7 @@
 function Measure-DowserCacheCandidate {
     <#
     .SYNOPSIS
-        Sizes one cache version folder with Measure-DowserDirectory and finds its newest file.
+        Sizes one cache version folder and finds its newest file, logging at Verbose only.
     .NOTES
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         -  Author:        Curtis Leggett                                  -
@@ -12,12 +12,11 @@ function Measure-DowserCacheCandidate {
         -  it is not water they seek, but the truth beneath the trees     -
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
-        Measure-DowserDirectory returns one row per immediate subfolder of the folder it is
-        given plus a '.' row for loose files, so the version folder's total is the sum of those
-        rows and its newest file is the latest NewestFileDate. That function skips a subfolder
-        it cannot scan and logs the error, so the row count is checked against the real number
-        of immediate subfolders; a mismatch returns Success false and the folder is treated as
-        unmeasured, never as small.
+        Lists every file under the folder once, without following symlinked folders, and totals
+        them with Measure-DowserFileSet, the same single-pass statistics Measure-DowserDirectory
+        uses. The public command is not called here because it logs an Info start and end pair
+        per call, and a run sizes many folders. A path that cannot be listed returns Success
+        false and the folder is treated as unmeasured, never as small.
     .PARAMETER Path
         The version folder to measure.
     .EXAMPLE
@@ -50,34 +49,34 @@ function Measure-DowserCacheCandidate {
         }
     }
 
-    $expectedFolders = 0
-    $rows = @()
+    $files = @()
+    $skipped = 0
     try {
         Write-Log "Attempting CacheCandidateMeasure on '$Path'" -Severity Verbose
-        $expectedFolders = @([System.IO.Directory]::GetDirectories($Path)).Count
-        $rows = @(Measure-DowserDirectory -Path $Path)
+        if ($PSVersionTable.PSVersion.Major -ge 6) {
+            $scanErrors = $null
+            $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue -ErrorVariable scanErrors)
+            $skipped = @($scanErrors).Count
+        }
+        else {
+            # 5.1 -Recurse follows links, so the pruning walker lists the files
+            $scan = Get-DowserRelativeFileMap -Root $Path
+            $files = @($scan.Map.Values)
+            $skipped = $scan.Errors
+        }
     }
     catch {
         Write-Log "CacheCandidateMeasure failed on '$Path': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
         return (& $outcome $false $null $null $null 'MeasureFailed' $_ (Get-WindowsErrorCode -Exception $_))
     }
-
-    $folderRows = @($rows | Where-Object { $_.Folder -ne '.' })
-    if ($folderRows.Count -ne $expectedFolders) {
-        Write-Log "CacheCandidateMeasure on '$Path' returned $($folderRows.Count) of $expectedFolders subfolder rows, treating the folder as unmeasured" -Severity Warning
-        return (& $outcome $false $null $null $null 'SubfolderRowsMissing' $null (Get-WindowsErrorCode -HResult 0x8007000D))
+    if ($skipped -gt 0) {
+        Write-Log "CacheCandidateMeasure on '$Path' could not read $skipped path(s), treating the folder as unmeasured" -Severity Warning
+        return (& $outcome $false $null $null $null 'UnreadablePaths' $null (Get-WindowsErrorCode -HResult 0x8007000D))
     }
 
-    $size = [long]0
-    $files = 0
-    $newest = $null
-    foreach ($row in $rows) {
-        $size += [long]$row.SizeBytes
-        $files += [int]$row.FileCount
-        if ($row.FileCount -gt 0 -and ($null -eq $newest -or $row.NewestFileDate -gt $newest)) {
-            $newest = $row.NewestFileDate
-        }
-    }
-    Write-Log "CacheCandidateMeasure succeeded on '$Path': $size bytes in $files file(s)" -Severity Verbose
-    return (& $outcome $true $size $files $newest $null $null 0)
+    $reference = Get-Date
+    $stats = Measure-DowserFileSet -Files $files -TodayStart $reference.Date -RecentCutoff $reference
+    $newest = if ($stats.Newest) { $stats.Newest.LastWriteTime } else { $null }
+    Write-Log "CacheCandidateMeasure succeeded on '$Path': $($stats.TotalBytes) bytes in $($stats.FileCount) file(s)" -Severity Verbose
+    return (& $outcome $true $stats.TotalBytes $stats.FileCount $newest $null $null 0)
 }
