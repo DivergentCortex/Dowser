@@ -25,6 +25,7 @@ These functions work identically (or with a platform-equivalent path) on all sup
 - `Find-DowserDuplicate`, `Find-DowserFile`, `Find-DowserModified`, `Find-DowserOrphan`, `Find-DowserDependency`, `Find-DowserScript`, `Find-DowserString`, `Find-DowserRecentLog`
 - `Start-DowserTransfer`, `Remove-DowserTransferSource`
 - `Invoke-DowserFastSearch`, `Invoke-DowserNumericSort`, `Measure-DowserDirectory`, `Measure-DowserDiskUsage`
+- `Invoke-DowserCacheRetention` - the /proc process check is Linux only; Windows and macOS read each process's executable path (and on Windows its command line), which is a reduced check
 - `Get-DowserMap`, `Get-DowserTopology`, `Get-DowserInfo`, `Get-DowserReport`, `Compare-DowserReport`, `Compare-DowserDirectory`
 - `ConvertTo-DowserBase64`
 - `Get-DowserOwnership` - returns Owner/Group/UnixMode plus a PlatformNote on non-Windows (the Shell.Application extended metadata is the Windows-only enrichment)
@@ -290,6 +291,15 @@ These functions emit a warning and return `$null` on non-Windows:
 - Related: `Measure-DowserDirectory` (recursive per-folder freshness and size, no ranking or HTML)
 - Source: Original to Dowser (not ported)
 - Aliases: `Measure-DiskUsage` (opt-in via `Enable-DowserAliases`)
+
+### Invoke-DowserCacheRetention
+
+- Purpose: Prunes stale plugin cache versions by rule and reports low free disk space. Preview is the default; `-Remove` deletes behind ShouldProcess. A version is kept when it is the installPath in installed_plugins.json, is held by a running process (/proc scan on Linux), is one of the newest `KeepNewest`, is a symlink, has no numeric order, or was written inside `QuietMinutes`. When the manifest or the process scan cannot be read, nothing is removed for that rule.
+- Inputs: `ConfigPath` (default `Config/CacheRetentionRules.psd1`), `RuleName`, `Remove`, `Now`, plus `-WhatIf` and `-Confirm`.
+- Outputs: One PSCustomObject: Mode, Success, ExitCode (0, 112 for a breached threshold, or the highest mapped failure code), CandidateCount, CandidateBytes, RemovedCount, FreedBytes, Folders (per version folder: Decision, Reasons, SizeBytes, Removed), DiskChecks, Errors.
+- Related: `Measure-DowserDirectory` (the sizing it reuses), `Measure-DowserDiskUsage`; `Invoke-DowserScheduledRetention.ps1` (repository root, the scheduled entry point) and `deploy/systemd/` (unit text and operator install steps)
+- Source: Original to Dowser (not ported)
+- Aliases: `Invoke-CacheRetention` (opt-in via `Enable-DowserAliases`)
 
 ### Invoke-DowserFastSearch
 

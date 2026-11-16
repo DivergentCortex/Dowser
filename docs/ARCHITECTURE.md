@@ -11,12 +11,14 @@ The module originated as a port of 22 standalone scripts into a single cohesive 
 ```
 Dowser.psd1  -->  Dowser.psm1
                     |
-                    +-- Private/*.ps1    (19 helpers, not exported)
-                    +-- Public/*.ps1     (33 files, one function each, exported)
+                    +-- Private/*.ps1    (32 helpers, not exported)
+                    +-- Public/*.ps1     (35 files, one function each, exported)
                     +-- Aliases/Aliases.ps1  ($DowserAliasMap + Enable-DowserAliases, opt-in, sourced last)
 ```
 
-The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 33 Public/ basenames plus `Compare-DowserReport` and `Enable-DowserAliases` (neither has a Public/ basename, so both are named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 35-name list, not a wildcard.
+The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 35 Public/ basenames plus `Compare-DowserReport` and `Enable-DowserAliases` (neither has a Public/ basename, so both are named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 37-name list, not a wildcard.
+
+Logging is `DivergentCortex.Witness`, imported first by Dowser.psm1 through the project's `_modules` link (`ln -s ~/projects/modules _modules` at the repository root; the link is gitignored and created once per checkout). The loader points Witness at `logs/dowser.module_YYYYMMDD.log` before any helper is dot-sourced, so every function calls `Write-Log` directly.
 
 One function per file in Public. This keeps diffs clean, prevents agents from stomping each other's work, and makes `Get-ChildItem Public` read like a table of contents.
 
@@ -44,7 +46,17 @@ One function per file in Public. This keeps diffs clean, prevents agents from st
 | Select-DowserUniquePath.ps1   | Deduplicates a path list in O(n), preserving first-seen order                                              |
 | Test-DowserHelpers.ps1        | Validation helpers shared across test functions                                                           |
 | Write-DowserJsonRepair.ps1    | Writes a diagnosis-approved repaired copy for Repair-DowserJson (RECORD banners, JSON comments)            |
-| Write-Log.ps1                 | CMTrace-compatible logging with file output and rotation                                                  |
+| Get-WindowsErrorCode.ps1      | Maps an exception or HRESULT to a Windows error code; the exit-code vocabulary for cache retention        |
+| Get-DowserVersionKey.ps1      | Sort key that orders dotted versions numerically; returns nothing for a version with no numeric order     |
+| Get-DowserFilesystemSpace.ps1 | Free and total bytes of the filesystem holding a path (longest mount match on Linux and macOS); shared by Start-DowserTransfer and cache retention |
+| Get-DowserRetentionRule.ps1   | Loads and validates Config/CacheRetentionRules.psd1; a rule that fails validation is rejected, never widened |
+| Get-DowserInstalledPluginPath.ps1 | Reads the installPath of every plugin in installed_plugins.json                                       |
+| Get-DowserProcessReference.ps1 | Reads one /proc/pid folder (cwd, exe, descriptors, maps, cmdline, environ) for strings under given roots |
+| Get-DowserActiveProcessPath.ps1 | Collects the cache paths held by every running process through Get-DowserProcessReference               |
+| Get-DowserCacheVersionPlan.ps1 | Lists version folders for a rule and decides Keep or Remove, with the reasons                            |
+| Measure-DowserCacheCandidate.ps1 | Sizes one version folder through Measure-DowserDirectory and refuses a result with missing subfolder rows |
+| Remove-DowserCacheVersion.ps1 | Deletes one version folder after re-checking depth under the rule root and that it is not a symlink       |
+| Test-DowserDiskThreshold.ps1  | Checks a DiskThreshold rule against free space                                                            |
 
 Archive-mode rendering for `Get-DowserMap` (auto-detecting a `.zip`/`.7z`/`.rar`/`.tar`/`.gz` `-Path` and rendering its internal contents as a tree) is not in this table: its helpers, `Get-DowserArchiveTreeLines` and `Complete-DowserArchiveMapOutput`, are private functions nested inside `Public/Get-DowserMap.ps1` itself rather than files under `Private/`. See Design decisions below for why, and `docs/INDEX.md`'s Get-DowserMap entry for the feature itself.
 
@@ -105,7 +117,9 @@ Assembly loads that would fail on Linux (System.Drawing in ConvertTo-DowserIco) 
 
 **One function per file.** Enforced by convention and the loader's `Get-ChildItem Public/*.ps1` pattern. The single exception is Compare-DowserReport, which is bundled in Get-DowserReport.ps1 because it is tightly coupled to Get-DowserReport's output schema. It is still a full public export: the loader names it explicitly in `Export-ModuleMember` since it has no Public/ basename, and the manifest lists it.
 
-**No Write-Host in public functions.** All user-facing output uses Write-Verbose, Write-Warning, Write-Information, or Write-Progress. This keeps function output streams clean for pipeline consumers. Find-DowserString uses `Write-Information -InformationAction Continue` for phase banners so users see progress without polluting the output stream.
+**No Write-Host in public functions.** Diagnostics go through `Write-Log` (Witness); data leaves a function as returned objects and long loops report through `Write-Progress`. This keeps function output streams clean for pipeline consumers. Find-DowserString uses `Write-Information -InformationAction Continue` for phase banners so users see progress without polluting the output stream.
+
+**Cache retention is rule-driven and preview-first.** `Invoke-DowserCacheRetention` reads `Config/CacheRetentionRules.psd1`. A VersionedCache rule covers `<Root>/<marketplace>/<plugin>/<version>`; a version is kept when it is the manifest's installPath, is held by a running process (/proc on Linux; a reduced executable-path check elsewhere), is one of the newest KeepNewest, is a symlink, has no numeric order, or was written inside QuietMinutes. If the installed manifest or the process scan cannot be read, the run removes nothing for it. A DiskThreshold rule only reports. Sizes come from Measure-DowserDirectory. Removal is behind `-Remove` and ShouldProcess, and the process scan is repeated just before deleting. `Invoke-DowserScheduledRetention.ps1` at the repository root is the scheduled entry point (one run, one exit code); `deploy/systemd/` carries the unit text and operator install steps. The command is serial because it has no per-item worker pool: the work is a bounded handful of folders sized one at a time, with Write-Progress and an ETA on the sizing and removal loops.
 
 **Pattern parameters auto-wrap.** Bare strings passed to `-Pattern` or `-Filter` parameters that lack wildcard characters get wrapped in `*...*` before being passed to `Get-ChildItem -Filter`. This prevents the silent "zero results" failure when users pass a substring expecting a contains-match but the underlying API requires exact wildcard syntax.
 
