@@ -14,7 +14,7 @@ Import-Module ./Dowser/Dowser.psd1 -Force
 Get-Command -Module Dowser
 ```
 
-No external dependencies on Windows. On Linux and macOS the archive functions want `7z` on PATH (install p7zip-full or whatever your distro calls it).
+Logging comes from the DivergentCortex.Witness module, loaded through a `_modules` link at the repository root. Create it once per checkout: `ln -s ~/projects/modules _modules` (the link is gitignored). Otherwise there are no external dependencies on Windows. On Linux and macOS the archive functions want `7z` on PATH (install p7zip-full or whatever your distro calls it).
 
 ## Quick start
 
@@ -46,7 +46,7 @@ Export-DowserJsonCsv -Path ./exports/events.jsonl -OutputPath ./events.csv
 
 ## What it does
 
-Thirty-six commands, grouped by the question they answer.
+Thirty-seven commands, grouped by the question they answer.
 
 **Find things.** `Find-DowserFile` is a multi-threaded search by attribute, size, and date. `Find-DowserString` runs multi-pattern text search with Aho-Corasick matching; `Invoke-DowserFastSearch` is the single-pattern parallel variant. `Find-DowserDuplicate` catches duplicates by name, size, or chunked hash. `Find-DowserModified` pulls files changed on a given date, `Find-DowserRecentLog` grabs the newest log in a directory, and `Find-DowserScript` walks a tree for script files by type.
 
@@ -59,6 +59,8 @@ Thirty-six commands, grouped by the question they answer.
 **Convert and tuck away.** `ConvertTo-DowserBase64` moves images to and from Base64. `ConvertTo-DowserExe` wraps a PowerShell script in a C# EXE, `ConvertTo-DowserIco` builds .ico files from images, and `Expand-DowserExe` pulls files out of extractable EXE archives. `New-DowserHiddenFolder` hides a directory the right way per platform (NTFS Hidden plus System on Windows, a leading-dot rename on Linux and macOS). `Invoke-DowserNumericSort` sorts naturally, so Item-2 lands before Item-10. `Get-DowserInfo` reports the module version and latest changelog entry; `Get-DowserTemplate` reads Explorer folder-template configs on Windows.
 
 **Move files safely.** `Start-DowserTransfer` copies files or directories to a destination, hashing every file before and after the copy and reporting it migrated only on a match; a real run writes a JSON verification manifest, though ManifestPath comes back $null if that write itself fails (disk full, permissions). `Remove-DowserTransferSource` takes that manifest and deletes only the entries it verified, re-hashing the destination immediately before each delete. It never runs on its own as a side effect of the transfer.
+
+**Keep a plugin cache lean.** `Invoke-DowserCacheRetention` applies the rules in `Config/CacheRetentionRules.psd1` to the Claude and Codex plugin caches: it keeps the installed version, any version a running process holds, the newest two, symlinks and anything written in the last hour, and lists the rest with sizes. Preview is the default; `-Remove` deletes behind `-WhatIf`/`-Confirm`. A free-space rule reports when a filesystem falls below its minimum. `Invoke-DowserScheduledRetention.ps1` is the scheduled entry point, and `deploy/systemd/README.md` has the operator install steps for the timer.
 
 **Make sense of JSON exports.** `Get-DowserJsonKey` streams JSON and JSONL files token by token to report key paths and occurrence counts, and with `-Compare` groups a whole directory by schema, naming the dominant layout and every variant; `-Validation` classifies each key's file coverage from AlwaysPresent down to Rare. `Export-DowserJsonCsv` writes scalar values out as a long-form CSV without loading a full document. `Test-DowserJson` diagnoses a file before you touch it: valid JSON, valid JSONL, comment-bearing, a Dowser RECORD banner, tagged transcript text, or a parser error. `Repair-DowserJson` acts on that diagnosis, writing a repaired copy only for the deterministic cases (RECORD banners, JSON comments) and never guessing at anything else. `Export-DowserJsonAssessment` runs the `-Compare` scan once and writes it straight to three CSV reports: directory summary, schema profiles, and key-validation coverage.
 
@@ -86,6 +88,9 @@ Dowser.psm1            Loader: dot-sources Private, Public, Aliases
 Public/                Exported functions, one per file
 Private/               Internal helpers, not exported
 Aliases/Aliases.ps1    Enable-DowserAliases, the opt-in alias set
+Config/                Cache retention rules
+deploy/systemd/        Timer and service units for scheduled retention, with install steps
+Invoke-DowserScheduledRetention.ps1  Scheduled retention entry point
 Tests/                 Pester suites and the test runner
 docs/                  Architecture, index, changelog
 ```
