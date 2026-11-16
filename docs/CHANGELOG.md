@@ -2,6 +2,57 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.16.307] - Module version set to the final slot; loader reports an import failure through Write-Log
+Module version set to the final slot; loader reports an import failure through Write-Log
+
+Dowser.psd1 ModuleVersion is now 2026.11.16.306, the slot of the last entry for the cache retention work. Dowser.psm1 logs a helper or public file that fails to dot-source with Write-Log at Error, carrying the exception type, line and message, instead of Write-Error.
+
+Files: Dowser.psd1, Dowser.psm1.
+
+## [2026.11.16.306] - Cache retention documentation, shared free-space helper for transfers
+Cache retention documentation, shared free-space helper for transfers
+
+README, INDEX and ARCHITECTURE describe Invoke-DowserCacheRetention, the scheduled entry script and the deploy/systemd units. ARCHITECTURE's Private table drops the retired Write-Log.ps1 row, lists the cache retention helpers, and states the real file counts (32 Private helpers, 35 Public files, 37 exported names). The README install section names the `_modules` link that Witness needs, and the ARCHITECTURE Write-Host note now points diagnostics at Write-Log.
+
+Start-DowserTransfer reads destination free space through Get-DowserFilesystemSpace instead of its own copy of the mount-matching code, so the transfer and the retention command measure space one way.
+
+Files: docs/README.md, docs/INDEX.md, docs/ARCHITECTURE.md, Public/Start-DowserTransfer.ps1.
+
+## [2026.11.16.305] - Scheduled retention entry script, systemd install notes, and environment-held cache versions
+Scheduled retention entry script, systemd install notes, and environment-held cache versions
+
+Invoke-DowserScheduledRetention.ps1 is the one entry point the timer runs: it imports Witness and Dowser, writes logs/dowser.cache.retention_YYYYMMDD.log, calls Invoke-DowserCacheRetention without prompting (with -Remove only when asked) and exits once with the command's ExitCode. deploy/systemd/README.md lists the operator steps to install, run, remove and change the schedule; nothing in the repository installs or enables the units.
+
+Get-DowserProcessReference now also reads /proc/<pid>/environ, so a version folder that a running seat or its children carry in an environment variable is kept as in use. Invoke-DowserCacheRetention logs one keep/remove line per plugin after sizing, so each line carries the sizes of the folders to be removed.
+
+Files: Invoke-DowserScheduledRetention.ps1, deploy/systemd/README.md, Private/Get-DowserProcessReference.ps1, Public/Invoke-DowserCacheRetention.ps1.
+
+## [2026.11.16.304] - Invoke-DowserCacheRetention prunes stale plugin cache versions by rule and reports low disk space
+Invoke-DowserCacheRetention prunes stale plugin cache versions by rule and reports low disk space
+
+New public command `Invoke-DowserCacheRetention` (alias `Invoke-CacheRetention`, opt-in with Enable-DowserAliases). It applies the rules in `Config/CacheRetentionRules.psd1`: for each `<Root>/<marketplace>/<plugin>/<version>` folder of the Claude plugin cache (myelindrite, cortex-toolbox, career-vulture) and the Codex plugin cache copy it keeps the version named as installPath in installed_plugins.json, every version a running process has as its working directory, executable, open file, mapped file or argument, the newest two by dotted version number, symlinks (never followed or removed), versions with no numeric order, and any version with a file written in the last hour. A DiskThreshold rule reports when free space on a filesystem is below its minimum.
+
+Preview is the default and lists each folder, its decision, its size from Measure-DowserDirectory and the total removal would free. `-Remove` deletes the stale folders, each behind ShouldProcess (`-WhatIf`, `-Confirm`), after repeating the process scan. When the installed manifest or the process scan cannot be read, or a folder cannot be measured, nothing is removed for it. Progress with an ETA is shown while measuring and removing, every decision and removal is logged through Witness, and the result carries an ExitCode mapped through Get-WindowsErrorCode (0, 112 for a breached threshold, or the highest failure code).
+
+Private helpers added: Get-DowserCacheVersionPlan, Measure-DowserCacheCandidate, Remove-DowserCacheVersion, Test-DowserDiskThreshold. Get-DowserRetentionRule reports a missing rule file as exit code 2.
+
+Tests: Tests/Invoke-DowserCacheRetention.Tests.ps1, 21 cases against a fixture tree in the temp folder, including a running process holding a version, a link out of a removed folder (the canary file survives), -WhatIf, an unreadable manifest, and both threshold outcomes.
+
+Files: Public/Invoke-DowserCacheRetention.ps1, Private/Get-DowserCacheVersionPlan.ps1, Private/Measure-DowserCacheCandidate.ps1, Private/Remove-DowserCacheVersion.ps1, Private/Test-DowserDiskThreshold.ps1, Private/Get-DowserRetentionRule.ps1, Private/Get-DowserActiveProcessPath.ps1, Aliases/Aliases.ps1, Dowser.psd1, Tests/Invoke-DowserCacheRetention.Tests.ps1.
+
+## [2026.11.16.303] - Cache retention foundations: rule file, private helpers and systemd units
+Cache retention foundations: rule file, private helpers and systemd units
+
+First pieces of the scheduled plugin cache retention work. Nothing here runs yet; the command that uses them follows.
+
+Config/CacheRetentionRules.psd1 holds the rule set: the Claude plugin cache (myelindrite, cortex-toolbox, career-vulture under ~/.claude/plugins/cache/divergentcortex), the Codex plugin cache copy, and a free-space threshold on the root filesystem. deploy/systemd carries the service and timer unit text for a six-hourly run; they are not installed or enabled.
+
+Private helpers, each returning a structured result with a mapped exit code and no throw: Get-DowserRetentionRule (loads and validates the rule file, rejects a plugin or marketplace name that is not a single folder name), Get-DowserInstalledPluginPath (installPath values from installed_plugins.json), Get-DowserActiveProcessPath and Get-DowserProcessReference (every path under the cache that a running process has as its working directory, executable, open descriptor, mapped file or argument, read from /proc on Linux), Get-DowserFilesystemSpace (free bytes on the mount holding a path), Get-DowserVersionKey (numeric order for dotted versions) and Get-WindowsErrorCode (the exit-code mapper, file-system subset).
+
+Dowser.psm1 now imports Witness without -Force so a caller that already loaded Witness keeps one shared log state. Test-DowserPlatformGuards.Tests.ps1 points each test at its own log file through that shared Witness.
+
+Files: Config/CacheRetentionRules.psd1, deploy/systemd/dowser-cache-retention.service, deploy/systemd/dowser-cache-retention.timer, Private/Get-WindowsErrorCode.ps1, Private/Get-DowserVersionKey.ps1, Private/Get-DowserFilesystemSpace.ps1, Private/Get-DowserRetentionRule.ps1, Private/Get-DowserInstalledPluginPath.ps1, Private/Get-DowserProcessReference.ps1, Private/Get-DowserActiveProcessPath.ps1, Dowser.psm1, Tests/Test-DowserPlatformGuards.Tests.ps1.
+
 ## [2026.11.16.302] - Dowser logs through DivergentCortex.Witness instead of a local Write-Log copy
 Dowser logs through DivergentCortex.Witness instead of a local Write-Log copy
 

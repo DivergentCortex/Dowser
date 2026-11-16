@@ -28,6 +28,7 @@ $DowserAliasMap = [ordered]@{
     'dfast'                 = 'Invoke-DowserFastSearch'
     'Invoke-FastSearch'     = 'Invoke-DowserFastSearch'
     'Invoke-NumericSort'    = 'Invoke-DowserNumericSort'
+    'Invoke-CacheRetention' = 'Invoke-DowserCacheRetention'
     'Measure-Directory'     = 'Measure-DowserDirectory'
     'Measure-DiskUsage'     = 'Measure-DowserDiskUsage'
     'New-HiddenFolder'      = 'New-DowserHiddenFolder'
