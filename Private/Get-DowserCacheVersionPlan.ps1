@@ -44,7 +44,8 @@ function Get-DowserCacheVersionPlan {
 
         Returns one row per version folder with its keep or remove decision.
     .OUTPUTS
-        PSCustomObject with Success, Rows, Reason, ExceptionType, Message, ExitCode.
+        PSCustomObject with Success, Rows, BirthFailure (the failed Get-DowserFolderBirthTime
+        result, or null), Reason, ExceptionType, Message, ExitCode.
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -81,6 +82,7 @@ function Get-DowserCacheVersionPlan {
 
     $rows = [System.Collections.Generic.List[object]]::new()
     $firstFailure = $null
+    $birthFailure = $null
 
     foreach ($marketplace in $Rule.Marketplaces) {
         foreach ($plugin in $Rule.Plugins) {
@@ -106,7 +108,9 @@ function Get-DowserCacheVersionPlan {
             # creation times only matter when a seat is running
             $births = @{}
             if ($ruleSeats.Count -gt 0) {
-                $births = (Get-DowserFolderBirthTime -Path @($versionFolders | ForEach-Object { $_.FullName })).Births
+                $birthRead = Get-DowserFolderBirthTime -Path @($versionFolders | ForEach-Object { $_.FullName })
+                $births = $birthRead.Births
+                if (-not $birthRead.Success -and $null -eq $birthFailure) { $birthFailure = $birthRead }
             }
 
             $pluginRows = foreach ($folder in $versionFolders) {
@@ -167,6 +171,7 @@ function Get-DowserCacheVersionPlan {
     return [pscustomobject]@{
         Success       = -not $failed
         Rows          = $rows.ToArray()
+        BirthFailure  = $birthFailure
         Reason        = if ($failed) { 'VersionListFailed' } else { $null }
         ExceptionType = if ($failed) { $firstFailure.Exception.GetType().Name } else { $null }
         Message       = if ($failed) { $firstFailure.Exception.Message } else { $null }

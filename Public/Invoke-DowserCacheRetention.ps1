@@ -208,10 +208,15 @@ function Invoke-DowserCacheRetention {
         if (-not $scan.Success) {
             & $note 'ProcessScan' ($roots -join ';') $scan.ExceptionType "$($scan.Reason): $($scan.Message)" $scan.ExitCode
         }
+        $birthNoted = $false
         foreach ($rule in $versioned) {
             $plan = & $planRule $rule $scan
             if (-not $plan.Success) {
                 & $note 'CacheVersionList' $rule.Root $plan.ExceptionType "$($plan.Reason): $($plan.Message)" $plan.ExitCode
+            }
+            if ($null -ne $plan.BirthFailure -and -not $birthNoted) {
+                $birthNoted = $true
+                & $note 'FolderBirthRead' $rule.Root $plan.BirthFailure.ExceptionType "$($plan.BirthFailure.Reason): $($plan.BirthFailure.Message)" $plan.BirthFailure.ExitCode
             }
             foreach ($row in $plan.Rows) { $folders.Add($row) }
         }
