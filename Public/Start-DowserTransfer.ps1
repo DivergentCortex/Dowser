@@ -200,24 +200,13 @@ function Start-DowserTransfer {
             return (& $emptyResult $resolvedDestination $transferItems.Count $totalBytes)
         }
 
-        try {
-            if ($IsWindows -eq $false) {
-                $matchedDrive = [System.IO.DriveInfo]::GetDrives() | Where-Object {
-                    $mountRoot = $_.RootDirectory.FullName.TrimEnd('/')
-                    $resolvedDestination -eq $mountRoot -or $resolvedDestination.StartsWith("$mountRoot/", [System.StringComparison]::Ordinal)
-                } | Sort-Object { $_.RootDirectory.FullName.Length } -Descending | Select-Object -First 1
-                $availableBytes = $matchedDrive.AvailableFreeSpace
-            }
-            else {
-                $driveRoot = [System.IO.Path]::GetPathRoot($resolvedDestination)
-                $availableBytes = [System.IO.DriveInfo]::new($driveRoot).AvailableFreeSpace
-            }
-        }
-        catch {
-            Write-Log "Start-DowserTransfer could not resolve free space for '$resolvedDestination': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Error
+        $space = Get-DowserFilesystemSpace -Path $resolvedDestination
+        if (-not $space.Success) {
+            Write-Log "Start-DowserTransfer could not resolve free space for '$resolvedDestination': $($space.Reason): $($space.Message)" -Severity Error
             Write-Log "Ending Start-DowserTransfer"
             return (& $emptyResult $resolvedDestination $transferItems.Count $totalBytes)
         }
+        $availableBytes = $space.FreeBytes
 
         $requiredBytes = [long][Math]::Ceiling($totalBytes * (1 + ($HeadroomPercent / 100)))
         if ($availableBytes -lt $requiredBytes) {

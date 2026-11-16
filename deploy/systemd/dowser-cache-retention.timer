@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Dowser plugin cache retention every six hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:17:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=dowser-cache-retention.service
+
+[Install]
+WantedBy=timers.target

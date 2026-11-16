@@ -1,0 +1,10 @@
+[Unit]
+Description=Dowser plugin cache retention and disk threshold check
+Documentation=file://%h/projects/Dowser/deploy/systemd/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env pwsh -NoProfile -NonInteractive -File %h/projects/Dowser/Invoke-DowserScheduledRetention.ps1 -Remove
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min
