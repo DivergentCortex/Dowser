@@ -13,7 +13,8 @@ function Remove-DowserCacheVersion {
         =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
     .DESCRIPTION
         Refuses a path that is not exactly <Root>/<marketplace>/<plugin>/<version>, a path that
-        is a symlink, and a path that no longer exists. The delete is
+        is a symlink, a path whose marketplace or plugin folder is a symlink (the delete would
+        land outside the cache), and a path that no longer exists. The delete is
         [System.IO.Directory]::Delete with recursion, which removes a link inside the folder
         without following it, so nothing outside the folder is touched. The folder is checked
         gone afterwards. The caller owns the confirmation prompt.
@@ -78,6 +79,14 @@ function Remove-DowserCacheVersion {
     if ($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint -or $null -ne $info.LinkTarget) {
         Write-Log "CacheVersionRemove refused '$Path': it is a symlink" -Severity Warning
         return (& $outcome $false $false 'IsSymlink' $null (Get-WindowsErrorCode -HResult 0x80070005))
+    }
+    $pluginFolder = $info.Parent
+    $marketplaceFolder = $pluginFolder.Parent
+    foreach ($ancestor in @($pluginFolder, $marketplaceFolder)) {
+        if ($ancestor.Attributes -band [System.IO.FileAttributes]::ReparsePoint -or $null -ne $ancestor.LinkTarget) {
+            Write-Log "CacheVersionRemove refused '$Path': its parent folder '$($ancestor.FullName)' is a symlink" -Severity Warning
+            return (& $outcome $false $false 'ParentSymlink' $null (Get-WindowsErrorCode -HResult 0x80070005))
+        }
     }
 
     try {

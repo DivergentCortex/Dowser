@@ -14,12 +14,18 @@ function Get-DowserCacheVersionPlan {
     .DESCRIPTION
         Walks <Root>/<marketplace>/<plugin>/<version> for the rule and gives each version folder
         a row. A row is kept, with the reasons listed, when it is a symlink (never followed or
-        removed), the installPath of an installed plugin, held by a running process, one of the
-        newest KeepNewest versions by dotted number, or a version with no numeric order such as
-        a commit hash. When the installed manifest or the process scan could not be read, every
-        row is kept for that reason, because nothing can be proved unused. A row with no keep
-        reason has Decision Remove. Only folder names and link attributes are read here; sizes
-        are measured later, for removal candidates only.
+        removed), the installPath of an installed plugin, held by a running process (InUse),
+        the version a running seat started on (InUseByStart, from Get-DowserSeatVersionHold),
+        one of the newest KeepNewest versions by dotted number, or a version with no numeric
+        order such as a commit hash. When the installed manifest or the process scan could not
+        be read, every row is kept for that reason, because nothing can be proved unused. A
+        marketplace or plugin folder that is itself a link keeps all its versions (ParentSymlink),
+        because a delete there would reach outside the cache. A row with no keep reason has
+        Decision Remove. Only folder names, link attributes and creation times are read here;
+        sizes are measured later, for removal candidates only.
+
+        A held string names a version when it contains <marketplace>/<plugin>/<version>/, so a
+        process that reached the cache through a link to its root is still matched.
     .PARAMETER Rule
         A VersionedCache rule from Get-DowserRetentionRule.
     .PARAMETER InstalledPath
@@ -30,8 +36,11 @@ function Get-DowserCacheVersionPlan {
         Paths held by running processes.
     .PARAMETER ProcessKnown
         False when the process scan failed.
+    .PARAMETER Seat
+        Running seats from Get-DowserActiveProcessPath, each with Name, StartKnown and StartUtc.
+        Only the seats named in the rule's SeatProcessNames are used.
     .EXAMPLE
-        Get-DowserCacheVersionPlan -Rule $rule -InstalledPath $paths -InstalledKnown $true -ProcessPath $held -ProcessKnown $true
+        Get-DowserCacheVersionPlan -Rule $rule -InstalledPath $paths -InstalledKnown $true -ProcessPath $held -ProcessKnown $true -Seat $seats
 
         Returns one row per version folder with its keep or remove decision.
     .OUTPUTS
@@ -49,8 +58,17 @@ function Get-DowserCacheVersionPlan {
 
         [string[]]$ProcessPath = @(),
 
-        [bool]$ProcessKnown = $true
+        [bool]$ProcessKnown = $true,
+
+        [object[]]$Seat = @()
     )
+
+    $separator = [System.IO.Path]::DirectorySeparatorChar
+    $ruleSeats = @($Seat | Where-Object { $Rule.SeatProcessNames -contains $_.Name })
+    $testLink = {
+        param([System.IO.FileSystemInfo]$info)
+        return [bool]($info.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or ($null -ne $info.LinkTarget)
+    }
 
     $comparer = [System.StringComparer]::Ordinal
     if ($IsWindows -ne $false) {
@@ -73,14 +91,22 @@ function Get-DowserCacheVersionPlan {
             }
 
             $versionFolders = @()
+            $parentIsLink = $false
             try {
                 Write-Log "Attempting CacheVersionList on '$pluginPath'" -Severity Verbose
+                $parentIsLink = (& $testLink ([System.IO.DirectoryInfo]::new($pluginPath))) -or (& $testLink ([System.IO.DirectoryInfo]::new((Join-Path $Rule.Root $marketplace))))
                 $versionFolders = @([System.IO.DirectoryInfo]::new($pluginPath).GetDirectories())
             }
             catch {
                 Write-Log "CacheVersionList failed on '$pluginPath': $($_.Exception.GetType().Name) at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)" -Severity Warning
                 if ($null -eq $firstFailure) { $firstFailure = $_ }
                 continue
+            }
+
+            # creation times only matter when a seat is running
+            $births = @{}
+            if ($ruleSeats.Count -gt 0) {
+                $births = (Get-DowserFolderBirthTime -Path @($versionFolders | ForEach-Object { $_.FullName })).Births
             }
 
             $pluginRows = foreach ($folder in $versionFolders) {
@@ -93,6 +119,7 @@ function Get-DowserCacheVersionPlan {
                     Path           = $folder.FullName
                     IsSymlink      = $isLink
                     LastWriteTime  = $folder.LastWriteTime
+                    BirthUtc       = $births[$folder.FullName]
                     VersionKey     = Get-DowserVersionKey -Version $folder.Name
                     Decision       = 'Keep'
                     Reasons        = [System.Collections.Generic.List[string]]::new()
@@ -107,20 +134,24 @@ function Get-DowserCacheVersionPlan {
 
             $rankable = @($pluginRows | Where-Object { -not $_.IsSymlink -and $null -ne $_.VersionKey } | Sort-Object VersionKey -Descending)
             $newest = @($rankable | Select-Object -First $Rule.KeepNewest)
+            $seatHold = Get-DowserSeatVersionHold -Version @($pluginRows | Where-Object { -not $_.IsSymlink }) -Seat $ruleSeats
 
             foreach ($row in $pluginRows) {
                 if ($row.IsSymlink) { $row.Reasons.Add('Symlink') }
                 elseif ($null -eq $row.VersionKey) { $row.Reasons.Add('UnrankableVersion') }
                 elseif ($newest -contains $row) { $row.Reasons.Add('Newest') }
+                if ($parentIsLink) { $row.Reasons.Add('ParentSymlink') }
                 if ($installed.Contains($row.Path.TrimEnd('/', '\'))) { $row.Reasons.Add('Installed') }
                 if ($ProcessKnown) {
-                    $folderMark = $row.Path.TrimEnd('/', '\') + '/'
+                    $versionMark = $separator + $marketplace + $separator + $plugin + $separator + $row.Version + $separator
                     foreach ($held in $ProcessPath) {
-                        if (($held + '/').IndexOf($folderMark, [System.StringComparison]::Ordinal) -ge 0) {
+                        if (($held + $separator).IndexOf($versionMark, [System.StringComparison]::Ordinal) -ge 0) {
                             $row.Reasons.Add('InUse')
                             break
                         }
                     }
+                    if ($seatHold.AllHeld) { $row.Reasons.Add($seatHold.Reason) }
+                    elseif ($seatHold.HeldVersions -contains $row.Version) { $row.Reasons.Add('InUseByStart') }
                 }
                 else {
                     $row.Reasons.Add('ProcessScanFailed')

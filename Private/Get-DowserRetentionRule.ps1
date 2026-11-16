@@ -18,6 +18,11 @@ function Get-DowserRetentionRule {
         removal run touches. Marketplace and plugin names must be single folder names; a name
         holding a path separator or a dot-only name is rejected so a rule cannot step outside
         its root.
+
+        A VersionedCache rule may also name RootAliases, other spellings of the root that a
+        process can use (a link that resolves into it), and SeatProcessNames, the program names
+        of the seats whose start time decides which versions are still in use. Each defaults to
+        none.
     .PARAMETER ConfigPath
         Path to the rule file.
     .EXAMPLE
@@ -101,12 +106,16 @@ function Get-DowserRetentionRule {
             elseif (@(@($entry.Marketplaces) + @($entry.Plugins) | Where-Object { -not (& $isFolderName $_) }).Count -gt 0) { $problem = 'a Marketplaces or Plugins name is not a single folder name' }
             elseif ($keep -isnot [int] -or $keep -lt 1 -or $keep -gt 100) { $problem = 'KeepNewest must be a whole number from 1 to 100' }
             elseif ($quiet -isnot [int] -or $quiet -lt 0 -or $quiet -gt 10080) { $problem = 'QuietMinutes must be a whole number from 0 to 10080' }
+            elseif (@($entry.SeatProcessNames | Where-Object { $null -ne $_ -and -not (& $isFolderName $_) }).Count -gt 0) { $problem = 'a SeatProcessNames entry is not a single program name' }
             if (-not $problem) {
                 $manifest = if ($entry.ContainsKey('InstalledManifest') -and $entry.InstalledManifest) { & $expand ([string]$entry.InstalledManifest) } else { $null }
+                $aliases = @($entry.RootAliases | Where-Object { $_ } | ForEach-Object { [System.IO.Path]::GetFullPath((& $expand ([string]$_))) })
                 $rules.Add([pscustomobject]@{
                         Name              = $name
                         Type              = 'VersionedCache'
                         Root              = [System.IO.Path]::GetFullPath((& $expand ([string]$entry.Root)))
+                        RootAliases       = $aliases
+                        SeatProcessNames  = @($entry.SeatProcessNames | Where-Object { $_ })
                         Marketplaces      = @($entry.Marketplaces)
                         Plugins           = @($entry.Plugins)
                         KeepNewest        = $keep
@@ -129,6 +138,8 @@ function Get-DowserRetentionRule {
                         Name              = $name
                         Type              = 'DiskThreshold'
                         Root              = $null
+                        RootAliases       = @()
+                        SeatProcessNames  = @()
                         Marketplaces      = @()
                         Plugins           = @()
                         KeepNewest        = $null

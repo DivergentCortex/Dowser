@@ -69,6 +69,37 @@ BeforeAll {
         }
         [pscustomobject]@{ Base = $base; Root = $root; Plugin = $plugin; Outside = $outside; Manifest = $manifest; Config = $config }
     }
+
+    # a seat as it really is: started once, holds nothing under the cache afterwards, so only its start time places it.
+    # versions 1.0.1 to 1.0.3 exist before the seat starts, 1.0.4 to 1.0.6 after
+    $script:NewSeatFixture = {
+        param([string]$Name, [bool]$WithSeatNames)
+        $base = Join-Path $script:Work $Name
+        $root = Join-Path $base 'cache'
+        $plugin = Join-Path (Join-Path $root 'mk') 'plugS'
+        $null = New-Item -ItemType Directory -Path $plugin -Force
+        $old = (Get-Date).AddDays(-3)
+        $addVersion = {
+            param($version)
+            $folder = Join-Path $plugin $version
+            $null = New-Item -ItemType Directory -Path $folder -Force
+            $file = Join-Path $folder 'a.bin'
+            [System.IO.File]::WriteAllBytes($file, [byte[]]::new(100))
+            (Get-Item -LiteralPath $file).LastWriteTime = $old
+        }
+        foreach ($version in '1.0.1', '1.0.2', '1.0.3') { & $addVersion $version }
+        $seatName = 'dowserseat' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+        $seatProgram = Join-Path $base $seatName
+        $null = New-Item -ItemType SymbolicLink -Path $seatProgram -Target (Get-Command sleep -CommandType Application | Select-Object -First 1).Source
+        $holder = Start-Process -FilePath $seatProgram -ArgumentList '600' -WorkingDirectory $script:Work -PassThru
+        $script:Holders.Add($holder)
+        Start-Sleep -Milliseconds 3500
+        foreach ($version in '1.0.4', '1.0.5', '1.0.6') { & $addVersion $version }
+        $seatLine = if ($WithSeatNames) { "SeatProcessNames = @('$seatName'); " } else { '' }
+        $config = Join-Path $base 'rules.psd1'
+        [System.IO.File]::WriteAllText($config, "@{ Rules = @(@{ Name = 'Seat'; Type = 'VersionedCache'; Root = '$root'; ${seatLine}Marketplaces = @('mk'); Plugins = @('plugS'); KeepNewest = 2; QuietMinutes = 0 }) }")
+        [pscustomobject]@{ Base = $base; Root = $root; Plugin = $plugin; Config = $config; SeatName = $seatName; Holder = $holder }
+    }
 }
 
 AfterAll {
@@ -99,7 +130,7 @@ Describe 'Invoke-DowserCacheRetention preview' -Skip:(-not ($IsWindows -eq $fals
         $script:Run.CandidateCount | Should -Be 2
     }
 
-    It 'sizes the candidates through Measure-DowserDirectory' {
+    It 'sizes the candidates' {
         $script:ByVersion['1.0.1'].SizeBytes | Should -Be 1010
         $script:ByVersion['1.0.4'].SizeBytes | Should -Be 2010
         $script:Run.CandidateBytes | Should -Be 3020
@@ -253,5 +284,164 @@ Describe 'Cache retention helpers' {
 
     It 'maps a breached threshold to ERROR_DISK_FULL through the exit-code mapper' {
         InModuleScope 'Dowser' { Get-WindowsErrorCode -HResult 0x80070070 | Should -Be 112 }
+    }
+
+    It 'ships the claude rule with the ravens link as a root spelling and the seat program names' {
+        $loaded = InModuleScope 'Dowser' { Get-DowserRetentionRule -ConfigPath (Join-Path $script:DowserRoot 'Config/CacheRetentionRules.psd1') }
+        $claude = $loaded.Rules | Where-Object { $_.Name -eq 'ClaudePluginCache' }
+        $codex = $loaded.Rules | Where-Object { $_.Name -eq 'CodexPluginCache' }
+        $claude.SeatProcessNames | Should -Contain 'claude'
+        $claude.RootAliases | Should -Contain (Join-Path $HOME '.claude/ravens/plugins/cache')
+        $codex.SeatProcessNames | Should -Contain 'codex'
+    }
+}
+
+Describe 'Seat version attribution' {
+    BeforeAll {
+        $script:Hold = InModuleScope 'Dowser' {
+            $day0 = [datetime]::new(2026, 1, 1, 0, 0, 0, [System.DateTimeKind]::Utc)
+            $versions = 1..6 | ForEach-Object { [pscustomobject]@{ Version = "1.0.$_"; VersionKey = Get-DowserVersionKey -Version "1.0.$_"; BirthUtc = $day0.AddDays($_) } }
+            $seatAt = { param($days) [pscustomobject]@{ StartKnown = $true; StartUtc = $day0.AddDays($days) } }
+            $unknownBirth = @($versions | ForEach-Object { [pscustomobject]@{ Version = $_.Version; VersionKey = $_.VersionKey; BirthUtc = [datetime]::new(1601, 1, 1) } })
+            @{
+                Middle       = Get-DowserSeatVersionHold -Version $versions -Seat @(& $seatAt 3.5)
+                BeforeAll    = Get-DowserSeatVersionHold -Version $versions -Seat @(& $seatAt 0.5)
+                AfterAll     = Get-DowserSeatVersionHold -Version $versions -Seat @(& $seatAt 30)
+                Two          = Get-DowserSeatVersionHold -Version $versions -Seat @((& $seatAt 1.5), (& $seatAt 4.5))
+                NoSeat       = Get-DowserSeatVersionHold -Version $versions -Seat @()
+                StartUnknown = Get-DowserSeatVersionHold -Version $versions -Seat @((& $seatAt 3.5), [pscustomobject]@{ StartKnown = $false; StartUtc = $null })
+                BirthUnknown = Get-DowserSeatVersionHold -Version $unknownBirth -Seat @(& $seatAt 3.5)
+            }
+        }
+    }
+
+    It 'holds the newest version the cache had at the seat start and the next older one' {
+        $script:Hold.Middle.AllHeld | Should -BeFalse
+        @($script:Hold.Middle.HeldVersions | Sort-Object) | Should -Be @('1.0.2', '1.0.3')
+    }
+
+    It 'holds the oldest version when the seat started before every remaining version' {
+        @($script:Hold.BeforeAll.HeldVersions) | Should -Be @('1.0.1')
+    }
+
+    It 'holds the newest two when the seat started after every version' {
+        @($script:Hold.AfterAll.HeldVersions | Sort-Object) | Should -Be @('1.0.5', '1.0.6')
+    }
+
+    It 'unions the versions of several seats' {
+        @($script:Hold.Two.HeldVersions | Sort-Object) | Should -Be @('1.0.1', '1.0.3', '1.0.4')
+    }
+
+    It 'holds nothing when no seat runs' {
+        $script:Hold.NoSeat.AllHeld | Should -BeFalse
+        @($script:Hold.NoSeat.HeldVersions).Count | Should -Be 0
+    }
+
+    It 'holds every version when a seat start time is unreadable' {
+        $script:Hold.StartUnknown.AllHeld | Should -BeTrue
+        $script:Hold.StartUnknown.Reason | Should -Be 'SeatStartUnknown'
+    }
+
+    It 'holds every version when a folder has no usable creation time' {
+        $script:Hold.BirthUnknown.AllHeld | Should -BeTrue
+        $script:Hold.BirthUnknown.Reason | Should -Be 'BirthTimeUnknown'
+    }
+}
+
+Describe 'Invoke-DowserCacheRetention running seats' -Skip:(-not ($IsWindows -eq $false -and $IsMacOS -ne $true)) {
+    It 'keeps the version a seat started on and the one before it, although both are older than the newest two' {
+        $fx = & $script:NewSeatFixture 'seat' $true
+        $run = Invoke-DowserCacheRetention -ConfigPath $fx.Config
+        $byVersion = @{}
+        foreach ($row in $run.Folders) { $byVersion[$row.Version] = $row }
+        @($run.Folders | Where-Object { $_.Decision -eq 'Remove' } | ForEach-Object { $_.Version } | Sort-Object) | Should -Be @('1.0.1', '1.0.4')
+        $byVersion['1.0.3'].Reasons | Should -Contain 'InUseByStart'
+        $byVersion['1.0.2'].Reasons | Should -Contain 'InUseByStart'
+        $byVersion['1.0.5'].Reasons | Should -Contain 'Newest'
+    }
+
+    It 'marks the seat versions for removal when the rule names no seat' {
+        $fx = & $script:NewSeatFixture 'noseat' $false
+        $run = Invoke-DowserCacheRetention -ConfigPath $fx.Config
+        @($run.Folders | Where-Object { $_.Decision -eq 'Remove' } | ForEach-Object { $_.Version } | Sort-Object) | Should -Be @('1.0.1', '1.0.2', '1.0.3', '1.0.4')
+    }
+
+    It 'deletes only the versions no seat started on in a real removal' {
+        $fx = & $script:NewSeatFixture 'seatremove' $true
+        $run = Invoke-DowserCacheRetention -ConfigPath $fx.Config -Remove -Confirm:$false
+        $run.RemovedCount | Should -Be 2
+        foreach ($gone in '1.0.1', '1.0.4') { Test-Path -LiteralPath (Join-Path $fx.Plugin $gone) | Should -BeFalse }
+        foreach ($kept in '1.0.2', '1.0.3', '1.0.5', '1.0.6') { Test-Path -LiteralPath (Join-Path $fx.Plugin $kept) | Should -BeTrue -Because "$kept must survive" }
+    }
+
+    It 'reports a running seat from the process scan with its start time' {
+        $fx = & $script:NewSeatFixture 'seatscan' $true
+        $scan = InModuleScope 'Dowser' -Parameters @{ Root = $fx.Root; Name = $fx.SeatName } -ScriptBlock { param($Root, $Name) Get-DowserActiveProcessPath -RootPrefix $Root -SeatName $Name }
+        @($scan.Seats).Count | Should -Be 1
+        $scan.Seats[0].StartKnown | Should -BeTrue
+        $scan.Seats[0].StartUtc | Should -BeLessThan ([datetime]::UtcNow)
+        $scan.Seats[0].StartUtc | Should -BeGreaterThan ([datetime]::UtcNow.AddMinutes(-5))
+    }
+
+    It 'matches a process that names a version through a link to the cache root' {
+        $fx = & $script:NewFixture 'alias'
+        $alias = Join-Path $fx.Base 'viaalias'
+        $null = New-Item -ItemType SymbolicLink -Path $alias -Target $fx.Root
+        $viaLink = Join-Path (Join-Path (Join-Path $alias 'mk') 'plugA') '1.0.1'
+        $start = [System.Diagnostics.ProcessStartInfo]::new('sh')
+        foreach ($argument in @('-c', 'while :; do sleep 1; done', 'dowserholder', $viaLink)) { $start.ArgumentList.Add($argument) }
+        $script:Holders.Add([System.Diagnostics.Process]::Start($start))
+        $withAlias = Join-Path $fx.Base 'alias-rules.psd1'
+        [System.IO.File]::WriteAllText($withAlias, "@{ Rules = @(@{ Name = 'Alias'; Type = 'VersionedCache'; Root = '$($fx.Root)'; RootAliases = @('$alias'); Marketplaces = @('mk'); Plugins = @('plugA'); KeepNewest = 2; InstalledManifest = '$($fx.Manifest)'; QuietMinutes = 60 }) }")
+        $matched = Invoke-DowserCacheRetention -ConfigPath $withAlias
+        $without = Invoke-DowserCacheRetention -ConfigPath $fx.Config
+        ($matched.Folders | Where-Object { $_.Version -eq '1.0.1' }).Reasons | Should -Contain 'InUse'
+        ($without.Folders | Where-Object { $_.Version -eq '1.0.1' }).Decision | Should -Be 'Remove'
+    }
+
+    It 'reads the birth time of a folder whose modification time was set back' {
+        $folder = Join-Path $script:Work 'birthcheck'
+        $null = New-Item -ItemType Directory -Path $folder -Force
+        (Get-Item -LiteralPath $folder).LastWriteTime = [datetime]::new(2001, 1, 1)
+        [System.IO.DirectoryInfo]::new($folder).CreationTimeUtc | Should -BeLessThan ([datetime]::UtcNow.AddYears(-10)) -Because '.NET reports the earlier of birth and write time'
+        $result = InModuleScope 'Dowser' -Parameters @{ Folder = $folder } -ScriptBlock { param($Folder) Get-DowserFolderBirthTime -Path $Folder }
+        $result.Success | Should -BeTrue
+        $result.Births[$folder] | Should -BeGreaterThan ([datetime]::UtcNow.AddMinutes(-5))
+    }
+}
+
+Describe 'Invoke-DowserCacheRetention symlinked parent folders' -Skip:(-not ($IsWindows -eq $false -and $IsMacOS -ne $true)) {
+    BeforeAll {
+        $base = Join-Path $script:Work 'parentlink'
+        $script:Target = Join-Path (Join-Path $base 'real') 'mk'
+        $script:LinkedRoot = Join-Path $base 'cache'
+        $old = (Get-Date).AddDays(-3)
+        foreach ($version in '1.0.1', '1.0.2', '1.0.3') {
+            $folder = Join-Path (Join-Path $script:Target 'plugA') $version
+            $null = New-Item -ItemType Directory -Path $folder -Force
+            $file = Join-Path $folder 'a.bin'
+            [System.IO.File]::WriteAllBytes($file, [byte[]]::new(100))
+            (Get-Item -LiteralPath $file).LastWriteTime = $old
+        }
+        $null = New-Item -ItemType Directory -Path $script:LinkedRoot -Force
+        $null = New-Item -ItemType SymbolicLink -Path (Join-Path $script:LinkedRoot 'mk') -Target $script:Target
+        $script:LinkedConfig = Join-Path $base 'rules.psd1'
+        [System.IO.File]::WriteAllText($script:LinkedConfig, "@{ Rules = @(@{ Name = 'Linked'; Type = 'VersionedCache'; Root = '$($script:LinkedRoot)'; Marketplaces = @('mk'); Plugins = @('plugA'); KeepNewest = 1; QuietMinutes = 0 }) }")
+    }
+
+    It 'keeps every version under a symlinked marketplace folder and removes nothing' {
+        $run = Invoke-DowserCacheRetention -ConfigPath $script:LinkedConfig -Remove -Confirm:$false
+        $run.CandidateCount | Should -Be 0
+        $run.RemovedCount | Should -Be 0
+        foreach ($row in $run.Folders) { $row.Reasons | Should -Contain 'ParentSymlink' }
+        foreach ($version in '1.0.1', '1.0.2', '1.0.3') { Test-Path -LiteralPath (Join-Path (Join-Path $script:Target 'plugA') $version) | Should -BeTrue }
+    }
+
+    It 'refuses to delete beneath a symlinked parent when called directly' {
+        $path = Join-Path (Join-Path (Join-Path $script:LinkedRoot 'mk') 'plugA') '1.0.1'
+        $result = InModuleScope 'Dowser' -Parameters @{ Path = $path; Root = $script:LinkedRoot } -ScriptBlock { param($Path, $Root) Remove-DowserCacheVersion -Path $Path -Root $Root }
+        $result.Success | Should -BeFalse
+        $result.Reason | Should -Be 'ParentSymlink'
+        Test-Path -LiteralPath (Join-Path (Join-Path $script:Target 'plugA') '1.0.1') | Should -BeTrue
     }
 }
