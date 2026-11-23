@@ -28,8 +28,8 @@ Find-DowserString -Path ~/projects -Pattern "TODO"
 # duplicate files, matched by hash not just name
 Find-DowserDuplicate -Path ./src
 
-# render a directory as a tree
-Get-DowserMap -Path . -IncludeSize
+# render a directory as a tree, with sizes and how recently each item changed
+Get-DowserMap -Path . -Show Size, Modified
 
 # corruption and hygiene sweep across a release folder
 Test-DowserIntegrity -Path ./release -Recurse

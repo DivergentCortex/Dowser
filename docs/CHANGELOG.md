@@ -2,6 +2,17 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.23.316] - Get-DowserMap -Show Size, Modified, Count puts sizes and times on every line
+Get-DowserMap -Show Size, Modified, Count puts sizes and times on every line
+
+`-IncludeSize` only annotated folder lines, and the folder you mapped is drawn as a trunk segment with no annotation. Mapping a folder that holds only files therefore showed no sizes at all.
+
+`-Show` replaces `-IncludeSize` and `-IncludeFileCount` (and its `-IncludePsCount` alias) outright. It takes Size, Modified and Count, with tab completion. Size and Modified now appear on every file and folder line, and on the mapped folder's own trunk line. A folder's Modified is its newest file. Count stays on folders.
+
+Folder totals come from Measure-DowserFileSet, and the text from Format-DowserSize and Format-DowserAge. The map's own walk now only collects the in-scope files and hands them over; it no longer keeps its own tally.
+
+Files: Public/Get-DowserMap.ps1, Tests/Get-DowserMap.Tests.ps1 and Tests/Invoke-DowserTestSuite.ps1 moved to -Show, docs/README.md and docs/INDEX.md. Get-DowserMap.Tests.ps1: 70 passed, 0 failed.
+
 ## [2026.11.16.315] - Module version set to the final slot
 ### Module version set to the final slot
 
