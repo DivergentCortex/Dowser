@@ -777,8 +777,8 @@ Add-TestResult -Cmdlet "Get-DowserMap" -TestName "FoldersOnly" `
     }) `
     -Detail "$(if($t3.Error){$t3.Error}else{"$($t3.Result.Count) lines (folders only)"})" -ElapsedMs $t3.ElapsedMs
 
-$t4 = Invoke-Timed { @(Get-DowserMap -Path $smallDir -IncludeSize -MaxDepth 3) }
-Add-TestResult -Cmdlet "Get-DowserMap" -TestName "IncludeSize" `
+$t4 = Invoke-Timed { @(Get-DowserMap -Path $smallDir -Show Size, Modified -MaxDepth 3) }
+Add-TestResult -Cmdlet "Get-DowserMap" -TestName "Show Size and Modified" `
     -Status $(if (-not $t4.Error) {
         'PASS'
     }
