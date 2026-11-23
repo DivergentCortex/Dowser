@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../Script_Mgmt"
+		},
+		{
+			"path": "../Write-Log"
 		}
 	],
 	"settings": {}
