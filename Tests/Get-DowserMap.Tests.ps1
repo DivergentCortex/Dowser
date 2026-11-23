@@ -206,7 +206,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
     Context 'Scan parameters and size rollup' {
         BeforeAll {
-            $script:out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -NoDefaultExcludes
+            $script:out = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -NoDefaultExcludes
         }
 
         It 'Declares MaxDepth, DefaultExcludes, and FoldersOnly' {
@@ -227,7 +227,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             $script:out | Where-Object { $_ -match 'A[\\/]Nested' } | Should -BeNullOrEmpty
         }
 
-        It 'Omits the size rollup when -IncludeSize is not set' {
+        It 'Omits the size rollup when -Show has no Size' {
             $noSizeOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -MaxDepth 1 -EmitSummary
             $noSizeOut | Where-Object { $_ -match 'Total size:' } | Should -BeNullOrEmpty
         }
@@ -248,7 +248,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             [System.IO.File]::WriteAllBytes((Join-Path $normalDir 'small.txt'), (New-Object byte[] 100))
 
             $script:excludeRoot = $excludeRoot
-            $script:excludeOut = Get-DowserMap -Path $excludeRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
+            $script:excludeOut = Get-DowserMap -Path $excludeRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary
         }
 
         AfterAll {
@@ -267,7 +267,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
 
         It 'Also names it in -ShowFullPathTree:$false mode (the other twin filter branch)' {
             # the two render branches filter top-level folders separately, so a fix in one can miss the other
-            $nonTrunkOut = Get-DowserMap -Path $script:excludeRoot -ShowFullPathTree:$false -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
+            $nonTrunkOut = Get-DowserMap -Path $script:excludeRoot -ShowFullPathTree:$false -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary
             $nonTrunkOut | Where-Object { $_ -match '^\s*Total size: 100\.0B$' } | Should -Not -BeNullOrEmpty
             $nonTrunkOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:.*logs' } | Should -Not -BeNullOrEmpty
         }
@@ -288,7 +288,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             [System.IO.File]::WriteAllBytes((Join-Path $secretDir 's1.txt'), (New-Object byte[] 5000))
 
             $script:pathExcludeRoot = $pathExcludeRoot
-            $script:pathExcludeOut = Get-DowserMap -Path $pathExcludeRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secretstuff*'
+            $script:pathExcludeOut = Get-DowserMap -Path $pathExcludeRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secretstuff*'
         }
 
         AfterAll {
@@ -306,7 +306,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
         }
 
         It 'Also names it in -ShowFullPathTree:$false mode (the other twin filter branch)' {
-            $nonTrunkOut = Get-DowserMap -Path $script:pathExcludeRoot -ShowFullPathTree:$false -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secretstuff*'
+            $nonTrunkOut = Get-DowserMap -Path $script:pathExcludeRoot -ShowFullPathTree:$false -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secretstuff*'
             $nonTrunkOut | Where-Object { $_ -match '^\s*Total size: 20\.0B$' } | Should -Not -BeNullOrEmpty
             $nonTrunkOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:.*secretstuff' } | Should -Not -BeNullOrEmpty
         }
@@ -328,7 +328,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             [System.IO.File]::WriteAllBytes((Join-Path $fileExcludeRoot 'normal.txt'), (New-Object byte[] 100))
 
             $script:fileExcludeRoot = $fileExcludeRoot
-            $script:fileExcludeOut = Get-DowserMap -Path $fileExcludeRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
+            $script:fileExcludeOut = Get-DowserMap -Path $fileExcludeRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary
         }
 
         AfterAll {
@@ -352,7 +352,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             [System.IO.File]::WriteAllBytes((Join-Path $pathRoot 'secret.dat'), (New-Object byte[] 5000))
             [System.IO.File]::WriteAllBytes((Join-Path $pathRoot 'normal.txt'), (New-Object byte[] 20))
             try {
-                $out = Get-DowserMap -Path $pathRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secret.dat*'
+                $out = Get-DowserMap -Path $pathRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -ExcludePathPatterns '*secret.dat*'
                 $out | Where-Object { $_ -match '^\s*Total size: 20\.0B$' } | Should -Not -BeNullOrEmpty
                 $out | Where-Object { $_ -match 'Total size excludes filtered top-level files:.*secret\.dat' } | Should -Not -BeNullOrEmpty
             }
@@ -370,7 +370,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             [System.IO.File]::WriteAllBytes((Join-Path $allowlistRoot 'keep.txt'), (New-Object byte[] 20))
             [System.IO.File]::WriteAllBytes((Join-Path $allowlistRoot 'ignore.log'), (New-Object byte[] 9000))
             try {
-                $out = Get-DowserMap -Path $allowlistRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -NoDefaultExcludes -IncludeExtensions '.txt'
+                $out = Get-DowserMap -Path $allowlistRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -NoDefaultExcludes -IncludeExtensions '.txt'
                 $out | Where-Object { $_ -match '^\s*Total size: 20\.0B$' } | Should -Not -BeNullOrEmpty
                 $out | Where-Object { $_ -match 'Total size excludes filtered top-level files:' } | Should -BeNullOrEmpty
             }
@@ -385,7 +385,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             $null = New-Item -ItemType Directory -Path $plainRoot -Force
             [System.IO.File]::WriteAllBytes((Join-Path $plainRoot 'ok.txt'), (New-Object byte[] 10))
             try {
-                $out = Get-DowserMap -Path $plainRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary
+                $out = Get-DowserMap -Path $plainRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary
                 $out | Where-Object { $_ -match 'Total size excludes filtered top-level files:' } | Should -BeNullOrEmpty
             }
             finally {
@@ -420,7 +420,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
             # -IncludeFolders is an opt-in allowlist, so everything outside it is declared
             # absence, not a surprise the summary needs to flag the way a default-exclude or
             # -ExcludeFolders carve-out is
-            $allowlistOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -EmitSummary -IncludeFolders 'A'
+            $allowlistOut = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -Show Size -MaxDepth 1 -EmitSummary -IncludeFolders 'A'
             $allowlistOut | Where-Object { $_ -match 'Total size excludes filtered top-level folders:' } | Should -BeNullOrEmpty
         }
     }
@@ -428,7 +428,7 @@ Describe 'Get-DowserMap summary auto-enable and size rollup' {
     Context 'Markdown summary placement' {
         It 'Places Summary before the fenced tree block and renders the size table' {
             $mdPath = Join-Path $script:outDir 'placement.md'
-            $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -IncludeSize -MaxDepth 1 -AsMarkdown -MarkdownFile $mdPath
+            $null = Get-DowserMap -Path $script:tmpRoot -FoldersOnly -Show Size -MaxDepth 1 -AsMarkdown -MarkdownFile $mdPath
             $content = Get-Content -LiteralPath $mdPath
 
             $summaryIndex = [array]::IndexOf($content, '#### Summary')
@@ -493,8 +493,8 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
             $out | Where-Object { $_ -match '^\s*Files: 3$' } | Should -Not -BeNullOrEmpty
         }
 
-        It 'Reports total size and per-top-level-folder size with -IncludeSize' {
-            $out = Get-DowserMap -Path $script:zipPath -EmitSummary -IncludeSize
+        It 'Reports total size and per-top-level-folder size with -Show Size' {
+            $out = Get-DowserMap -Path $script:zipPath -EmitSummary -Show Size
             # folderA (500) + folderB (100) + rootloose.bin (50) = 650
             $out | Where-Object { $_ -match '^\s*Total size: 650\.0B$' } | Should -Not -BeNullOrEmpty
             $out | Where-Object { $_ -match '500\.0B\s+folderA$' } | Should -Not -BeNullOrEmpty
@@ -566,12 +566,12 @@ Describe 'Get-DowserMap archive-mode summary, output-file, and markdown-file sup
         }
 
         It 'Total size reflects only the non-excluded archive entry' {
-            $out = Get-DowserMap -Path $script:arcFileExcludeZip -EmitSummary -IncludeSize
+            $out = Get-DowserMap -Path $script:arcFileExcludeZip -EmitSummary -Show Size
             $out | Where-Object { $_ -match '^\s*Total size: 100\.0B$' } | Should -Not -BeNullOrEmpty
         }
 
         It 'Names the excluded root-level archive entry, on the file-specific summary line' {
-            $out = Get-DowserMap -Path $script:arcFileExcludeZip -EmitSummary -IncludeSize
+            $out = Get-DowserMap -Path $script:arcFileExcludeZip -EmitSummary -Show Size
             $out | Where-Object { $_ -match 'Total size excludes filtered top-level files:.*settings\.local\.json' } | Should -Not -BeNullOrEmpty
         }
     }
@@ -763,14 +763,14 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         }
 
         It 'Total size does not count loose root files hidden by -IncludeFolders' {
-            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders selected -IncludeSize -EmitSummary -FoldersOnly
+            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders selected -Show Size -EmitSummary -FoldersOnly
             $out | Where-Object { $_ -match '^\s*Total size: 10\.0B$' } | Should -Not -BeNullOrEmpty
         }
 
         It 'A route folder annotates and totals only its in-scope descendants' {
             # outer/ is only the route to outer/inner: its own 300B file and outer/other (500B)
             # are out of scope, so just inner's 40B counts, on the outer/ line and in the total
-            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders 'outer/inner' -IncludeSize -IncludeFileCount -EmitSummary -FoldersOnly
+            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders 'outer/inner' -Show Size, Count -EmitSummary -FoldersOnly
             $out | Where-Object { $_ -match 'outer[\\/] \[40\.0B\] \[1 files\]' } | Should -Not -BeNullOrEmpty
             $out | Where-Object { $_ -match '^\s*Total size: 40\.0B$' } | Should -Not -BeNullOrEmpty
         }
@@ -785,7 +785,7 @@ Describe 'Get-DowserMap -IncludeFolders scoping, -MaxDepth, and parameter bindin
         It 'Default excludes still apply inside an included folder' {
             $null = New-Item -ItemType Directory -Path (Join-Path $script:sizeRoot 'selected/node_modules') -Force
             [System.IO.File]::WriteAllBytes((Join-Path $script:sizeRoot 'selected/node_modules/dep.js'), (New-Object byte[] 999))
-            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders selected -IncludeSize -EmitSummary -MaxDepth 3
+            $out = Get-DowserMap -Path $script:sizeRoot -IncludeFolders selected -Show Size -EmitSummary -MaxDepth 3
             $out | Where-Object { $_ -match 'node_modules' } | Should -BeNullOrEmpty
             $out | Where-Object { $_ -match '^\s*Total size: 10\.0B$' } | Should -Not -BeNullOrEmpty
         }
