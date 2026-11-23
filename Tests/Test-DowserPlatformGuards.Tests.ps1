@@ -28,7 +28,7 @@ BeforeAll {
     $script:ManifestPath = Join-Path $script:ModuleRoot 'Dowser.psd1'
 
     # one Witness instance, shared by the module and these tests, so a test can point every Write-Log at its own file
-    Import-Module (Join-Path $script:ModuleRoot '_modules/ps/DivergentCortex.Witness') -ErrorAction Stop
+    Import-Module (Join-Path (Join-Path $script:ModuleRoot 'Modules') 'DivergentCortex.Witness') -ErrorAction Stop
     Remove-Module Dowser -Force -ErrorAction SilentlyContinue
     Import-Module $script:ManifestPath -Force -ErrorAction Stop
 

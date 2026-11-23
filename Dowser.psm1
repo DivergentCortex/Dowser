@@ -28,7 +28,8 @@
         exports the public command surface.
 #>
 
-Import-Module (Join-Path $PSScriptRoot '_modules/ps/DivergentCortex.Witness')
+# witness ships inside the repo so a plain clone loads with nothing else installed
+Import-Module (Join-Path (Join-Path $PSScriptRoot 'Modules') 'DivergentCortex.Witness')
 
 # 5.1 doesn't know what linux is, bless it, so we hand it $IsWindows/$IsLinux/$IsMacOS
 # on pwsh 6+ those are read-only automatics, hence the version gate and Set-Variable

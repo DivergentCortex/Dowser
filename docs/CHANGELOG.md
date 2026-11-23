@@ -2,6 +2,13 @@
 
 All notable changes to Dowser land here. Format loosely follows Keep a Changelog. Dates ISO-8601.
 
+## [2026.11.23.317] - Witness ships inside the repo, the _modules link is gone
+### Witness ships inside the repo, the _modules link is gone
+
+A clone of Dowser could not load. Dowser.psm1 imported DivergentCortex.Witness through `_modules`, a gitignored symlink to a private modules tree that only exists on the author's machine, so on any other checkout the import failed and every Write-Log call failed after it. The README install step told users to run `ln -s ~/projects/modules _modules`, which no one else can do and which does not work on Windows at all.
+
+The runtime files of Witness (manifest, loader, Public, Private, config and LICENSE) are now committed under `Modules/DivergentCortex.Witness`. Dowser.psm1, Invoke-DowserScheduledRetention.ps1 and the three test files that import Witness directly (Invoke-DowserCacheRetention, Test-DowserLogging, Test-DowserPlatformGuards) load it from there. The `_modules` entry is removed from .gitignore. The README install section and ARCHITECTURE now say Witness comes with the repo and nothing else is needed on Windows.
+
 ## [2026.11.23.316] - Get-DowserMap -Show Size, Modified, Count puts sizes and times on every line
 Get-DowserMap -Show Size, Modified, Count puts sizes and times on every line
 

@@ -18,7 +18,7 @@ Dowser.psd1  -->  Dowser.psm1
 
 The manifest (psd1) points to the root module (psm1). The loader dot-sources Private first (so helpers are available to Public functions), then Public, then Aliases. `Export-ModuleMember` exports the 35 Public/ basenames plus `Compare-DowserReport` and `Enable-DowserAliases` (neither has a Public/ basename, so both are named explicitly), plus all aliases. The manifest's `FunctionsToExport` is an explicit 37-name list, not a wildcard.
 
-Logging is `DivergentCortex.Witness`, imported first by Dowser.psm1 through the project's `_modules` link (`ln -s ~/projects/modules _modules` at the repository root; the link is gitignored and created once per checkout). The loader points Witness at `logs/dowser.module_YYYYMMDD.log` before any helper is dot-sourced, so every function calls `Write-Log` directly.
+Logging is `DivergentCortex.Witness`, imported first by Dowser.psm1 from `Modules/DivergentCortex.Witness`, a copy of the module committed with the repo so a clone needs nothing else installed. Only its runtime files are kept: the manifest, loader, Public, Private, config and LICENSE. The loader points Witness at `logs/dowser.module_YYYYMMDD.log` before any helper is dot-sourced, so every function calls `Write-Log` directly.
 
 One function per file in Public. This keeps diffs clean, prevents agents from stomping each other's work, and makes `Get-ChildItem Public` read like a table of contents.
 

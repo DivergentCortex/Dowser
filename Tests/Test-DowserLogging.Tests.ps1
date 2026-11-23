@@ -9,7 +9,7 @@
     Version:      See docs/CHANGELOG.md
 
 .DESCRIPTION
-    Proves the logging contract of DivergentCortex.Witness, imported through the project _modules link:
+    Proves the logging contract of DivergentCortex.Witness, imported from the copy under Modules/:
     - Dowser's own Write-Log resolves to the Witness module, with no local copy.
     - Initialize-Log creates the file and writes the session-start banner.
     - Bare Write-Log (Info severity) always lands in the log file.
@@ -25,7 +25,7 @@
 BeforeAll {
     $script:ModuleRoot = Split-Path -Parent $PSScriptRoot
 
-    Import-Module (Join-Path $script:ModuleRoot '_modules/ps/DivergentCortex.Witness') -Force -ErrorAction Stop
+    Import-Module (Join-Path (Join-Path $script:ModuleRoot 'Modules') 'DivergentCortex.Witness') -Force -ErrorAction Stop
 
     $script:TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dowserlogltest_" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $script:TempDir -Force | Out-Null

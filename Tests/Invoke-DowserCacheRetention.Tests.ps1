@@ -24,7 +24,7 @@
 
 BeforeAll {
     $script:ModuleRoot = Split-Path -Parent $PSScriptRoot
-    Import-Module (Join-Path $script:ModuleRoot '_modules/ps/DivergentCortex.Witness') -ErrorAction Stop
+    Import-Module (Join-Path (Join-Path $script:ModuleRoot 'Modules') 'DivergentCortex.Witness') -ErrorAction Stop
     Remove-Module Dowser -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $script:ModuleRoot 'Dowser.psd1') -Force -ErrorAction Stop
 

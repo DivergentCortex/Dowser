@@ -33,7 +33,7 @@ param(
     [string]$ConfigPath
 )
 
-Import-Module (Join-Path $PSScriptRoot '_modules/ps/DivergentCortex.Witness')
+Import-Module (Join-Path (Join-Path $PSScriptRoot 'Modules') 'DivergentCortex.Witness')
 . (Join-Path (Join-Path $PSScriptRoot 'Private') 'Get-WindowsErrorCode.ps1')
 
 $script:ExitCode = 0

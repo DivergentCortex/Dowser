@@ -14,7 +14,7 @@ Import-Module ./Dowser/Dowser.psd1 -Force
 Get-Command -Module Dowser
 ```
 
-Logging comes from the DivergentCortex.Witness module, loaded through a `_modules` link at the repository root. Create it once per checkout: `ln -s ~/projects/modules _modules` (the link is gitignored). Otherwise there are no external dependencies on Windows. On Linux and macOS the archive functions want `7z` on PATH (install p7zip-full or whatever your distro calls it).
+Nothing else to install on Windows. Logging comes from [DivergentCortex.Witness](https://github.com/DivergentCortex/Witness), which ships inside the repo under `Modules/` and loads with Dowser. On Linux and macOS the archive functions want `7z` on PATH (install p7zip-full or whatever your distro calls it).
 
 ## Quick start
 
